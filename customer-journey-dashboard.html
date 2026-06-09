@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Journey Dashboard | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <style>
+    body{background:#faf8f4}.dashboard-wrap{max-width:1200px;margin:30px auto;padding:0 18px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.metric{background:#fff;border:1px solid #eadfce;border-radius:18px;padding:20px;box-shadow:0 8px 22px rgba(0,0,0,.05)}.metric strong{display:block;font-size:30px;margin-top:8px}.panel{background:#fff;border:1px solid #eadfce;border-radius:18px;padding:20px;margin-top:18px;overflow:auto}.panel table{width:100%;border-collapse:collapse}.panel th,.panel td{border-bottom:1px solid #eee;padding:10px;text-align:left}.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}.btn{border:0;border-radius:999px;padding:11px 16px;background:#111;color:#fff;text-decoration:none;cursor:pointer}.muted{color:#666}.nav-small{padding:16px 24px;background:#fff;border-bottom:1px solid #eee}.nav-small a{margin-right:14px;color:#111;text-decoration:none;font-weight:600}
+  </style>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+</head>
+<body>
+<div class="ux95-release-ribbon"><span>UX95 Journey Dashboard</span> <small>Tracking events, sources, funnel and wishlist</small></div>
+  <div class="nav-small"><a href="admin.html">Admin</a><a href="financial-dashboard.html">Financials</a><a href="crm.html">CRM</a><a href="shop.html">Shop</a></div>
+  <main class="dashboard-wrap">
+    <div class="toolbar"><div><h1>Customer Journey Dashboard</h1><p class="muted">Tracks UTMs, customer source, pages, funnel events, product interest and abandoned carts.</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="journeyDays" onchange="loadJourney()"><option value="1">Today</option><option value="7">Last 7 Days</option><option value="30">Last 30 Days</option><option value="60">Last 60 Days</option><option value="90">Last 90 Days</option></select><button class="btn" onclick="loadJourney()">Refresh</button></div></div>
+    <div class="cards" id="metrics"></div>
+    <div class="panel"><h2>Funnel Events</h2><table><thead><tr><th>Event</th><th>Events</th><th>Sessions</th></tr></thead><tbody id="funnel"></tbody></table></div>
+    <div class="panel"><h2>Traffic Sources</h2><table><thead><tr><th>Source</th><th>Medium</th><th>Sessions</th><th>Events</th></tr></thead><tbody id="sources"></tbody></table></div>
+    <div class="panel"><h2>Top Pages</h2><table><thead><tr><th>Page</th><th>Views</th><th>Sessions</th></tr></thead><tbody id="pages"></tbody></table></div>
+    <div class="panel"><h2>Top Product Interest</h2><table><thead><tr><th>Product</th><th>Views</th><th>Sessions</th></tr></thead><tbody id="products"></tbody></table></div>
+  </main>
+<script>
+function token(){return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''}
+async function api(path){const r=await fetch(path,{headers:{Authorization:'Bearer '+token()}}); if(!r.ok) throw new Error(await r.text()); return r.json();}
+function rows(id, arr, cols){document.getElementById(id).innerHTML=(arr||[]).map(x=>'<tr>'+cols.map(c=>'<td>'+String(typeof c==='function'?c(x):x[c]??'')+'</td>').join('')+'</tr>').join('')||'<tr><td colspan="4">No data yet</td></tr>';}
+function initialDays(){ const p=new URLSearchParams(location.search); return p.get('days') || localStorage.getItem('cvAnalyticsDays') || '30'; }
+document.addEventListener('DOMContentLoaded',()=>{ const s=document.getElementById('journeyDays'); if(s) s.value=initialDays(); });
+async function loadJourney(){
+  try{
+    const days = document.getElementById('journeyDays')?.value || initialDays();
+    localStorage.setItem('cvAnalyticsDays', days);
+    const d=await api('/api/journey/summary?days=' + encodeURIComponent(days));
+    document.getElementById('metrics').innerHTML=`<div class="metric">Sessions<strong>${d.totals.sessions||0}</strong></div><div class="metric">Events<strong>${d.totals.events||0}</strong></div><div class="metric">Open Abandoned Carts<strong>${d.abandoned.open_carts||0}</strong></div><div class="metric">Period<strong>${d.days} days</strong></div>`;
+    rows('funnel',d.funnel,['event_type','count','sessions']);
+    rows('sources',d.sources,['source','medium','sessions','events']);
+    rows('pages',d.pages,['page_url','views','sessions']);
+    rows('products',d.products,[x=>x.product_name||x.product_id||'Unknown','views','sessions']);
+  }catch(e){alert('Login as Super Admin first, then open this dashboard. '+e.message)}
+}
+loadJourney();
+</script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+</body>
+</html>
