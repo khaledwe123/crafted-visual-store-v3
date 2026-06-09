@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review Order | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2">
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+</head>
+<body>
+<header class="nav">
+  <div class="brand" id="brandText">Crafted Visual</div>
+  <nav><a href="index.html">Continue Shopping</a></nav>
+</header>
+
+<main class="review-page">
+  <div class="cj-checkout-progress"><span class="active">1 Cart</span><span class="active">2 Delivery</span><span>3 Payment</span><span>4 Confirmation</span></div>
+  <h1>Review Your Order</h1>
+  <p>Please review your items before confirming the order.</p>
+  <div id="userBox" class="review-box"></div>
+  <div id="reviewItems"></div>
+
+  <section class="review-box">
+    <h2>Delivery Details</h2>
+    <label>City</label>
+    <select id="city" onchange="updateTotals()" required></select>
+    <textarea id="address" placeholder="Delivery Address"></textarea>
+    <textarea id="notes" placeholder="Order Notes"></textarea>
+  </section>
+
+  <div class="review-total" id="reviewTotal"></div>
+  <div class="review-box discount-code-box">
+    <h3>Discount Code</h3>
+    <p>Add your discount code, then press Apply.</p>
+    <div class="discount-code-row">
+      <input id="checkoutDiscountCode" placeholder="Enter discount code e.g. CV10">
+      <button class="btn secondary" type="button" onclick="applyCheckoutDiscount()">Apply</button>
+    </div>
+    <p id="discountCodeMessage"></p>
+  </div>
+  <button class="btn primary cj-sticky-checkout" onclick="confirmOrder()">Continue to Payment</button>
+  <button class="btn secondary" onclick="location.href='index.html'">Back to Shop</button>
+</main>
+
+<script>
+let settings = {};
+let cities = [];
+const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+const cart = JSON.parse(localStorage.getItem("cart") || sessionStorage.getItem("cart") || "[]");
+
+if(!user){ location.href = "auth.html?return=review.html"; }
+
+async function getJSON(file, fallback){
+  const localKey = file.replace(".json","");
+  const local = localStorage.getItem("cms_" + localKey);
+  if(local) return JSON.parse(local);
+  try { return await fetch(file).then(r=>r.json()); } catch(e){ return fallback; }
+}
+
+async function init(){
+  settings = await getJSON("settings.json", {whatsapp_number:"966500000000", riyadh_delivery:0, outside_riyadh_delivery:400, brand_en:"Crafted Visual"});
+  cities = await getJSON("cities.json", ["Riyadh","Jeddah","Dammam","Khobar"]);
+  document.getElementById("brandText").textContent = settings.brand_en || "Crafted Visual";
+  document.getElementById("city").innerHTML = `<option value="">Select City</option>` + cities.map(c=>`<option>${c}</option>`).join("");
+  render();
+}
+init();
+
+function deliveryBeforeVat(){
+  const city = document.getElementById("city").value;
+  if(!city) return 0;
+  return city === "Riyadh" ? Number(settings.riyadh_delivery || 0) : Number(settings.outside_riyadh_delivery || 400);
+}
+
+function deliveryVat(){
+  return deliveryBeforeVat() * Number(settings.vat_rate || 15) / 100;
+}
+
+function deliveryFee(){
+  return deliveryBeforeVat() + deliveryVat();
+}
+
+function subtotal(){
+  return cart.reduce((sum,item)=>sum + Number(item.price) * Number(item.qty || 1),0);
+}
+
+let appliedDiscount = JSON.parse(localStorage.getItem("appliedDiscount") || "null");
+
+function applyCheckoutDiscount(){
+  const code = document.getElementById("checkoutDiscountCode").value.trim().toUpperCase();
+  const msg = document.getElementById("discountCodeMessage");
+  const codes = JSON.parse(localStorage.getItem("discountCodes") || "[]");
+  const found = codes.find(c=>c.code === code && c.active !== false);
+  if(!found){
+    appliedDiscount = null;
+    localStorage.removeItem("appliedDiscount");
+    msg.textContent = "Invalid discount code.";
+    msg.className = "discount-red";
+    updateTotals();
+    return;
+  }
+  if(found.expiry && new Date(found.expiry) < new Date()){
+    msg.textContent = "Discount code expired.";
+    msg.className = "discount-red";
+    return;
+  }
+  appliedDiscount = found;
+  localStorage.setItem("appliedDiscount", JSON.stringify(found));
+  msg.textContent = `Code applied: ${found.percent}% discount`;
+  msg.className = "discount-price";
+  updateTotals();
+}
+
+function discountAmount(){
+  return appliedDiscount ? subtotal() * Number(appliedDiscount.percent || 0) / 100 : 0;
+}
+
+function updateTotals(){
+  const sub = subtotal();
+  const deliveryBase = deliveryBeforeVat();
+  const deliveryVAT = deliveryVat();
+  const delivery = deliveryFee();
+  const discount = discountAmount();
+  const total = sub - discount + delivery;
+  const city = document.getElementById("city").value;
+  const deliveryText = city === "Riyadh" ? "Free delivery within Riyadh" : `Delivery before VAT: SAR ${deliveryBase.toLocaleString()} | VAT: SAR ${Math.round(deliveryVAT).toLocaleString()} | Delivery incl. VAT: SAR ${Math.round(delivery).toLocaleString()}`;
+  document.getElementById("reviewTotal").innerHTML = `
+    <div>Items Total incl. VAT: SAR ${sub.toLocaleString()}</div>
+    <div class="discount-price">Discount: SAR ${Math.round(discount).toLocaleString()}</div>
+    <div>${city ? deliveryText : "Select city to calculate delivery"}</div>
+    <div>Total: SAR ${Math.round(total).toLocaleString()}</div>
+  `;
+}
+
+function render(){
+  document.getElementById("userBox").innerHTML = `<h2>Customer</h2><p><strong>${user.name}</strong><br>${user.email}<br>${user.mobile}</p>`;
+  if(!cart.length){
+    document.getElementById("reviewItems").innerHTML = "<p>Your cart is empty.</p>";
+    updateTotals();
+    return;
+  }
+  document.getElementById("reviewItems").innerHTML = cart.map(item=>`
+    <div class="review-item">
+      ${item.image ? `<img src="${item.image}">` : ""}
+      <div>
+        <h3>${item.name}</h3>
+        <p>Color: ${item.color} ${item.colorCode ? "(" + item.colorCode + ")" : ""}</p>
+        <p>Fabric: ${item.fabric}</p>
+        <p>Size: ${item.size}</p><p>Qty: ${item.qty || 1}</p><p>Qty: ${item.qty || 1}</p>
+        ${item.discountPercent ? `<p>Discount: ${item.discountPercent}%</p>` : ""}
+        <strong>SAR ${Number(item.price).toLocaleString()}</strong>
+      </div>
+    </div>
+  `).join("");
+  updateTotals();
+}
+
+async function confirmOrder(){
+  const city = document.getElementById("city").value.trim();
+  const address = document.getElementById("address").value.trim();
+  const notes = document.getElementById("notes").value.trim();
+  if(!city || !address){ alert("Please select city and add delivery address."); return; }
+  const delivery = deliveryFee();
+  const sub = subtotal();
+  const discount = discountAmount();
+  const total = sub - discount + delivery;
+
+  const lines = cart.map(i=>`${i.name} | ${i.color} ${i.colorCode || ""} | ${i.fabric} | ${i.size} | SAR ${Number(i.price) * Number(i.qty || 1)} | Qty ${i.qty || 1}`).join("\n");
+  const order = { id: "ORD-" + Date.now(), customer: user, items: cart, city, address, notes, subtotal: sub, delivery, deliveryBeforeVat: deliveryBeforeVat(), discount, total, date: new Date().toISOString() };
+  if(window.CV_API && await CV_API.available()){
+    try{ const saved = await CV_API.createOrderFromPrototype(order); order.id = saved.order_no; order.apiId = saved.id; order.total = saved.total_amount; }
+    catch(err){ alert("Backend order save failed: " + err.message); return; }
+  } else {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    orders.push(order);
+    localStorage.setItem("orders", JSON.stringify(orders));
+  }
+  localStorage.setItem("pendingOrder", JSON.stringify(order));
+  window.location.href = "payment.html";
+}
+</script>
+  <script src="analytics-tracker.js"></script>
+  <script src="customer-journey-95.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+</body>
+</html>
+<style>.cj-checkout-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0}.cj-checkout-progress span{background:#eee;border-radius:999px;padding:9px;text-align:center;font-size:13px}.cj-checkout-progress .active{background:#d8b25d;color:#1f1a12;font-weight:700}.cj-sticky-checkout{position:sticky;bottom:14px;z-index:50;width:100%;box-shadow:0 10px 25px rgba(0,0,0,.18)}</style>

@@ -1,0 +1,36 @@
+Analytics Center added inside admin.html
+
+How to use:
+1. Deploy to Railway.
+2. Login to admin.html as Super Admin.
+3. Click the Analytics Center tab in the CMS buttons.
+4. Visit the public website pages to generate tracking data:
+   - index.html
+   - shop.html
+   - contact.html
+   - account.html
+   - track-order.html
+5. Refresh Analytics Center.
+
+What it tracks:
+- Customer sessions
+- Page views
+- Clicks
+- WhatsApp clicks
+- View Details clicks
+- Add to Cart clicks
+- UTM source, medium, campaign, term, content
+- Referrer
+- Device type
+- Top pages
+- Top products
+- Funnel events
+- Abandoned carts endpoint
+
+Campaign link example:
+https://your-domain.com/shop.html?utm_source=instagram&utm_medium=social&utm_campaign=riyadh_sofas
+
+Important:
+- Use the live Railway URL, not file:// local files, because tracking is saved through /api/journey.
+- Super Admin can access analytics automatically.
+- For regular admins, give them analytics read permission in Admin Users.

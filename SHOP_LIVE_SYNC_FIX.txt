@@ -1,0 +1,21 @@
+SHOP LIVE SYNC FIX
+
+This version fixes product visibility after saving from Super Admin.
+
+What changed:
+1. The real Shop page now tries to read products from /api/products first.
+2. Super Admin now also loads products from /api/products when Railway backend is available.
+3. Local/static prototype fallback still works if backend is not available.
+4. After saving a product in live mode, it should appear on both:
+   - Shop Preview
+   - shop.html
+
+Important live test flow:
+1. Deploy to Railway.
+2. Open /admin-login.html and login as Super Admin.
+3. Add/save product.
+4. Open /shop.html or refresh it.
+5. Product should show.
+
+If you open the files directly as file:/// on your Mac, the real Shop page cannot use /api/products.
+For real shop sync, test through Railway URL or by running npm start locally.

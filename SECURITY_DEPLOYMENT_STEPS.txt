@@ -1,0 +1,47 @@
+Crafted Visual Security-Hardened Deployment
+
+Before deploying on Railway, add these Variables:
+
+1) JWT_SECRET
+Use a long random value, minimum 32 characters.
+Example: use a password manager to generate 48+ characters.
+
+2) DEFAULT_ADMIN_EMAIL
+Example: your real admin email.
+
+3) DEFAULT_ADMIN_PASSWORD
+Use a strong password, minimum 12 characters.
+Important: this is only used when the database has no admin users yet.
+After first login, create your own admin user and rotate this variable.
+
+4) NODE_ENV
+production
+
+5) ALLOWED_ORIGINS
+Your Railway live domain only, for example:
+https://crafted-visual-store-v2-production.up.railway.app
+
+Security changes included:
+- Strong JWT secret required in production.
+- Default admin password no longer hardcoded in production.
+- Safer upload handling with image-only validation.
+- File size limit for uploads.
+- Random uploaded filenames.
+- Security headers through Helmet.
+- CORS can be locked to your live domain.
+- Basic rate limiting for API, login, orders and uploads.
+- Express x-powered-by disabled.
+- Smaller JSON body limit.
+- Basic input sanitization for text fields.
+
+After upload:
+1. Upload all files to GitHub root.
+2. Commit changes.
+3. In Railway Variables, add the variables above.
+4. Deploy.
+5. Open /admin-login.html and login with DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD.
+6. Create a new strong Super Admin or update password.
+7. Keep this file private and do not publish admin credentials.
+
+Important:
+This is safer, but for real payment/live customer data, use PostgreSQL, backups, monitoring, and a real payment gateway. SQLite is acceptable for prototype/small internal testing only.
