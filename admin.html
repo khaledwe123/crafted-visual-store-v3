@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crafted Visual CMS</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <script src="adminAuthGuard.js?v=superadmin-media-fix-20260609"></script>
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+</head>
+<body>
+<header class="nav">
+  <div class="brand">Crafted Visual CMS</div>
+  <nav class="admin-top-nav">
+    <button class="btn primary admin-preview-top" type="button" onclick="openRealShop()">Open Shop</button>
+    <a href="index.html">Website</a>
+    <a href="orders.html">Orders</a>
+    <a href="financial-dashboard.html">Financial Dashboard</a>
+    <a href="#" data-tab-link="analyticsControl">Analytics Center</a>
+    <a href="customer-journey-dashboard.html">Customer Journey</a>
+    <a href="crm.html">CRM</a>
+  </nav>
+</header>
+
+<main class="admin-wrap">
+  <div id="adminUserBar" class="admin-user-bar"></div>
+  <h1>Backend Control Panel</h1>
+  <p>Manage the full website through the sections below.</p>
+  <div id="adminSaveStatus" class="admin-save-status"></div>
+
+  <div class="cms-tabs">
+    <button class="active" type="button" data-tab="menuControl">Menu Control</button>
+    <button type="button" data-tab="picturesControl">Pictures & Banners Control</button>
+    <button type="button" data-tab="productsControl">Products</button>
+    <button type="button" data-tab="categoriesControl">Product Category</button>
+    <button type="button" data-tab="seoControl">SEO Words</button>
+    <button type="button" data-tab="analyticsControl">Analytics Center</button>
+    <button type="button" data-tab="discountControl">Discount Page</button>
+    <button type="button" data-tab="mediaControl">Media Library</button>
+    <button type="button" data-tab="usersControl">Admin Users</button>
+  </div>
+
+  <section id="menuControl" class="cms-section active">
+    <div class="admin-panel">
+      <h2>Menu Control</h2>
+      <div class="admin-note">Multi-page structure is now active: Home = index.html, Shop = shop.html. Update these menu links here if needed.</div>
+      <div class="admin-grid-3">
+        <input id="menu_label_en" placeholder="Menu Label English">
+        <input id="menu_label_ar" placeholder="Menu Label Arabic">
+        <input id="menu_url" placeholder="URL e.g. index.html#shop">
+      </div>
+      <button class="btn secondary" type="button" onclick="addMenuItem()">Add Menu Item</button>
+      <div id="menuList" class="admin-list"></div>
+      <button class="btn primary" type="button" onclick="saveMenu()">Save Menu</button>
+      <button class="btn secondary" type="button" onclick="resetMenu()">Reset Default Menu</button>
+    </div>
+
+    <div class="admin-panel">
+      <label class="auto-translate-toggle"><input id="auto_translate_arabic" type="checkbox" checked> Auto Translate Arabic Content</label>
+      <h2>Website Content, WhatsApp & Social Media Links</h2>
+      <div class="admin-grid-3">
+        <input id="brand_en" placeholder="Brand English">
+        <input id="brand_ar" placeholder="Brand Arabic">
+        <input id="whatsapp_number" placeholder="WhatsApp Number">
+        <input id="currency" placeholder="Currency">
+        <input id="vat_rate" type="number" placeholder="VAT % default 15">
+        <input id="riyadh_delivery" type="number" placeholder="Riyadh Delivery">
+        <input id="outside_riyadh_delivery" type="number" placeholder="Outside Riyadh Delivery">
+        <input id="instagram_url" placeholder="Instagram URL">
+        <input id="tiktok_url" placeholder="TikTok URL">
+        <input id="facebook_url" placeholder="Facebook URL">
+        <input id="linkedin_url" placeholder="LinkedIn URL">
+        <input id="youtube_url" placeholder="YouTube URL">
+        <input id="snapchat_url" placeholder="Snapchat URL">
+      </div>
+      <textarea id="hero_title_en" placeholder="Hero Title English"></textarea>
+      <textarea id="hero_title_ar" placeholder="Hero Title Arabic"></textarea>
+      <textarea id="hero_text_en" placeholder="Hero Text English"></textarea>
+      <textarea id="hero_text_ar" placeholder="Hero Text Arabic"></textarea>
+      <textarea id="intro_title_en" placeholder="Intro Title English"></textarea>
+      <textarea id="intro_title_ar" placeholder="Intro Title Arabic"></textarea>
+      <textarea id="intro_text_en" placeholder="Intro Text English"></textarea>
+      <textarea id="intro_text_ar" placeholder="Intro Text Arabic"></textarea>
+
+      <textarea id="footer_text_en" placeholder="Footer Text English"></textarea>
+      <textarea id="footer_text_ar" placeholder="Footer Text Arabic"></textarea>
+
+      <h3>Footer Control</h3>
+      <div class="admin-grid-3">
+        <input id="footer_cr_number" placeholder="Commercial Registration / CR Number">
+        <input id="footer_vat_number" placeholder="VAT Number">
+        <input id="footer_address" placeholder="Address">
+        <input id="footer_email" placeholder="Footer Email">
+        <input id="footer_phone" placeholder="Footer Phone / Mobile">
+      </div>
+      <textarea id="footer_extra_info_en" placeholder="Other Footer Info English"></textarea>
+      <textarea id="footer_extra_info_ar" placeholder="Other Footer Info Arabic"></textarea>
+      <button class="btn secondary" type="button" onclick="autoFillArabicFields()">Auto Fill Arabic</button>
+      <button class="btn primary" type="button" onclick="saveSettings()">Save Website Content</button>
+    </div>
+  </section>
+
+  <section id="picturesControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>Changing Main Page Banner</h2>
+      <p class="admin-note">Upload up to 5 homepage banner pictures. The homepage will rotate them automatically every 5 seconds.</p>
+      <div class="banner-admin-grid">
+        <div class="banner-admin-item">
+          <label>Banner Picture 1</label>
+          <input id="heroBannerFile1" type="file" accept="image/*">
+          <input id="hero_banner_1" placeholder="Banner 1 image URL/path">
+        </div>
+        <div class="banner-admin-item">
+          <label>Banner Picture 2</label>
+          <input id="heroBannerFile2" type="file" accept="image/*">
+          <input id="hero_banner_2" placeholder="Banner 2 image URL/path">
+        </div>
+        <div class="banner-admin-item">
+          <label>Banner Picture 3</label>
+          <input id="heroBannerFile3" type="file" accept="image/*">
+          <input id="hero_banner_3" placeholder="Banner 3 image URL/path">
+        </div>
+        <div class="banner-admin-item">
+          <label>Banner Picture 4</label>
+          <input id="heroBannerFile4" type="file" accept="image/*">
+          <input id="hero_banner_4" placeholder="Banner 4 image URL/path">
+        </div>
+        <div class="banner-admin-item">
+          <label>Banner Picture 5</label>
+          <input id="heroBannerFile5" type="file" accept="image/*">
+          <input id="hero_banner_5" placeholder="Banner 5 image URL/path">
+        </div>
+      </div>
+      <input id="hero_image" placeholder="Fallback banner image URL/path" style="display:none">
+      <div id="heroPreview" class="banner-preview-grid"></div>
+      <button class="btn secondary" type="button" onclick="clearHeroBanners()">Clear Banner Pictures</button>
+      <button class="btn primary" type="button" onclick="saveSettings()">Save Banner Pictures</button>
+    </div>
+  </section>
+
+  <section id="productsControl" class="cms-section">
+    <div class="admin-grid">
+      <section class="admin-panel">
+        <h2>Simple Add Product</h2>
+        <input id="id" placeholder="Product Code / ID e.g. sofa-001">
+        <input id="name" placeholder="Product Name English">
+        <input id="name_ar" placeholder="Product Name Arabic">
+        <select id="category"></select>
+        <input id="category_ar" placeholder="Arabic Category - Auto" readonly>
+        <input id="price" placeholder="Default Price Before VAT SAR" type="number">
+        <input id="costPrice" placeholder="Cost of Goods / COGS SAR" type="number">
+        <input id="vatRate" placeholder="VAT % default 15" type="number" value="15">
+        <input id="discountPercent" placeholder="Discount % optional" type="number" min="0" max="90">
+        <textarea id="description" placeholder="Short English Description"></textarea>
+        <textarea id="description_ar" placeholder="Short Arabic Description"></textarea>
+
+        <h3>Manual Sizes</h3>
+        <p>Write each product size manually, then click Add Size.</p>
+        <div class="admin-grid-3">
+          <input id="sizeNameInput" placeholder="Size Name e.g. King, 3 Seater, Large">
+          <input id="sizeWidthInput" type="text" inputmode="decimal" placeholder="Width / Length cm">
+          <input id="sizeDepthInput" type="text" inputmode="decimal" placeholder="Depth cm">
+          <input id="sizeHeightInput" type="text" inputmode="decimal" placeholder="Height cm">
+        </div>
+        <button class="btn secondary" type="button" onclick="addManualSize()">Add Size</button>
+        <div class="table-scroll">
+          <table class="spec-table">
+            <thead><tr><th>Size Name</th><th>Width / Length</th><th>Depth</th><th>Height</th><th>Action</th></tr></thead>
+            <tbody id="manualSizeTable"></tbody>
+          </table>
+        </div>
+
+        <h3>Manual Fabrics</h3>
+        <p>Add each fabric manually. Each fabric must include a description shown in the product page.</p>
+        <div class="admin-grid-3">
+          <input id="fabricNameInput" placeholder="Fabric Name e.g. Velvet Premium">
+          <textarea id="fabricDescInput" placeholder="Fabric Description"></textarea>
+        </div>
+        <button class="btn secondary" type="button" onclick="addManualFabric()">Add Fabric</button>
+        <div class="table-scroll">
+          <table class="spec-table">
+            <thead><tr><th>Fabric Name</th><th>Description</th><th>Action</th></tr></thead>
+            <tbody id="manualFabricTable"></tbody>
+          </table>
+        </div>
+
+        <h3>Size + Fabric Selling Price & Cost Table</h3>
+        <p>After adding sizes and fabrics, press Build Price Table and enter the exact selling price and cost for every size + fabric combination.</p>
+        <button class="btn secondary" type="button" onclick="buildSizeFabricPriceTable()">Build / Refresh Price Table</button>
+        <div class="table-scroll">
+          <table class="spec-table">
+            <thead id="sizeFabricPriceHead"></thead>
+            <tbody id="sizeFabricPriceBody"></tbody>
+          </table>
+        </div>
+
+        <details>
+          <summary>Advanced Options</summary>
+          <textarea id="sizes" placeholder="Custom sizes, one per line"></textarea>
+          <textarea id="fabrics" placeholder="Custom fabrics, one per line"></textarea>
+          <textarea id="gallery" placeholder="Optional general gallery image links, one per line"></textarea>
+        </details>
+
+        
+
+        <h3>Colors & Product Photos</h3>
+        <div class="color-admin simple-color-admin">
+          <input id="colorName" placeholder="Color name e.g. Dark Green">
+          <input id="colorCode" placeholder="Color code optional e.g. DG-01">
+          <select id="colorPhotoFabric" aria-label="Fabric for these photos"><option value="">Select fabric for these photos</option></select>
+          <input id="colorHex" type="color" value="#183d32">
+          <input id="colorFiles" type="file" accept="image/*" multiple>
+          <small>Large images will be compressed automatically before saving.</small>
+          <button class="btn secondary" onclick="addColorSet()" type="button">Add Color Photos</button>
+        </div>
+        <div id="colorSetsPreview" class="color-sets-preview"></div>
+
+        <button class="btn secondary" type="button" onclick="autoFillProductArabic()">Auto Fill Product Arabic</button>
+        <div class="sticky-save">
+          <button class="btn primary" type="button" onclick="saveProduct()">Save Product</button>
+          <button class="btn secondary" type="button" onclick="openRealShop()">Open Shop</button>
+          <button class="btn secondary" type="button" onclick="clearForm()">Clear</button>
+        </div>
+      </section>
+
+      <section class="admin-panel">
+        <h2>Products</h2>
+        <input id="productSearch" placeholder="Search products" oninput="renderProductsAdmin()">
+        <div id="productList" class="admin-list"></div>
+        <div class="prototype-actions">
+          <button class="btn primary" type="button" onclick="openRealShop()">Open Shop</button>
+          <button class="btn secondary" type="button" onclick="exportProducts()">Show products JSON</button>
+          <button class="btn secondary" type="button" onclick="downloadPrototypeProductsJson()">Download products.json</button>
+        </div>
+        <small class="prototype-note">Live mode: after saving a product, open the Shop page to view it directly.</small>
+        <textarea id="exportBox" placeholder="Exported JSON will appear here"></textarea>
+      </section>
+    </div>
+  </section>
+
+  <section id="categoriesControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>Product Category</h2>
+      <div class="admin-grid-3">
+        <input id="cat_en" placeholder="Category English">
+        <input id="cat_ar" placeholder="Category Arabic">
+      </div>
+      <button class="btn secondary" type="button" onclick="addCategory()">Add Category</button>
+      <div id="categoryList" class="admin-list"></div>
+      <button class="btn primary" type="button" onclick="saveCategories()">Save Categories</button>
+    </div>
+  </section>
+
+
+  <section id="seoControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>SEO Words Control</h2>
+      <div class="admin-note">Add, remove, or edit SEO page titles, meta descriptions, and keywords. These are saved in the live backend and applied to meta tags, Open Graph, sitemap.xml, robots.txt, and schema markup.</div>
+      <div class="admin-grid-3">
+        <select id="seoPageKey" onchange="loadSeoPageForm()">
+          <option value="home">Home Page</option>
+          <option value="shop">Shop Page</option>
+          <option value="contact">Contact Page</option>
+          <option value="account">My Account Page</option>
+          <option value="track">Track Order Page</option>
+          <option value="product">Product Default</option>
+        </select>
+        <input id="seoTitle" placeholder="SEO Page Title">
+        <input id="seoKeywordInput" placeholder="Add SEO word / keyword">
+      </div>
+      <textarea id="seoDescription" placeholder="SEO Meta Description"></textarea>
+      <div class="admin-grid-3">
+        <button class="btn secondary" type="button" onclick="addSeoKeyword()">Add SEO Word</button>
+        <button class="btn primary" type="button" onclick="saveSeoPage()">Save SEO Page</button>
+        <button class="btn secondary" type="button" onclick="resetSeoDefaults()">Reset SEO Defaults</button>
+      </div>
+      <h3>Current SEO Words</h3>
+      <div id="seoKeywordList" class="admin-list"></div>
+      <h3>SEO Pages Preview</h3>
+      <div id="seoPagesList" class="admin-list"></div>
+    </div>
+  </section>
+
+  <section id="analyticsControl" class="cms-section">
+    <div class="admin-panel analytics-center-panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+        <div>
+          <h2>Analytics Center</h2>
+          <p class="admin-note">Track customer journey, source links, campaign UTMs, product interest, conversion funnel, abandoned carts, and top pages directly from the CMS.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="analyticsPeriod" onchange="loadAnalyticsCenter()">
+            <option value="1">Today</option>
+            <option value="7">Last 7 Days</option>
+            <option value="30" selected>Last 30 Days</option>
+            <option value="60">Last 60 Days</option>
+            <option value="90">Last 90 Days</option>
+          </select>
+          <button class="btn primary" type="button" onclick="loadAnalyticsCenter()">Refresh</button>
+          <a class="btn secondary" href="customer-journey-dashboard.html" target="_blank">Open Full Journey Page</a>
+        </div>
+      </div>
+
+      <div id="analyticsStatus" class="admin-note">Loading analytics when this tab opens...</div>
+
+      <div class="analytics-kpi-grid">
+        <div class="analytics-kpi"><span>Sessions</span><strong id="kpiSessions">0</strong></div>
+        <div class="analytics-kpi"><span>Tracked Events</span><strong id="kpiEvents">0</strong></div>
+        <div class="analytics-kpi"><span>Abandoned Carts</span><strong id="kpiAbandoned">0</strong></div>
+        <div class="analytics-kpi"><span>Conversion Signals</span><strong id="kpiConversions">0</strong></div>
+      </div>
+
+      <div class="analytics-grid-2">
+        <div class="analytics-box">
+          <h3>Conversion Funnel</h3>
+          <div id="analyticsFunnel" class="analytics-list">No data yet</div>
+        </div>
+        <div class="analytics-box">
+          <h3>Traffic Sources / Campaigns</h3>
+          <div id="analyticsSources" class="analytics-list">No data yet</div>
+        </div>
+        <div class="analytics-box">
+          <h3>Top Pages</h3>
+          <div id="analyticsPages" class="analytics-list">No data yet</div>
+        </div>
+        <div class="analytics-box">
+          <h3>Top Product Interest</h3>
+          <div id="analyticsProducts" class="analytics-list">No data yet</div>
+        </div>
+      </div>
+
+      <div class="analytics-box" style="margin-top:16px;">
+        <h3>Latest Customer Journey Events</h3>
+        <div class="table-scroll">
+          <table class="spec-table">
+            <thead><tr><th>Time</th><th>Session</th><th>Event</th><th>Page</th><th>Product</th><th>Source</th><th>Device</th></tr></thead>
+            <tbody id="analyticsRecentEvents"><tr><td colspan="7">No data yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-note" style="margin-top:16px;">
+        Use campaign links like <b>?utm_source=instagram&utm_medium=social&utm_campaign=riyadh_sofas</b>. The dashboard will show where customers came from and which pages/products they viewed.
+      </div>
+    </div>
+  </section>
+
+  <section id="discountControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>Discount Page</h2>
+      <div class="admin-grid-3">
+        <select id="discountTargetType" onchange="renderDiscountTargets()">
+          <option value="">Choose discount target</option>
+          <option value="all">All Products</option>
+          <option value="category">Product Category</option>
+          <option value="product">Specific Product</option>
+        </select>
+        <select id="discountCategoryTarget" style="display:none"></select>
+        <select id="discountProductTarget" style="display:none" onchange="renderDiscountVariantTargets()"></select>
+      </div>
+      <div class="admin-grid-3" style="margin-top:10px;">
+        <select id="discountApplyScope" style="display:none" onchange="renderDiscountVariantTargets()">
+          <option value="product">Product Only</option>
+          <option value="size">Size Only</option>
+          <option value="fabric">Fabric Only</option>
+          <option value="combo">Size + Fabric Combination</option>
+        </select>
+        <select id="discountSizeTarget" style="display:none"></select>
+        <select id="discountFabricTarget" style="display:none"></select>
+      </div>
+      <div class="admin-grid-3" style="margin-top:10px;">
+        <input id="bulkDiscount" type="number" min="0" max="90" placeholder="Discount %">
+        <select id="discountStatus">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <div></div>
+      </div>
+      <button class="btn primary" type="button" onclick="applyDiscount()">Apply Discount</button>
+      <button class="btn primary" type="button" onclick="saveDiscountPage()">Save Discount Page</button>
+      <button class="btn secondary" type="button" onclick="clearDiscounts()">Clear All Discounts</button>
+      <hr>
+      <h3>Checkout Discount Codes</h3>
+      <div class="admin-grid-3">
+        <input id="discountCodeInput" placeholder="Code e.g. CV10">
+        <input id="discountCodePercent" type="number" min="0" max="90" placeholder="Discount %">
+        <input id="discountCodeExpiry" type="date">
+      </div>
+      <button class="btn primary" type="button" onclick="addDiscountCode()">Create Discount Code</button>
+      <div id="discountCodeList" class="admin-list"></div>
+      <div id="discountList" class="admin-list"></div>
+    </div>
+  </section>
+
+  <section id="mediaControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>Media Library</h2>
+      <p>Upload images and assign them to products, banners, pages, or website sections. Only JPG, PNG, WEBP, and GIF up to 5&nbsp;MB are allowed.</p>
+      <div class="admin-grid-3">
+        <input id="mediaFileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+        <input id="mediaAltInput" placeholder="Alt text (optional)">
+        <button class="btn primary" type="button" data-media-upload="true">Upload Image</button>
+      </div>
+      <div id="mediaGrid" class="media-grid" style="margin-top:14px;"></div>
+    </div>
+  </section>
+
+  <section id="usersControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>Admin & Super Admin Users</h2>
+      <p>Super Admin can manage users. Admin can manage products, menu, pictures and orders.</p>
+      <div class="admin-grid-3">
+        <input id="newAdminName" placeholder="Name">
+        <input id="newAdminEmail" placeholder="Email">
+        <input id="newAdminPassword" placeholder="Password">
+        <select id="newAdminRole">
+          <option value="admin">Admin</option>
+          <option value="superadmin">Super Admin</option>
+        </select>
+      </div>
+      <div id="newAdminPermissionsMatrix" class="permissions-matrix">
+        <table class="spec-table">
+          <thead><tr><th>Section</th><th>Read</th><th>Write/Edit</th></tr></thead>
+          <tbody>
+            <tr><td>Menu Control</td><td><input type="checkbox" data-perm="menu" data-level="read" checked></td><td><input type="checkbox" data-perm="menu" data-level="write" checked></td></tr>
+            <tr><td>Pictures & Banners</td><td><input type="checkbox" data-perm="pictures" data-level="read" checked></td><td><input type="checkbox" data-perm="pictures" data-level="write" checked></td></tr>
+            <tr><td>Products</td><td><input type="checkbox" data-perm="products" data-level="read" checked></td><td><input type="checkbox" data-perm="products" data-level="write" checked></td></tr>
+            <tr><td>Product Category</td><td><input type="checkbox" data-perm="categories" data-level="read" checked></td><td><input type="checkbox" data-perm="categories" data-level="write" checked></td></tr>
+            <tr><td>SEO Words</td><td><input type="checkbox" data-perm="seo" data-level="read" checked></td><td><input type="checkbox" data-perm="seo" data-level="write" checked></td></tr>
+            <tr><td>Discounts</td><td><input type="checkbox" data-perm="discounts" data-level="read" checked></td><td><input type="checkbox" data-perm="discounts" data-level="write" checked></td></tr>
+            <tr><td>Orders</td><td><input type="checkbox" data-perm="orders" data-level="read" checked></td><td><input type="checkbox" data-perm="orders" data-level="write" checked></td></tr>
+            <tr><td>Financial Dashboard</td><td><input type="checkbox" data-perm="finance" data-level="read" checked></td><td><input type="checkbox" data-perm="finance" data-level="write"></td></tr>
+            <tr><td>Analytics / Journey</td><td><input type="checkbox" data-perm="analytics" data-level="read" checked></td><td><input type="checkbox" data-perm="analytics" data-level="write"></td></tr>
+            <tr><td>Inventory</td><td><input type="checkbox" data-perm="inventory" data-level="read" checked></td><td><input type="checkbox" data-perm="inventory" data-level="write" checked></td></tr>
+            <tr><td>Security Audit</td><td><input type="checkbox" data-perm="security" data-level="read" checked></td><td><input type="checkbox" data-perm="security" data-level="write"></td></tr>
+            <tr><td>CRM</td><td><input type="checkbox" data-perm="crm" data-level="read" checked></td><td><input type="checkbox" data-perm="crm" data-level="write" checked></td></tr>
+            <tr><td>Media Library</td><td><input type="checkbox" data-perm="media" data-level="read" checked></td><td><input type="checkbox" data-perm="media" data-level="write" checked></td></tr>
+            <tr><td>Admin Users</td><td><input type="checkbox" data-perm="users" data-level="read"></td><td><input type="checkbox" data-perm="users" data-level="write"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="admin-grid-3">
+      </div>
+      <button class="btn primary" type="button" onclick="addAdminUser()">Create User</button>
+      <div id="adminUsersList" class="admin-list"></div>
+    </div>
+  </section>
+</main>
+
+
+<section id="prototypeShopPreviewPanel" class="cms-section prototype-shop-preview-section" style="display:none;">
+  <div class="admin-panel">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+      <div>
+        <h2>Shop Preview</h2>
+        <p>This preview uses the products currently saved inside Super Admin prototype mode.</p>
+      </div>
+      <button class="btn secondary" type="button" onclick="closeInlineShopPreview()">Close Preview</button>
+    </div>
+    <div id="prototypeShopPreviewGrid" class="product-grid"></div>
+  </div>
+</section>
+
+<div id="prototypeDetailModal" class="modal hidden">
+  <div class="modal-content">
+    <button class="close modal-close" onclick="closePrototypeDetail()" type="button">×</button>
+    <div class="modal-grid">
+      <div>
+        <img id="prototypeDetailImage" class="modal-img" src="" alt="" />
+        <div id="prototypeDetailThumbs" class="thumbs"></div>
+      </div>
+      <div>
+        <h2 id="prototypeDetailName"></h2>
+        <p id="prototypeDetailCategory"></p>
+        <h3 id="prototypeDetailPrice"></h3>
+        <p id="prototypeDetailDescription"></p>
+        <div class="modal-actions">
+          <button class="btn primary" type="button" onclick="alert('Prototype: item added to cart preview')">Add to Cart</button>
+          <a id="prototypeDetailWhatsapp" class="btn secondary" href="#" target="_blank">WhatsApp Enquiry</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js?v=superadmin-media-fix-20260609"></script>
+<script src="admin-workflow-fix-v34.js?v=20260609-discount-page-v34"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+</body>
+</html>
