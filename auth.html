@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Sign In | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+</head>
+<body>
+<header class="nav">
+  <div class="brand">Crafted Visual</div>
+  <nav><a href="index.html">Home</a><a href="contact.html">Contact Us</a></nav>
+</header>
+
+<main class="auth-page">
+  <section class="auth-card">
+    <h1 id="formTitle">Sign In</h1>
+
+    <div class="auth-tabs">
+      <button type="button" id="tabSignIn" class="active">Sign In</button>
+      <button type="button" id="tabSignUp">Sign Up</button>
+      <button type="button" id="tabForgot">Forgot Password</button>
+    </div>
+
+    <div id="signupFields" style="display:none">
+      <input id="name" placeholder="Full Name">
+      <input id="mobile" placeholder="Mobile Number">
+    </div>
+
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+
+    <div id="forgotHelp" style="display:none">
+      <p>Enter your email and solve the captcha. A password reset request will be saved in CRM.</p>
+    </div>
+
+    <div class="captcha-box">
+      <label id="captchaQuestion"></label>
+      <input id="captchaAnswer" placeholder="Captcha answer">
+      <button type="button" class="btn secondary" id="refreshCaptchaBtn">Refresh Captcha</button>
+    </div>
+
+    <button class="btn primary" id="submitBtn" type="button">Sign In</button>
+    <div id="authStatus" class="admin-save-status"></div>
+  </section>
+</main>
+
+<script>
+let mode = "signin";
+let captchaResult = 0;
+
+function returnUrl(){
+  const p = new URLSearchParams(location.search);
+  return p.get("return") || "index.html";
+}
+
+function generateCaptcha(){
+  const a = Math.floor(Math.random()*8)+2;
+  const b = Math.floor(Math.random()*8)+2;
+  captchaResult = a + b;
+  document.getElementById("captchaQuestion").textContent = `Captcha: ${a} + ${b} = ?`;
+  document.getElementById("captchaAnswer").value = "";
+}
+generateCaptcha();
+
+function validateCaptcha(){
+  return Number(document.getElementById("captchaAnswer").value) === captchaResult;
+}
+
+function showStatus(msg, error=false){
+  const box = document.getElementById("authStatus");
+  box.textContent = msg;
+  box.className = "admin-save-status " + (error ? "error" : "success");
+}
+
+function showMode(next){
+  mode = next;
+  document.querySelectorAll(".auth-tabs button").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tabSignIn").classList.toggle("active", mode==="signin");
+  document.getElementById("tabSignUp").classList.toggle("active", mode==="signup");
+  document.getElementById("tabForgot").classList.toggle("active", mode==="forgot");
+
+  document.getElementById("signupFields").style.display = mode === "signup" ? "" : "none";
+  document.getElementById("password").style.display = mode === "forgot" ? "none" : "";
+  document.getElementById("forgotHelp").style.display = mode === "forgot" ? "" : "none";
+
+  document.getElementById("formTitle").textContent = mode === "signin" ? "Sign In" : mode === "signup" ? "Sign Up" : "Forgot Password";
+  document.getElementById("submitBtn").textContent = mode === "signin" ? "Sign In" : mode === "signup" ? "Create Account" : "Request Password Reset";
+  generateCaptcha();
+}
+
+function getUsers(){ return JSON.parse(localStorage.getItem("users") || "[]"); }
+function saveUsers(users){ localStorage.setItem("users", JSON.stringify(users)); }
+
+async function submitAuth(){
+  if(!validateCaptcha()){
+    showStatus("Captcha is incorrect.", true);
+    generateCaptcha();
+    return;
+  }
+
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+  const users = getUsers();
+
+  try{
+    if(mode === "signup"){
+      const name = document.getElementById("name").value.trim();
+      const mobile = document.getElementById("mobile").value.trim();
+      if(!name || !mobile || !email || !password){ showStatus("Please fill all required fields.", true); return; }
+      if(users.some(u=>u.email === email)){ showStatus("Account already exists.", true); return; }
+
+      if(window.CV_API && typeof CV_API.customerRegister === "function"){
+        await CV_API.customerRegister({name,email,mobile,password});
+      }else{
+        const user = {name,email,mobile,password,addresses:[],createdAt:new Date().toISOString()};
+        users.push(user);
+        saveUsers(users);
+        localStorage.setItem("currentUser", JSON.stringify(user));
+      }
+      location.href = returnUrl();
+      return;
+    }
+
+    if(mode === "signin"){
+      if(window.CV_API && typeof CV_API.customerLogin === "function"){
+        await CV_API.customerLogin(email,password);
+      }else{
+        const user = users.find(u=>u.email === email && u.password === password);
+        if(!user){ showStatus("Invalid email or password.", true); return; }
+        localStorage.setItem("currentUser", JSON.stringify(user));
+      }
+      location.href = returnUrl();
+      return;
+    }
+
+    if(mode === "forgot"){
+      if(!email){ showStatus("Please enter your email.", true); return; }
+      const resetRequests = JSON.parse(localStorage.getItem("passwordResetRequests") || "[]");
+      resetRequests.push({id:"RESET-" + Date.now(), email, date:new Date().toISOString(), status:"New"});
+      localStorage.setItem("passwordResetRequests", JSON.stringify(resetRequests));
+      const acts = JSON.parse(localStorage.getItem("crmActivities") || "[]");
+      acts.push({id:"ACT-" + Date.now(), type:"Password Reset Request", payload:{email}, date:new Date().toISOString()});
+      localStorage.setItem("crmActivities", JSON.stringify(acts));
+      showStatus("Password reset request saved. Customer care will contact you.");
+      return;
+    }
+  }catch(err){
+    showStatus(err && err.message ? err.message : "Request failed. Please try again.", true);
+    generateCaptcha();
+  }
+}
+
+document.getElementById("tabSignIn").addEventListener("click", () => showMode("signin"));
+document.getElementById("tabSignUp").addEventListener("click", () => showMode("signup"));
+document.getElementById("tabForgot").addEventListener("click", () => showMode("forgot"));
+document.getElementById("refreshCaptchaBtn").addEventListener("click", generateCaptcha);
+document.getElementById("submitBtn").addEventListener("click", submitAuth);
+
+document.querySelector(".auth-card").addEventListener("keydown", function(e){
+  if(e.key === "Enter"){
+    e.preventDefault();
+    submitAuth();
+  }
+});
+</script>
+<!-- CV_STATIC_ARABIC_PATCH -->
+
+<script>
+(function(){
+  const lang = localStorage.getItem('lang') || 'en';
+  if(lang !== 'ar') return;
+  document.documentElement.lang='ar';
+  document.documentElement.dir='rtl';
+  const map = {
+    'Crafted Visual':'كرافتد فيجوال','Home':'الرئيسية','Shop':'المتجر','My Account':'حسابي','Contact Us':'تواصل معنا','Track Order':'تتبع الطلب',
+    'Contact Crafted Visual':'تواصل مع كرافتد فيجوال','For furniture inquiries, custom orders, delivery, after-sales support, and project requests.':'لاستفسارات الأثاث والطلبات الخاصة والتوصيل وخدمة ما بعد البيع وطلبات المشاريع.','Contact Information':'معلومات التواصل','Send Inquiry':'إرسال استفسار','WhatsApp:':'واتساب:','Chat with us':'تواصل معنا','Email:':'البريد الإلكتروني:','Location: Riyadh, Saudi Arabia':'الموقع: الرياض، المملكة العربية السعودية','Working Hours: Saturday to Thursday, 9:00 AM - 9:00 PM':'ساعات العمل: من السبت إلى الخميس، 9:00 صباحاً - 9:00 مساءً','Product Inquiry':'استفسار عن منتج',
+    'Track Your Order':'تتبع طلبك','Enter the full order number exactly as received.':'أدخل رقم الطلب الكامل كما وصل إليك.','Track Order':'تتبع الطلب',
+    'My Account':'حسابي','Manage your saved delivery details.':'إدارة بيانات التوصيل المحفوظة.','Full Name':'الاسم الكامل','Email':'البريد الإلكتروني','Phone Number':'رقم الجوال','City':'المدينة','Delivery Address':'عنوان التوصيل','Building / Villa / Apartment':'المبنى / الفيلا / الشقة','Additional Notes':'ملاحظات إضافية','Save Account':'حفظ الحساب','Logout':'تسجيل الخروج'
+  };
+  function walk(node){
+    if(node.nodeType===3){
+      const t=node.nodeValue.trim();
+      if(map[t]) node.nodeValue=node.nodeValue.replace(t,map[t]);
+    } else if(node.nodeType===1 && !['SCRIPT','STYLE'].includes(node.tagName)) {
+      [...node.childNodes].forEach(walk);
+    }
+  }
+  walk(document.body);
+  const ph = {'Full Name':'الاسم الكامل','Mobile Number':'رقم الجوال','Email':'البريد الإلكتروني','Message':'الرسالة','Full Order Number e.g. CV-...':'رقم الطلب الكامل مثال CV-...','Phone Number':'رقم الجوال','Full delivery address':'عنوان التوصيل الكامل','Building, villa or apartment':'المبنى أو الفيلا أو الشقة','Preferred delivery notes':'ملاحظات التوصيل المفضلة'};
+  document.querySelectorAll('input,textarea').forEach(el=>{ if(ph[el.placeholder]) el.placeholder=ph[el.placeholder]; });
+  document.querySelectorAll('select option').forEach(o=>{ if(map[o.textContent.trim()]) o.textContent=map[o.textContent.trim()]; });
+})();
+</script>
+
+  <script src="analytics-tracker.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+</body>
+</html>
