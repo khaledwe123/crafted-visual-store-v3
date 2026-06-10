@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review Order | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2">
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+</head>
+<body>
+<header class="nav">
+  <div class="brand" id="brandText">Crafted Visual</div>
+  <nav><a href="index.html">Continue Shopping</a></nav>
+</header>
+
+<main class="review-page">
+  <div class="cj-checkout-progress"><span class="active">1 Cart</span><span class="active">2 Delivery</span><span>3 Payment</span><span>4 Confirmation</span></div>
+  <h1>Review Your Order</h1>
+  <p>Please review your items before confirming the order.</p>
+  <div id="userBox" class="review-box"></div>
+  <div id="reviewItems"></div>
+
+  <section class="review-box">
+    <h2>Delivery Details</h2>
+    <label>City</label>
+    <select id="city" required></select>
+    <textarea id="address" placeholder="Delivery Address"></textarea>
+    <textarea id="notes" placeholder="Order Notes"></textarea>
+  </section>
+
+  <div class="review-total" id="reviewTotal"></div>
+  <div class="review-box discount-code-box">
+    <h3>Discount Code</h3>
+    <p>Add your discount code, then press Apply.</p>
+    <div class="discount-code-row">
+      <input id="checkoutDiscountCode" placeholder="Enter discount code e.g. CV10">
+      <button class="btn secondary" type="button" id="applyCheckoutDiscountBtn">Apply</button>
+    </div>
+    <p id="discountCodeMessage"></p>
+  </div>
+  <button class="btn primary cj-sticky-checkout" id="confirmOrderBtn">Continue to Payment</button>
+  <button class="btn secondary" id="backToShopBtn">Back to Shop</button>
+</main>
+
+<script>
+let settings = {};
+let cities = [];
+const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+const cart = JSON.parse(localStorage.getItem("cart") || sessionStorage.getItem("cart") || "[]");
+
+if(!user){ location.href = "auth.html?return=review.html"; }
+
+async function getJSON(file, fallback){
+  const localKey = file.replace(".json","");
+  const local = localStorage.getItem("cms_" + localKey);
+  if(local) return JSON.parse(local);
+  try { return await fetch(file).then(r=>r.json()); } catch(e){ return fallback; }
+}
+
+async function init(){
+  settings = await getJSON("settings.json", {whatsapp_number:"966500000000", riyadh_delivery:0, outside_riyadh_delivery:400, brand_en:"Crafted Visual"});
+  cities = await getJSON("cities.json", ["Riyadh","Jeddah","Dammam","Khobar"]);
+  document.getElementById("brandText").textContent = settings.brand_en || "Crafted Visual";
+  document.getElementById("city").innerHTML = `<option value="">Select City</option>` + cities.map(c=>`<option>${c}</option>`).join("");
+  render();
+}
+init();
+
+function deliveryBeforeVat(){
+  const city = document.getElementById("city").value;
+  if(!city) return 0;
+  return city === "Riyadh" ? Number(settings.riyadh_delivery || 0) : Number(settings.outside_riyadh_delivery || 400);
+}
+
+function deliveryVat(){
+  return deliveryBeforeVat() * Number(settings.vat_rate || 15) / 100;
+}
+
+function deliveryFee(){
+  return deliveryBeforeVat() + deliveryVat();
+}
+
+function subtotal(){
+  return cart.reduce((sum,item)=>sum + Number(item.price || 0) * Number(item.qty || 1),0);
+}
+function itemQty(item){ return Math.max(1, Number(item && item.qty || 1)); }
+function itemBeforeVat(item){ return Number(item && (item.priceBeforeVat || item.originalPrice) || 0); }
+function itemVatRate(item){ return Number(item && item.vatRate || settings.vat_rate || 15); }
+function itemHasProductDiscount(item){ return Number(item && item.discountPercent || 0) > 0; }
+function money(n){ return "SAR " + Math.round(Number(n || 0)).toLocaleString(); }
+function normalizeDiscountCode(row){
+  row = row || {};
+  return {
+    code: String(row.code || row.discount_code || "").trim().toUpperCase(),
+    percent: Number(row.percent || row.discountPercent || row.discount_percent || row.value || 0),
+    active: row.active === false || row.active === 0 ? false : true,
+    expires_at: row.expires_at || row.expiry || row.expiresAt || null
+  };
+}
+async function loadDiscountCodes(){
+  let out = [];
+  try{
+    const res = await fetch('/api/discounts', {cache:'no-store'});
+    if(res.ok){
+      const rows = await res.json();
+      if(Array.isArray(rows)) out = out.concat(rows.map(normalizeDiscountCode));
+    }
+  }catch(e){}
+  ['discountCodes','checkoutDiscountCodes','cvDiscountCodes'].forEach(key=>{
+    try{
+      const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if(raw){
+        const rows = JSON.parse(raw);
+        if(Array.isArray(rows)) out = out.concat(rows.map(normalizeDiscountCode));
+      }
+    }catch(e){}
+  });
+  const map = new Map();
+  out.filter(c=>c.code && c.percent > 0).forEach(c=>map.set(c.code,c));
+  return [...map.values()];
+}
+function isCodeExpired(code){
+  if(!code || !code.expires_at) return false;
+  const d = new Date(code.expires_at);
+  return !isNaN(d.getTime()) && d < new Date();
+}
+let appliedDiscount = JSON.parse(localStorage.getItem("appliedDiscount") || "null");
+function eligibleBeforeVatSubtotal(){
+  return cart.reduce((sum,item)=> itemHasProductDiscount(item) ? sum : sum + itemBeforeVat(item) * itemQty(item), 0);
+}
+async function applyCheckoutDiscount(){
+  const code = document.getElementById("checkoutDiscountCode").value.trim().toUpperCase();
+  const msg = document.getElementById("discountCodeMessage");
+  if(!code){
+    appliedDiscount = null;
+    localStorage.removeItem("appliedDiscount");
+    msg.textContent = "Please add a discount code.";
+    msg.className = "discount-red";
+    updateTotals();
+    return;
+  }
+  if(eligibleBeforeVatSubtotal() <= 0){
+    appliedDiscount = null;
+    localStorage.removeItem("appliedDiscount");
+    msg.textContent = "This product is already under discount, so no additional discount will be added.";
+    msg.className = "discount-red";
+    updateTotals();
+    return;
+  }
+  const codes = await loadDiscountCodes();
+  const found = codes.find(c=>c.code === code && c.active !== false);
+  if(!found){
+    appliedDiscount = null;
+    localStorage.removeItem("appliedDiscount");
+    msg.textContent = "Invalid discount code.";
+    msg.className = "discount-red";
+    updateTotals();
+    return;
+  }
+  if(isCodeExpired(found)){
+    appliedDiscount = null;
+    localStorage.removeItem("appliedDiscount");
+    msg.textContent = "Discount code expired.";
+    msg.className = "discount-red";
+    updateTotals();
+    return;
+  }
+  appliedDiscount = found;
+  localStorage.setItem("appliedDiscount", JSON.stringify(found));
+  const hasExcluded = cart.some(itemHasProductDiscount);
+  msg.textContent = `Code applied: ${found.percent}% before VAT.` + (hasExcluded ? " Products already under discount were excluded." : "");
+  msg.className = "discount-price";
+  updateTotals();
+}
+function cartTotalsWithCode(){
+  const percent = appliedDiscount ? Number(appliedDiscount.percent || 0) : 0;
+  let subtotalBeforeVat = 0;
+  let itemProductDiscountTotal = 0;
+  let codeDiscountBeforeVat = 0;
+  let vat = 0;
+  let total = 0;
+  cart.forEach(item=>{
+    const qty = itemQty(item);
+    const before = itemBeforeVat(item);
+    const rate = itemVatRate(item);
+    subtotalBeforeVat += before * qty;
+    if(itemHasProductDiscount(item)){
+      const line = Number(item.price || 0) * qty;
+      total += line;
+      vat += line - (line / (1 + rate / 100));
+      itemProductDiscountTotal += Math.max(0, (before * (1 + rate/100) * qty) - line);
+    }else{
+      const lineBefore = before * qty;
+      const codeDiscount = percent ? lineBefore * percent / 100 : 0;
+      const afterBeforeVat = Math.max(0, lineBefore - codeDiscount);
+      codeDiscountBeforeVat += codeDiscount;
+      vat += afterBeforeVat * rate / 100;
+      total += afterBeforeVat * (1 + rate / 100);
+    }
+  });
+  return {subtotalBeforeVat, itemProductDiscountTotal, codeDiscountBeforeVat, vat, total};
+}
+function discountAmount(){
+  return cartTotalsWithCode().codeDiscountBeforeVat;
+}
+function updateTotals(){
+  const t = cartTotalsWithCode();
+  const deliveryBase = deliveryBeforeVat();
+  const deliveryVAT = deliveryVat();
+  const delivery = deliveryFee();
+  const total = t.total + delivery;
+  const city = document.getElementById("city").value;
+  const deliveryText = city === "Riyadh" ? "Free delivery within Riyadh" : `Delivery before VAT: ${money(deliveryBase)} | VAT: ${money(deliveryVAT)} | Delivery incl. VAT: ${money(delivery)}`;
+  document.getElementById("reviewTotal").innerHTML = `
+    <div>Items subtotal before VAT: ${money(t.subtotalBeforeVat)}</div>
+    ${t.itemProductDiscountTotal ? `<div class="discount-price">Product discounts already applied: -${money(t.itemProductDiscountTotal)}</div>` : ""}
+    ${t.codeDiscountBeforeVat ? `<div class="discount-price">Discount code before VAT: -${money(t.codeDiscountBeforeVat)}</div>` : ""}
+    <div>VAT after discounts: ${money(t.vat)}</div>
+    <div>${city ? deliveryText : "Select city to calculate delivery"}</div>
+    <div>Total: ${money(total)}</div>
+  `;
+}
+function render(){
+  document.getElementById("userBox").innerHTML = `<h2>Customer</h2><p><strong>${user.name}</strong><br>${user.email}<br>${user.mobile}</p>`;
+  if(!cart.length){
+    document.getElementById("reviewItems").innerHTML = "<p>Your cart is empty.</p>";
+    updateTotals();
+    return;
+  }
+  document.getElementById("reviewItems").innerHTML = cart.map(item=>`
+    <div class="review-item">
+      ${item.image ? `<img src="${item.image}">` : ""}
+      <div>
+        <h3>${item.name}</h3>
+        <p>Color: ${item.color} ${item.colorCode ? "(" + item.colorCode + ")" : ""}</p>
+        <p>Fabric: ${item.fabric}</p>
+        <p>Size: ${item.size}</p><p>Qty: ${item.qty || 1}</p><p>Qty: ${item.qty || 1}</p>
+        ${item.discountPercent ? `<p>Discount: ${item.discountPercent}%</p>` : ""}
+        <strong>SAR ${Number(item.price).toLocaleString()}</strong>
+      </div>
+    </div>
+  `).join("");
+  updateTotals();
+}
+
+async function confirmOrder(){
+  const city = document.getElementById("city").value.trim();
+  const address = document.getElementById("address").value.trim();
+  const notes = document.getElementById("notes").value.trim();
+  if(!city || !address){ alert("Please select city and add delivery address."); return; }
+  const delivery = deliveryFee();
+  const totals = cartTotalsWithCode();
+  const sub = totals.subtotalBeforeVat;
+  const discount = totals.codeDiscountBeforeVat;
+  const total = totals.total + delivery;
+
+  const lines = cart.map(i=>`${i.name} | ${i.color} ${i.colorCode || ""} | ${i.fabric} | ${i.size} | SAR ${Number(i.price) * Number(i.qty || 1)} | Qty ${i.qty || 1}`).join("\n");
+  const order = { id: "ORD-" + Date.now(), customer: user, items: cart, city, address, notes, subtotalBeforeVat: sub, subtotal: totals.total, productDiscount: totals.itemProductDiscountTotal, delivery, deliveryBeforeVat: deliveryBeforeVat(), discountCode: appliedDiscount, discount, vat: totals.vat, total, date: new Date().toISOString() };
+  if(window.CV_API && await CV_API.available()){
+    try{ const saved = await CV_API.createOrderFromPrototype(order); order.id = saved.order_no; order.apiId = saved.id; order.total = saved.total_amount; }
+    catch(err){ alert("Backend order save failed: " + err.message); return; }
+  } else {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    orders.push(order);
+    localStorage.setItem("orders", JSON.stringify(orders));
+  }
+  localStorage.setItem("pendingOrder", JSON.stringify(order));
+  window.location.href = "payment.html";
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  const cityEl = document.getElementById("city");
+  const applyBtn = document.getElementById("applyCheckoutDiscountBtn");
+  const confirmBtn = document.getElementById("confirmOrderBtn");
+  const backBtn = document.getElementById("backToShopBtn");
+  if(cityEl) cityEl.addEventListener("change", updateTotals);
+  if(applyBtn) applyBtn.addEventListener("click", applyCheckoutDiscount);
+  if(confirmBtn) confirmBtn.addEventListener("click", confirmOrder);
+  if(backBtn) backBtn.addEventListener("click", function(){ location.href = "index.html"; });
+});
+
+</script>
+  <script src="analytics-tracker.js"></script>
+  <script src="customer-journey-95.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+</body>
+</html>
+<style>.cj-checkout-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0}.cj-checkout-progress span{background:#eee;border-radius:999px;padding:9px;text-align:center;font-size:13px}.cj-checkout-progress .active{background:#d8b25d;color:#1f1a12;font-weight:700}.cj-sticky-checkout{position:sticky;bottom:14px;z-index:50;width:100%;box-shadow:0 10px 25px rgba(0,0,0,.18)}</style>
