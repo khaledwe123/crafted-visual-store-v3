@@ -24,7 +24,7 @@
     <div class="panel"><h2>Top Product Interest</h2><table><thead><tr><th>Product</th><th>Views</th><th>Sessions</th></tr></thead><tbody id="products"></tbody></table></div>
   </main>
 <script>
-function token(){return sessionStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('adminToken') || ''}
+function token(){return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''}
 async function api(path){const r=await fetch(path,{headers:{Authorization:'Bearer '+token()}}); if(!r.ok) throw new Error(await r.text()); return r.json();}
 function rows(id, arr, cols){document.getElementById(id).innerHTML=(arr||[]).map(x=>'<tr>'+cols.map(c=>'<td>'+String(typeof c==='function'?c(x):x[c]??'')+'</td>').join('')+'</tr>').join('')||'<tr><td colspan="4">No data yet</td></tr>';}
 function initialDays(){ const p=new URLSearchParams(location.search); return p.get('days') || localStorage.getItem('cvAnalyticsDays') || '30'; }

@@ -1,0 +1,16 @@
+Crafted Furniture v13 Godmode Auth Fix
+
+1. Upload all files to GitHub root and commit.
+2. Railway variables:
+   NODE_ENV=production
+   JWT_SECRET=<32+ characters>
+   DEFAULT_ADMIN_EMAIL=admin@craftedvisual.com
+   DEFAULT_ADMIN_PASSWORD=Admin@12345Secure
+   RESET_ADMIN_PASSWORD=true
+   PUBLIC_SITE_URL=<your Railway domain>
+3. Redeploy Railway.
+4. Check /api/version: CRAFTED-FURNITURE-GODMODE-AUTH-FIX-20260608-13
+5. Clear browser storage and login again.
+6. Verify role with /api/admin/me or sessionStorage.
+
+This version treats the authenticated DEFAULT_ADMIN_EMAIL as the secure system owner/superadmin in both backend and frontend permission checks.

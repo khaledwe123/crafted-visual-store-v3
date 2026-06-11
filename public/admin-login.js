@@ -14,17 +14,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function saveAdminAuth(data){
     const user = data && data.user;
-    const token = data && data.token;
-    if(token){
-      [localStorage, sessionStorage].forEach((store) => {
-        try {
-          store.setItem("cvAdminApiToken", token);
-          store.setItem("adminToken", token);
-          store.setItem("token", token);
-          store.setItem("authToken", token);
-        } catch (_) {}
-      });
-    }
+    // The real JWT is stored by the server in an HttpOnly cookie.
+    // This non-secret marker only keeps legacy admin scripts from assuming the user is logged out.
+    [localStorage, sessionStorage].forEach((store) => {
+      try {
+        store.setItem("cvAdminApiToken", "cookie-auth");
+        store.setItem("adminToken", "cookie-auth");
+        store.setItem("token", "cookie-auth");
+        store.setItem("authToken", "cookie-auth");
+      } catch (_) {}
+    });
     if(user){
       const userJson = JSON.stringify(user);
       [localStorage, sessionStorage].forEach((store) => {

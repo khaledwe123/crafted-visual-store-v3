@@ -10,9 +10,7 @@
     },
     token(admin=false){
       if(admin){
-        return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') ||
-               localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') ||
-               localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+        return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || '';
       }
       return localStorage.getItem('cvApiToken') || sessionStorage.getItem('cvApiToken') ||
              localStorage.getItem('customerToken') || sessionStorage.getItem('customerToken') || '';
@@ -47,11 +45,7 @@
     },
     async adminLogin(email,password){
       const r = await this.request('/admin/login', {method:'POST', body:{email,password}});
-      if(r.token){
-        ['cvAdminApiToken','adminToken','token'].forEach(k=>{
-          try{ localStorage.setItem(k, r.token); sessionStorage.setItem(k, r.token); }catch(e){}
-        });
-      }
+      try{ localStorage.setItem('cvAdminApiToken','cookie-auth'); sessionStorage.setItem('cvAdminApiToken','cookie-auth'); }catch(e){}
       if(r.user){
         try{ localStorage.setItem('cvAdminSession', JSON.stringify(r.user)); sessionStorage.setItem('cvAdminSession', JSON.stringify(r.user)); }catch(e){}
       }
@@ -71,13 +65,13 @@
     },
     async customerLogin(email,password){
       const r = await this.request('/customers/login', {method:'POST', body:{email,password}});
-      if(r.token){ try{ localStorage.setItem(this.tokenKey,r.token); sessionStorage.setItem(this.tokenKey,r.token); }catch(e){} }
+      try{ localStorage.setItem(this.tokenKey,'cookie-auth'); sessionStorage.setItem(this.tokenKey,'cookie-auth'); }catch(e){}
       if(r.user){ try{ localStorage.setItem('currentUser', JSON.stringify(r.user)); }catch(e){} }
       return r;
     },
     async customerRegister(payload){
       const r = await this.request('/customers/register', {method:'POST', body:payload});
-      if(r.token){ try{ localStorage.setItem(this.tokenKey,r.token); sessionStorage.setItem(this.tokenKey,r.token); }catch(e){} }
+      try{ localStorage.setItem(this.tokenKey,'cookie-auth'); sessionStorage.setItem(this.tokenKey,'cookie-auth'); }catch(e){}
       if(r.user){ try{ localStorage.setItem('currentUser', JSON.stringify(r.user)); }catch(e){} }
       return r;
     },

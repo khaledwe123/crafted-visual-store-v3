@@ -117,8 +117,10 @@ async function submitAuth(){
       if(window.CV_API && await CV_API.available()){
         await CV_API.customerRegister({name,email,mobile,password});
       } else {
-        showStatus("Online sign up is temporarily unavailable. Please try again later.", true);
-        return;
+        const users = getUsers();
+        if(users.some(u=>u.email === email)){ showStatus("Account already exists.", true); return; }
+        const user = {name,email,mobile,addresses:[],createdAt:new Date().toISOString()};
+        users.push(user); saveUsers(users); localStorage.setItem("currentUser", JSON.stringify(user));
       }
       location.href = returnUrl();
     }catch(err){ showStatus(err.message || "Sign up failed.", true); }
@@ -141,14 +143,13 @@ async function submitAuth(){
 
   if(mode === "forgot"){
     if(!validEmail(email)){ showStatus("Please enter a valid email.", true); return; }
-    try{
-      if(window.CV_API && await CV_API.available()){
-        await CV_API.forgotPassword(email);
-        showStatus("If this email exists, customer care will contact you.");
-      } else {
-        showStatus("Online password reset is temporarily unavailable. Please try again later.", true);
-      }
-    }catch(err){ showStatus(err.message || "Password reset request failed.", true); }
+    const resetRequests = JSON.parse(localStorage.getItem("passwordResetRequests") || "[]");
+    resetRequests.push({id:"RESET-" + Date.now(), email, date:new Date().toISOString(), status:"New"});
+    localStorage.setItem("passwordResetRequests", JSON.stringify(resetRequests));
+    const acts = JSON.parse(localStorage.getItem("crmActivities") || "[]");
+    acts.push({id:"ACT-" + Date.now(), type:"Password Reset Request", payload:{email}, date:new Date().toISOString()});
+    localStorage.setItem("crmActivities", JSON.stringify(acts));
+    showStatus("Password reset request saved. Customer care will contact you.");
     return;
   }
 }

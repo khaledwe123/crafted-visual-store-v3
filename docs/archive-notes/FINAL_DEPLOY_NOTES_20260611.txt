@@ -1,0 +1,8 @@
+Final rebuilt package for Railway/PostgreSQL.
+Fixes:
+- Restores full CSS/JS/public file structure.
+- Exposes CV_API globally for legacy admin scripts.
+- Adds final direct live backend admin/superadmin creation override.
+- Keeps favicon.ico in root and public.
+- Keeps menu compatibility functions.
+After pushing: wait for Railway redeploy, then hard refresh Command+Shift+R.

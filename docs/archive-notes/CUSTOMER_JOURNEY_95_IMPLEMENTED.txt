@@ -1,0 +1,38 @@
+Crafted Visual - 95/100 Customer Journey Upgrade
+
+Implemented in this package:
+1. Floating WhatsApp Furniture Expert button on public pages.
+2. Shop by Room section on Home page.
+3. Enhanced product cards with:
+   - Wishlist button
+   - Starting-from price
+   - Color swatches
+   - Fabric tags
+   - Delivery estimate
+   - Quick View / Customize buttons
+4. Product detail modal enhancements:
+   - Wishlist action
+   - Selected color/fabric/size/dimensions summary
+   - VAT included / warranty / secure enquiry / made in Saudi Arabia trust badges
+   - Customer reviews UI
+   - Related products
+5. Recently Viewed products shelf.
+6. Wishlist shelf.
+7. Customer journey events sent to backend:
+   - product_view
+   - wishlist_toggle
+   - add_to_cart
+   - selected color/fabric/size changes
+   - WhatsApp clicks
+8. Abandoned cart signal sent to backend after Add to Cart.
+9. One-page checkout improvements:
+   - Checkout progress indicator
+   - Sticky Continue to Payment button
+10. Works with the existing Analytics Center in Admin.
+
+To test:
+1. Upload all extracted files and folders to GitHub.
+2. Redeploy Railway.
+3. Open /shop.html.
+4. Open a product, select color/fabric/size, add to cart.
+5. Open /admin.html > Analytics Center to see journey events.

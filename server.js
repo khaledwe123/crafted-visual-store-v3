@@ -917,11 +917,9 @@ function htmlFileForRequest(req){
   let requested = req.path === '/' ? '/index.html' : req.path;
   if(!path.extname(requested)) requested += '.html';
   if(path.extname(requested).toLowerCase() !== '.html') return null;
-  const publicCandidate = path.join(__dirname, 'public', requested.replace(/^\/+/, ''));
-  const rootCandidate = path.join(__dirname, requested.replace(/^\/+/, ''));
-  for(const candidate of [publicCandidate, rootCandidate]){
-    if(candidate.startsWith(__dirname) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
-  }
+  const publicDir = path.join(__dirname, 'public');
+  const candidate = path.join(publicDir, requested.replace(/^\/+/, ''));
+  if(candidate.startsWith(publicDir) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   return null;
 }
 function applyHtmlSecurityTransforms(html, nonce){
@@ -942,20 +940,9 @@ app.get(['/', '/*.html'], (req,res,next)=>{
 });
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { fallthrough:false, setHeaders(res){ res.setHeader('X-Content-Type-Options','nosniff'); } }));
+// Production frontend assets are served from /public only.
+// Root-level backend and source files are never exposed as static assets.
 app.use(express.static(path.join(__dirname, 'public'), { extensions:['html'], fallthrough:true }));
-// SAFE_STATIC_EXTENSIONS_CV_FINAL: serve only frontend assets from the project root if
-// a deployment accidentally misses/caches the public copy. Backend/source files remain blocked.
-const SAFE_STATIC_EXTENSIONS_CV_FINAL = new Set(['.html','.css','.js','.json','.ico','.png','.jpg','.jpeg','.webp','.gif','.svg','.txt']);
-const BLOCKED_STATIC_BASENAMES_CV_FINAL = new Set(['server.js','db.js','schema.js','pg-sync-worker.js','package.json','package-lock.json','.env']);
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-  const ext = path.extname(req.path).toLowerCase();
-  const base = path.basename(req.path).toLowerCase();
-  if (!SAFE_STATIC_EXTENSIONS_CV_FINAL.has(ext) || BLOCKED_STATIC_BASENAMES_CV_FINAL.has(base)) return next();
-  const candidate = path.join(__dirname, req.path.replace(/^\/+/, ''));
-  if (!candidate.startsWith(__dirname) || !fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) return next();
-  return res.sendFile(candidate);
-});
 
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: IS_PROD ? 'Server error' : err.message }); });
 app.listen(PORT,()=>console.log(`Crafted Visual platform running securely: http://localhost:${PORT}`));
