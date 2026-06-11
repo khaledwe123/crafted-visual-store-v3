@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Track Order | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2">
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
+</head>
+<body>
+<header class="nav">
+  <div class="brand">Crafted Visual</div>
+  <nav><a href="index.html">Home</a></nav>
+</header>
+<main class="review-page">
+  <section class="review-box">
+    <h1>Track Your Order</h1>
+    <p>Enter the full order number exactly as received.</p>
+    <input id="trackInput" placeholder="Full Order Number e.g. CV-...">
+    <button class="btn primary" onclick="trackOrder()">Track Order</button>
+  </section>
+  <div id="trackResult"></div>
+</main>
+<script>
+function trackOrder(){
+  const q = document.getElementById("trackInput").value.trim().toLowerCase();
+  const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+  if(!q){
+    document.getElementById("trackResult").innerHTML = `<section class="review-box"><p>Please enter the full order number.</p></section>`;
+    return;
+  }
+  const found = orders.filter(o => (o.id || "").toLowerCase() === q);
+  document.getElementById("trackResult").innerHTML = found.length ? found.map(o=>`
+    <section class="review-box">
+      <h2>${o.id}</h2>
+      <p><strong>Status:</strong> ${o.orderStatus || "New Order"}</p>
+      <p><strong>Payment:</strong> ${o.paymentStatus || "Pending"}</p>
+      <p><strong>Total:</strong> SAR ${Number(o.total || 0).toLocaleString()}</p>
+      <div class="status-timeline">
+        ${["New Order","Paid","Confirmed","In Production","Quality Check","Ready for Delivery","Out for Delivery","Delivered"].map(s=>`
+          <span class="${s === o.orderStatus ? "active" : ""}">${s}</span>
+        `).join("")}
+      </div>
+    </section>
+  `).join("") : `<section class="review-box"><p>No order found.</p></section>`;
+}
+</script>
+<!-- CV_STATIC_ARABIC_PATCH -->
+
+<script>
+(function(){
+  const lang = localStorage.getItem('lang') || 'en';
+  if(lang !== 'ar') return;
+  document.documentElement.lang='ar';
+  document.documentElement.dir='rtl';
+  const map = {
+    'Crafted Visual':'كرافتد فيجوال','Home':'الرئيسية','Shop':'المتجر','My Account':'حسابي','Contact Us':'تواصل معنا','Track Order':'تتبع الطلب',
+    'Contact Crafted Visual':'تواصل مع كرافتد فيجوال','For furniture inquiries, custom orders, delivery, after-sales support, and project requests.':'لاستفسارات الأثاث والطلبات الخاصة والتوصيل وخدمة ما بعد البيع وطلبات المشاريع.','Contact Information':'معلومات التواصل','Send Inquiry':'إرسال استفسار','WhatsApp:':'واتساب:','Chat with us':'تواصل معنا','Email:':'البريد الإلكتروني:','Location: Riyadh, Saudi Arabia':'الموقع: الرياض، المملكة العربية السعودية','Working Hours: Saturday to Thursday, 9:00 AM - 9:00 PM':'ساعات العمل: من السبت إلى الخميس، 9:00 صباحاً - 9:00 مساءً','Product Inquiry':'استفسار عن منتج',
+    'Track Your Order':'تتبع طلبك','Enter the full order number exactly as received.':'أدخل رقم الطلب الكامل كما وصل إليك.','Track Order':'تتبع الطلب',
+    'My Account':'حسابي','Manage your saved delivery details.':'إدارة بيانات التوصيل المحفوظة.','Full Name':'الاسم الكامل','Email':'البريد الإلكتروني','Phone Number':'رقم الجوال','City':'المدينة','Delivery Address':'عنوان التوصيل','Building / Villa / Apartment':'المبنى / الفيلا / الشقة','Additional Notes':'ملاحظات إضافية','Save Account':'حفظ الحساب','Logout':'تسجيل الخروج'
+  };
+  function walk(node){
+    if(node.nodeType===3){
+      const t=node.nodeValue.trim();
+      if(map[t]) node.nodeValue=node.nodeValue.replace(t,map[t]);
+    } else if(node.nodeType===1 && !['SCRIPT','STYLE'].includes(node.tagName)) {
+      [...node.childNodes].forEach(walk);
+    }
+  }
+  walk(document.body);
+  const ph = {'Full Name':'الاسم الكامل','Mobile Number':'رقم الجوال','Email':'البريد الإلكتروني','Message':'الرسالة','Full Order Number e.g. CV-...':'رقم الطلب الكامل مثال CV-...','Phone Number':'رقم الجوال','Full delivery address':'عنوان التوصيل الكامل','Building, villa or apartment':'المبنى أو الفيلا أو الشقة','Preferred delivery notes':'ملاحظات التوصيل المفضلة'};
+  document.querySelectorAll('input,textarea').forEach(el=>{ if(ph[el.placeholder]) el.placeholder=ph[el.placeholder]; });
+  document.querySelectorAll('select option').forEach(o=>{ if(map[o.textContent.trim()]) o.textContent=map[o.textContent.trim()]; });
+})();
+</script>
+
+  <script src="analytics-tracker.js"></script>
+  <script src="customer-journey-95.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+</body>
+</html>
