@@ -1,0 +1,199 @@
+{
+  "brand_en": "Crafted Visual",
+  "brand_ar": "كرافتد فيجوال",
+  "hero_eyebrow_en": "2026 Furniture Collection",
+  "hero_eyebrow_ar": "مجموعة أثاث 2026",
+  "hero_title_en": "Premium sofas, beds, and chairs by Crafted Visual.",
+  "hero_title_ar": "كنب وأسرة وكراسي فاخرة من كرافتد فيجوال.",
+  "hero_text_en": "Custom dimensions, premium fabrics, elegant colors, and a luxury shopping experience.",
+  "hero_text_ar": "مقاسات مخصصة، أقمشة فاخرة، ألوان أنيقة، وتجربة تسوق راقية.",
+  "hero_image": "assets/products/product_13.png",
+  "intro_title_en": "Luxury furniture with custom options",
+  "intro_title_ar": "أثاث فاخر بخيارات تفصيل متعددة",
+  "intro_text_en": "Choose your product, select fabric, select color, view the correct image, then add to cart.",
+  "intro_text_ar": "اختر المنتج، القماش، اللون، وشاهد الصورة المطابقة ثم أضف المنتج إلى السلة.",
+  "footer_text_en": "Premium customizable furniture by Crafted Visual in Saudi Arabia.",
+  "footer_text_ar": "أثاث فاخر قابل للتخصيص من كرافتد فيجوال في المملكة العربية السعودية.",
+  "whatsapp_number": "966500000000",
+  "riyadh_delivery": 0,
+  "outside_riyadh_delivery": 400,
+  "currency": "SAR",
+  "instagram_url": "https://instagram.com/",
+  "tiktok_url": "https://tiktok.com/",
+  "facebook_url": "https://facebook.com/",
+  "x_url": "https://x.com/",
+  "linkedin_url": "https://linkedin.com/",
+  "youtube_url": "https://youtube.com/",
+  "snapchat_url": "https://snapchat.com/",
+  "google_analytics_id": "G-XXXXXXXXXX",
+  "google_tag_manager_id": "GTM-XXXXXXX",
+  "meta_pixel_id": "",
+  "tiktok_pixel_id": "",
+  "snap_pixel_id": "",
+  "hotjar_id": "",
+  "crm_followup_days": [
+    1,
+    3,
+    7,
+    14
+  ],
+  "order_statuses": [
+    "New Order",
+    "Pending Payment",
+    "Paid",
+    "Confirmed",
+    "In Production",
+    "Quality Check",
+    "Ready for Delivery",
+    "Out for Delivery",
+    "Delivered",
+    "Cancelled"
+  ],
+  "about_title_en": "About Crafted Visual",
+  "about_title_ar": "عن كرافتد فيجوال",
+  "about_text_en": "Crafted Visual creates premium custom furniture for modern Saudi homes, combining elegant design, high-quality materials, tailored dimensions, and refined finishing.",
+  "about_text_ar": "كرافتد فيجوال تقدم أثاثاً فاخراً مخصصاً للمنازل السعودية العصرية، يجمع بين التصميم الأنيق والخامات عالية الجودة والمقاسات حسب الطلب.",
+  "about_image": "assets/products/product_13.png",
+  "email_from_name": "Crafted Visual Customer Care",
+  "customer_care_email": "orders@craftedvisual.com",
+  "do_not_reply_email": "do-not-reply@craftedvisual.com",
+  "crm_email_api_url": "",
+  "whatsapp_business_api_url": "",
+  "auto_send_email": true,
+  "auto_send_whatsapp": false,
+  "vat_rate": 15,
+  "standard_sizes": {
+    "L Shape Sofas": [
+      "280 x 180 cm",
+      "300 x 200 cm",
+      "320 x 220 cm",
+      "350 x 230 cm",
+      "Custom Size"
+    ],
+    "Beds": [
+      "Queen 160 x 200 cm",
+      "King 180 x 200 cm",
+      "Super King 200 x 200 cm",
+      "Custom Size"
+    ],
+    "Single Chairs": [
+      "80 x 85 cm",
+      "90 x 95 cm",
+      "100 x 100 cm",
+      "Custom Size"
+    ]
+  },
+  "footer_cr_number": "",
+  "footer_vat_number": "",
+  "footer_address": "Riyadh, Saudi Arabia",
+  "footer_email": "orders@craftedvisual.com",
+  "footer_phone": "",
+  "footer_extra_info_en": "",
+  "footer_extra_info_ar": "",
+  "auto_translate_arabic": true,
+  "about_box1_title_en": "Custom Sizes",
+  "about_box1_title_ar": "مقاسات حسب الطلب",
+  "about_box1_text_en": "Made to fit your space.",
+  "about_box1_text_ar": "مصممة لتناسب مساحتك.",
+  "about_box2_title_en": "Premium Fabrics",
+  "about_box2_title_ar": "أقمشة فاخرة",
+  "about_box2_text_en": "Multiple colors and textures.",
+  "about_box2_text_ar": "ألوان وخامات متعددة.",
+  "about_box3_title_en": "Saudi Delivery",
+  "about_box3_title_ar": "توصيل داخل السعودية",
+  "about_box3_text_en": "Free delivery inside Riyadh.",
+  "about_box3_text_ar": "توصيل مجاني داخل الرياض.",
+  "seo_pages": {
+    "home": {
+      "title": "Custom Furniture Saudi Arabia | Crafted Visual",
+      "description": "Shop premium custom furniture in Saudi Arabia including sofas, beds, chairs, luxury fabrics, custom sizes, and Riyadh delivery by Crafted Visual.",
+      "keywords": [
+        "custom furniture Saudi Arabia",
+        "premium furniture Riyadh",
+        "sofas Riyadh",
+        "beds Saudi Arabia",
+        "single chairs",
+        "luxury furniture",
+        "custom sofas",
+        "furniture delivery Riyadh"
+      ],
+      "title_en": "Custom Furniture Saudi Arabia | Crafted Visual",
+      "title_ar": "أثاث مخصص في السعودية | كرافتد فيجوال",
+      "description_en": "Shop premium custom furniture in Saudi Arabia including sofas, beds, chairs, luxury fabrics, custom sizes, and Riyadh delivery by Crafted Visual.",
+      "description_ar": "تسوق أثاثاً مخصصاً وفاخراً في السعودية يشمل الكنب والأسرة والكراسي والأقمشة الفاخرة والمقاسات حسب الطلب من كرافتد فيجوال."
+    },
+    "shop": {
+      "title": "Shop Custom Sofas, Beds & Chairs | Crafted Visual",
+      "description": "Browse Crafted Visual furniture collections with custom sizes, fabrics, colors, prices, and delivery options across Saudi Arabia.",
+      "keywords": [
+        "shop furniture Saudi Arabia",
+        "buy sofa Riyadh",
+        "custom beds Riyadh",
+        "custom chairs Saudi",
+        "furniture ecommerce Saudi Arabia"
+      ],
+      "title_en": "Shop Custom Sofas, Beds & Chairs | Crafted Visual",
+      "title_ar": "تسوق كنب وأسرة وكراسي مخصصة | كرافتد فيجوال",
+      "description_en": "Browse Crafted Visual furniture collections with custom sizes, fabrics, colors, prices, and delivery options across Saudi Arabia.",
+      "description_ar": "تصفح مجموعات أثاث كرافتد فيجوال مع المقاسات والأقمشة والألوان والأسعار وخيارات التوصيل داخل السعودية."
+    },
+    "contact": {
+      "title": "Contact Crafted Visual Furniture | Riyadh Saudi Arabia",
+      "description": "Contact Crafted Visual for custom furniture orders, WhatsApp inquiries, delivery questions, and furniture support in Saudi Arabia.",
+      "keywords": [
+        "contact furniture Riyadh",
+        "custom furniture inquiry",
+        "furniture WhatsApp Saudi Arabia",
+        "Crafted Visual contact"
+      ],
+      "title_en": "Contact Crafted Visual Furniture | Riyadh Saudi Arabia",
+      "title_ar": "تواصل مع كرافتد فيجوال للأثاث | الرياض السعودية",
+      "description_en": "Contact Crafted Visual for custom furniture orders, WhatsApp inquiries, delivery questions, and furniture support in Saudi Arabia.",
+      "description_ar": "تواصل مع كرافتد فيجوال لطلبات الأثاث المخصص، الاستفسارات عبر واتساب، التوصيل، وخدمة العملاء في السعودية."
+    },
+    "account": {
+      "title": "My Account | Crafted Visual Furniture",
+      "description": "Sign in to your Crafted Visual account to track orders, manage furniture purchases, and review your shopping journey.",
+      "keywords": [
+        "furniture account",
+        "track furniture order",
+        "Crafted Visual account"
+      ],
+      "title_en": "My Account | Crafted Visual Furniture",
+      "title_ar": "حسابي | كرافتد فيجوال للأثاث",
+      "description_en": "Sign in to your Crafted Visual account to track orders, manage furniture purchases, and review your shopping journey.",
+      "description_ar": "سجل الدخول إلى حسابك في كرافتد فيجوال لتتبع الطلبات وإدارة بيانات التوصيل والمشتريات."
+    },
+    "product": {
+      "title": "Custom Furniture Product | Crafted Visual",
+      "description": "View product details, custom sizes, fabrics, colors, prices, and ordering options from Crafted Visual.",
+      "keywords": [
+        "custom furniture product",
+        "custom size sofa",
+        "custom fabric furniture",
+        "luxury product Saudi Arabia"
+      ],
+      "title_en": "Custom Furniture Product | Crafted Visual",
+      "title_ar": "منتج أثاث مخصص | كرافتد فيجوال",
+      "description_en": "View product details, custom sizes, fabrics, colors, prices, and ordering options from Crafted Visual.",
+      "description_ar": "شاهد تفاصيل المنتج والمقاسات والأقمشة والألوان والأسعار وخيارات الطلب من كرافتد فيجوال."
+    },
+    "track": {
+      "title_en": "Track Your Order | Crafted Visual",
+      "title_ar": "تتبع طلبك | كرافتد فيجوال",
+      "description_en": "Track your Crafted Visual furniture order status using your order number.",
+      "description_ar": "تتبع حالة طلب الأثاث الخاص بك من كرافتد فيجوال باستخدام رقم الطلب.",
+      "keywords": []
+    }
+  },
+  "hero_banners": [
+    "assets/products/product_13.png"
+  ],
+  "hero_banner_1": "assets/products/product_13.png",
+  "hero_banner_2": "",
+  "hero_banner_3": "",
+  "hero_banner_4": "",
+  "hero_banner_5": "",
+  "site_url": "",
+  "seo_default_image": "product_01.png"
+}

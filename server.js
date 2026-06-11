@@ -825,5 +825,19 @@ app.delete('/api/media/assignments/:assignId', adminAuth('media','write'), (req,
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { fallthrough:false, setHeaders(res){ res.setHeader('X-Content-Type-Options','nosniff'); } }));
 app.use(express.static(path.join(__dirname, 'public'), { extensions:['html'], fallthrough:true }));
+// SAFE_STATIC_EXTENSIONS_CV_FINAL: serve only frontend assets from the project root if
+// a deployment accidentally misses/caches the public copy. Backend/source files remain blocked.
+const SAFE_STATIC_EXTENSIONS_CV_FINAL = new Set(['.html','.css','.js','.json','.ico','.png','.jpg','.jpeg','.webp','.gif','.svg','.txt']);
+const BLOCKED_STATIC_BASENAMES_CV_FINAL = new Set(['server.js','db.js','schema.js','pg-sync-worker.js','package.json','package-lock.json','.env']);
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+  const ext = path.extname(req.path).toLowerCase();
+  const base = path.basename(req.path).toLowerCase();
+  if (!SAFE_STATIC_EXTENSIONS_CV_FINAL.has(ext) || BLOCKED_STATIC_BASENAMES_CV_FINAL.has(base)) return next();
+  const candidate = path.join(__dirname, req.path.replace(/^\/+/, ''));
+  if (!candidate.startsWith(__dirname) || !fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) return next();
+  return res.sendFile(candidate);
+});
+
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: IS_PROD ? 'Server error' : err.message }); });
 app.listen(PORT,()=>console.log(`Crafted Visual platform running securely: http://localhost:${PORT}`));
