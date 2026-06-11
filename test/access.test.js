@@ -22,6 +22,12 @@ const TMP_DB = path.join(os.tmpdir(), `cv_test_${Date.now()}.sqlite`);
 const OWNER_EMAIL = 'admin@craftedvisual.com';
 const OWNER_PASS = 'OwnerPass12345!';
 
+
+if (!process.env.DATABASE_URL && !process.env.TEST_DATABASE_URL) {
+  test('PostgreSQL integration tests require DATABASE_URL or TEST_DATABASE_URL', { skip: true }, () => {});
+  process.exit(0);
+}
+
 let server;
 
 function waitForHealth(timeoutMs = 15000) {
@@ -54,13 +60,13 @@ async function api(path, { method = 'GET', token, body, raw } = {}) {
 }
 
 test.before(async () => {
-  server = spawn(process.execPath, ['--experimental-sqlite', 'server.js'], {
+  server = spawn(process.execPath, ['server.js'], {
     cwd: path.join(__dirname, '..'),
     env: {
       ...process.env,
       NODE_ENV: 'development',
       PORT: String(PORT),
-      DATABASE_FILE: TMP_DB,
+      DATABASE_URL: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
       DEFAULT_ADMIN_EMAIL: OWNER_EMAIL,
       DEFAULT_ADMIN_PASSWORD: OWNER_PASS,
     },

@@ -1129,3 +1129,70 @@ img, video, iframe { max-width: 100%; }
   .cms-tabs { grid-template-columns: 1fr !important; }
   .admin-wrap, main.admin-wrap { padding: 14px 10px; }
 }
+
+/* === Crafted Visual duplicate mobile UI fix 20260611 === */
+.nav .mobile-menu-toggle,
+.nav .ux95-mobile-toggle{
+  display:none !important;
+}
+.nav #cvPrimaryMobileMenu{
+  display:none;
+}
+.mobile-bottom-nav,
+.ux95-bottom-nav{
+  display:none !important;
+}
+.ux95-floating-wa,
+#cvExpertWA:not(#floatingExpertWhatsapp){
+  display:none !important;
+}
+@media (max-width: 900px){
+  .nav #cvPrimaryMobileMenu{
+    display:inline-flex !important;
+    align-items:center;
+    justify-content:center;
+    min-height:44px;
+    min-width:88px;
+    padding:10px 14px;
+    border-radius:14px;
+    border:0;
+    background:#183d32;
+    color:#fff;
+    font-weight:900;
+    box-shadow:0 8px 20px rgba(24,61,50,.16);
+  }
+  .nav{
+    grid-template-columns:1fr auto !important;
+  }
+  #mainMenu{
+    display:none !important;
+    grid-column:1 / -1 !important;
+  }
+  body.cv-menu-open #mainMenu,
+  body.ux95-menu-open #mainMenu,
+  body.mobile-menu-open #mainMenu,
+  #mainMenu.cv-menu-visible{
+    display:flex !important;
+  }
+  #cvBottomNav[data-cv-primary-bottom-nav="true"]{
+    display:grid !important;
+  }
+  #floatingExpertWhatsapp[data-cv-primary-whatsapp="true"]{
+    display:flex !important;
+    left:14px !important;
+    right:14px !important;
+    bottom:86px !important;
+    max-width:none !important;
+    justify-content:center;
+    text-align:center;
+  }
+}
+@media (min-width: 901px){
+  #cvBottomNav{display:none !important;}
+  #floatingExpertWhatsapp[data-cv-primary-whatsapp="true"]{
+    left:auto !important;
+    right:24px !important;
+    bottom:24px !important;
+    max-width:240px;
+  }
+}

@@ -53,7 +53,7 @@
       const res = await fetch('/api/admin/me', {credentials:'same-origin', headers:{Authorization:'Bearer '+t}});
       if(!res.ok) throw new Error('not authenticated');
       const data = await res.json();
-      setSession(data.user);
+      setSession(data.user || data);
     }catch(e){ location.href = 'admin-login.html'; }
   }
   verify();

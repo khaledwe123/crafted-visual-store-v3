@@ -36,6 +36,9 @@ function normalizeSql(sql, wantsInsertedId = false) {
   let out = convertPlaceholders(sql)
     .replace(/\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b/gi, 'SERIAL PRIMARY KEY')
     .replace(/\bREAL\b/gi, 'NUMERIC')
+    // SQLite compatibility used by legacy analytics queries.
+    .replace(/datetime\('now',\s*\$(\d+)\)/gi, "CURRENT_TIMESTAMP + ($$$1)::interval")
+    .replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP')
     .replace(/\bCURRENT_DATE\b/gi, 'CURRENT_DATE')
     .replace(/\bCURRENT_TIMESTAMP\b/gi, 'CURRENT_TIMESTAMP');
 
