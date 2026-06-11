@@ -18,7 +18,8 @@ const CV_API = {
   async customerLogin(email,password){ const r=await this.request('/customers/login',{method:'POST',body:{email,password}}); localStorage.setItem(this.tokenKey,r.token); localStorage.setItem('currentUser', JSON.stringify(r.user)); return r; },
   async customerRegister(payload){ const r=await this.request('/customers/register',{method:'POST',body:payload}); localStorage.setItem(this.tokenKey,r.token); localStorage.setItem('currentUser', JSON.stringify(r.user)); return r; },
   async createOrderFromPrototype(order){
-    const items = (order.items||[]).map(i=>({name:i.name, size:i.size, fabric:i.fabric, color:i.color, qty:i.qty||1, price:i.price, unit_price_before_vat:i.priceBeforeVat||i.price, vat_rate:i.vatRate||15, cost:i.cost||i.unit_cost||0, data:i}));
-    return this.request('/orders',{method:'POST',body:{customer:order.customer,items,city:order.city,address:order.address,notes:order.notes,delivery_before_vat:order.deliveryBeforeVat||0,discount_amount:order.discount||0}});
+    const items = (order.items||[]).map(i=>({id:i.id, product_id:i.product_id, productId:i.productId, sku:i.sku, name:i.name, size:i.size, fabric:i.fabric, color:i.color, qty:i.qty||1, discountPercent:i.discountPercent||0, data:i}));
+    const discountCode = order.discountCode && order.discountCode.code ? order.discountCode.code : '';
+    return this.request('/orders',{method:'POST',body:{customer:order.customer,items,city:order.city,address:order.address,notes:order.notes,delivery_before_vat:order.deliveryBeforeVat||0,discount_code:discountCode}});
   }
 };

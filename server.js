@@ -36,10 +36,11 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 
 app.use(cors({
   origin(origin, cb) {
-    if (!origin || !IS_PROD || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return cb(null, true);
+    if (IS_PROD && allowedOrigins.length === 0) return cb(new Error('ALLOWED_ORIGINS must be set in production'));
+    if (!origin || !IS_PROD || allowedOrigins.includes(origin)) return cb(null, true);
     return cb(new Error('CORS origin not allowed'));
   },
-  credentials: false,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -66,7 +67,7 @@ app.use((req, res, next) => {
   if (IS_PROD && req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
     return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
   }
-  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=()');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=(self)');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
@@ -115,6 +116,26 @@ const upload = multer({
   }
 });
 
+function isAllowedImageSignature(filePath){
+  try{
+    const b = fs.readFileSync(filePath);
+    if(b.length < 12) return false;
+    const isJpg = b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+    const isPng = b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a;
+    const isGif = b.slice(0,6).toString('ascii') === 'GIF87a' || b.slice(0,6).toString('ascii') === 'GIF89a';
+    const isWebp = b.slice(0,4).toString('ascii') === 'RIFF' && b.slice(8,12).toString('ascii') === 'WEBP';
+    return isJpg || isPng || isGif || isWebp;
+  }catch(e){ return false; }
+}
+function validateUploadedImage(req,res,next){
+  if(!req.file) return res.status(400).json({error:'No image file uploaded'});
+  if(!isAllowedImageSignature(req.file.path)){
+    try{ fs.unlinkSync(req.file.path); }catch(e){}
+    return res.status(400).json({error:'Uploaded file is not a valid image.'});
+  }
+  next();
+}
+
 function sanitizeText(v, max = 5000) {
   if (v === undefined || v === null) return v;
   return String(v).replace(/[<>]/g, '').trim().slice(0, max);
@@ -129,9 +150,79 @@ function sanitizeBody(obj) {
 }
 app.use((req, _res, next) => { if (req.body) sanitizeBody(req.body); next(); });
 
+function isEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim()); }
+function toNum(v, def=0, min=0, max=Number.MAX_SAFE_INTEGER){
+  const n = Number(v);
+  if(!Number.isFinite(n)) return def;
+  return Math.min(max, Math.max(min, n));
+}
+function cleanStr(v, max=500){ return sanitizeText(v || '', max); }
+function publicSettings(settings){
+  const deny = new Set(['smtp','smtp_password','email_password','api_key','api_secret','secret','jwt_secret','admin_password','password','private_settings']);
+  const out = {};
+  Object.entries(settings || {}).forEach(([k,v]) => { if(!deny.has(String(k).toLowerCase())) out[k] = v; });
+  return out;
+}
+
+function deliveryBeforeVatForCity(city){
+  const cityName = String(city||'').trim().toLowerCase();
+  const rows = db.prepare('SELECT key,value FROM settings WHERE key IN (?,?)').all('riyadh_delivery','outside_riyadh_delivery');
+  const map = Object.fromEntries(rows.map(r=>[r.key, r.value]));
+  const riyadh = toNum(map.riyadh_delivery,0,0,100000);
+  const outside = toNum(map.outside_riyadh_delivery,riyadh,0,100000);
+  return cityName.includes('riyadh') || cityName.includes('الرياض') ? riyadh : outside;
+}
+function validateDiscountCode(code){
+  const c = db.prepare('SELECT id,code,percent,active,expires_at,usage_limit,usage_count FROM discount_codes WHERE code=? AND active=1').get(String(code||'').trim().toUpperCase());
+  if(!c) return {valid:false, error:'Invalid discount code'};
+  if(c.expires_at && new Date(c.expires_at) < new Date()) return {valid:false, error:'Expired'};
+  if(c.usage_limit && c.usage_count >= c.usage_limit) return {valid:false, error:'Usage limit reached'};
+  c.percent = toNum(c.percent, 0, 0, 100);
+  return {valid:true, discount:c};
+}
+function findProductForCartItem(item){
+  const id = cleanStr(item.id || item.product_id || item.productId || item.sku || '', 120);
+  let p = null;
+  if(id) p = db.prepare('SELECT * FROM products WHERE active=1 AND (sku=? OR id=?)').get(id, Number(id)||-1);
+  if(!p && item.name) p = db.prepare('SELECT * FROM products WHERE active=1 AND (lower(name_en)=lower(?) OR lower(name_ar)=lower(?))').get(item.name, item.name);
+  return p;
+}
+function findVariantForCartItem(product, item){
+  if(!product) return null;
+  return db.prepare(`SELECT * FROM product_variants WHERE product_id=?
+    AND (size IS NULL OR size='' OR lower(size)=lower(?))
+    AND (fabric IS NULL OR fabric='' OR lower(fabric)=lower(?))
+    AND (color IS NULL OR color='' OR lower(color)=lower(?))
+    ORDER BY id DESC LIMIT 1`).get(product.id, cleanStr(item.size,120), cleanStr(item.fabric,120), cleanStr(item.color,120));
+}
+
 function json(v,d={}){ try{return JSON.parse(v||'')}catch{return d} }
+
+function parseCookies(req){
+  const header = req.headers.cookie || '';
+  return Object.fromEntries(header.split(';').map(v => v.trim()).filter(Boolean).map(v => {
+    const i = v.indexOf('=');
+    return i === -1 ? [v, ''] : [decodeURIComponent(v.slice(0,i)), decodeURIComponent(v.slice(i+1))];
+  }));
+}
+function setAuthCookie(res, name, value){
+  const parts = [`${name}=${encodeURIComponent(value)}`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=43200'];
+  if (IS_PROD) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+function clearAuthCookie(res, name){
+  const parts = [`${name}=`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0'];
+  if (IS_PROD) parts.push('Secure');
+  res.append ? res.append('Set-Cookie', parts.join('; ')) : res.setHeader('Set-Cookie', parts.join('; '));
+}
+function bearerOrCookieToken(req){
+  const h = req.headers.authorization || '';
+  if (h.startsWith('Bearer ')) return h.slice(7);
+  const cookies = parseCookies(req);
+  return cookies.cv_admin_auth || cookies.cv_customer_auth || '';
+}
 function token(user,type){ return jwt.sign({id:user.id,email:user.email,role:user.role,type}, ACTIVE_JWT_SECRET, {expiresIn:'12h'}); }
-function auth(req,res,next){ const h=req.headers.authorization||''; try{ req.user=jwt.verify(h.replace('Bearer ',''),ACTIVE_JWT_SECRET); next(); } catch(e){ res.status(401).json({error:'Unauthorized'}); } }
+function auth(req,res,next){ const raw = bearerOrCookieToken(req); try{ req.user=jwt.verify(raw,ACTIVE_JWT_SECRET); next(); } catch(e){ res.status(401).json({error:'Unauthorized'}); } }
 function isDefaultSuperAdminEmail(email=''){
   const configured = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@craftedvisual.com').trim().toLowerCase();
   return String(email || '').trim().toLowerCase() === configured;
@@ -324,7 +415,7 @@ seedDefaults();
 app.get('/api/health',(req,res)=>res.json({ok:true, platform:'Crafted Visual DB Ecommerce', time:new Date().toISOString()}));
 app.get('/api/version',(req,res)=>res.json({version:'CRAFTED-VISUAL-SUPERADMIN-MEDIA-FIX-20260609-18', superadminFix:true, mediaLibrary:true, publicTopRibbon:false, publicAnalyticsMenu:false, adminLogin:true, time:new Date().toISOString()}));
 
-app.get('/api/settings',(req,res)=>res.json(getSettingObject()));
+app.get('/api/settings',(req,res)=>res.json(publicSettings(getSettingObject())));
 app.put('/api/settings', adminAuth('settings','write'), (req,res)=>{ saveSettingObject(req.body || {}); res.json({ok:true, settings:getSettingObject()}); });
 app.post('/api/settings', adminAuth('settings','write'), (req,res)=>{ saveSettingObject(req.body || {}); res.json({ok:true, settings:getSettingObject()}); });
 
@@ -421,8 +512,10 @@ app.post('/api/admin/login', authLimiter, (req,res)=>{
 
   const role = String(user.role || '').toLowerCase();
   const permissions = (role === 'superadmin' || isDefaultSuperAdminEmail(user.email)) ? fullPermissions() : json(user.permissions_json,{});
+  const adminJwt = token(user,'admin');
+  setAuthCookie(res, 'cv_admin_auth', adminJwt);
   res.json({
-    token:token(user,'admin'),
+    token: IS_PROD ? undefined : adminJwt,
     user:{id:user.id,name:user.name,email:user.email,role:user.role,permissions}
   });
 });
@@ -443,8 +536,56 @@ app.get('/api/admin/me',(req,res)=>{
     });
   });
 });
-app.post('/api/customers/register', authLimiter, (req,res)=>{ const {name,email,mobile,password,city,address}=req.body; const hash=password?bcrypt.hashSync(password,10):null; const r=db.prepare('INSERT INTO customers(name,email,mobile,password_hash,city,address) VALUES(?,?,?,?,?,?)').run(name,email,mobile,hash,city,address); const u=db.prepare('SELECT id,name,email,mobile,city,address FROM customers WHERE id=?').get(r.lastInsertRowid); res.json({token:token({...u,role:'customer'},'customer'), user:u}); });
-app.post('/api/customers/login', authLimiter, (req,res)=>{ const {email,password}=req.body; const u=db.prepare('SELECT * FROM customers WHERE lower(email)=lower(?)').get(email||''); if(!u || !u.password_hash || !bcrypt.compareSync(password||'',u.password_hash)) return res.status(401).json({error:'Invalid login'}); res.json({token:token({...u,role:'customer'},'customer'), user:{id:u.id,name:u.name,email:u.email,mobile:u.mobile,city:u.city,address:u.address}}); });
+app.post('/api/customers/register', authLimiter, (req,res)=>{
+  const {name,email,mobile,password,city,address}=req.body || {};
+  if(!cleanStr(name,120) || !isEmail(email) || !cleanStr(mobile,50) || String(password||'').length < 8){
+    return res.status(400).json({error:'Please enter name, valid email, mobile, and password of at least 8 characters.'});
+  }
+  try{
+    const hash=bcrypt.hashSync(String(password),12);
+    const r=db.prepare('INSERT INTO customers(name,email,mobile,password_hash,city,address) VALUES(?,?,?,?,?,?)')
+      .run(cleanStr(name,120),String(email).trim().toLowerCase(),cleanStr(mobile,50),hash,cleanStr(city,100),cleanStr(address,500));
+    const u=db.prepare('SELECT id,name,email,mobile,city,address FROM customers WHERE id=?').get(r.lastInsertRowid);
+    const customerJwt = token({...u,role:'customer'},'customer');
+    setAuthCookie(res, 'cv_customer_auth', customerJwt);
+    res.json({token: IS_PROD ? undefined : customerJwt, user:u});
+  }catch(e){
+    if(String(e.message||'').includes('UNIQUE')) return res.status(409).json({error:'Account already exists.'});
+    throw e;
+  }
+});
+app.post('/api/customers/login', authLimiter, (req,res)=>{
+  const {email,password}=req.body || {};
+  if(!isEmail(email) || !password) return res.status(400).json({error:'Enter a valid email and password.'});
+  const u=db.prepare('SELECT * FROM customers WHERE lower(email)=lower(?)').get(String(email).trim().toLowerCase());
+  if(!u || !u.password_hash || !bcrypt.compareSync(String(password),u.password_hash)) return res.status(401).json({error:'Invalid login'});
+  const customerJwt = token({...u,role:'customer'},'customer');
+  setAuthCookie(res, 'cv_customer_auth', customerJwt);
+  res.json({token: IS_PROD ? undefined : customerJwt, user:{id:u.id,name:u.name,email:u.email,mobile:u.mobile,city:u.city,address:u.address}});
+});
+app.get('/api/customer/me', auth, (req,res)=>{
+  if(req.user.type !== 'customer') return res.status(403).json({error:'Customer only'});
+  const u=db.prepare('SELECT id,name,email,mobile,city,address,notes,created_at FROM customers WHERE id=?').get(req.user.id);
+  if(!u) return res.status(404).json({error:'Customer not found'});
+  res.json({user:u});
+});
+app.post('/api/auth/logout',(req,res)=>{ clearAuthCookie(res,'cv_customer_auth'); clearAuthCookie(res,'cv_admin_auth'); res.json({ok:true}); });
+app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
+  const {email}=req.body||{};
+  if(!isEmail(email)) return res.status(400).json({error:'Enter a valid email.'});
+  const u=db.prepare('SELECT id,email FROM customers WHERE lower(email)=lower(?)').get(String(email).trim().toLowerCase());
+  const tokenValue=crypto.randomBytes(24).toString('hex');
+  db.prepare('INSERT INTO crm_activities(customer_id,type,channel,subject,body,status,metadata_json) VALUES(?,?,?,?,?,?,?)')
+    .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
+  res.json({ok:true, message:'If this email exists, customer care will contact you.'});
+});
+app.get('/api/admin/me', auth, (req,res)=>{
+  if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
+  const u=db.prepare('SELECT id,name,email,role,permissions_json,active FROM admin_users WHERE id=? AND active=1').get(req.user.id);
+  if(!u) return res.status(404).json({error:'Admin not found'});
+  const role=String(u.role||'').toLowerCase();
+  res.json({user:{id:u.id,name:u.name,email:u.email,role:u.role,permissions:(role==='superadmin'||isDefaultSuperAdminEmail(u.email))?fullPermissions():json(u.permissions_json,{})}});
+});
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
 app.get('/api/products',(req,res)=>res.json(db.prepare(`SELECT p.*, c.name_en category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.active=1 ORDER BY p.created_at DESC`).all().map(p=>({...p,data:json(p.data_json,{})}))));
@@ -454,15 +595,80 @@ app.put('/api/products/:id',adminAuth('products','write'),(req,res)=>{ const b=r
 app.post('/api/products/:id/variants',adminAuth('products','write'),(req,res)=>{ const b=req.body; const r=db.prepare('INSERT INTO product_variants(product_id,size,fabric,color,color_code,selling_price_before_vat,cost,stock_qty,data_json) VALUES(?,?,?,?,?,?,?,?,?)').run(req.params.id,b.size,b.fabric,b.color,b.color_code,b.selling_price_before_vat||0,b.cost||0,b.stock_qty||0,JSON.stringify(b.data||{})); res.json({id:r.lastInsertRowid}); });
 app.get('/api/discounts',adminAuth('discounts','read'),(req,res)=>res.json(db.prepare('SELECT * FROM discount_codes ORDER BY id DESC').all()));
 app.post('/api/discounts',adminAuth('discounts','write'),(req,res)=>{ const b=req.body; const r=db.prepare('INSERT INTO discount_codes(code,percent,active,expires_at,usage_limit) VALUES(?,?,?,?,?)').run(String(b.code).toUpperCase(),b.percent,b.active!==false?1:0,b.expires_at,b.usage_limit); res.json({id:r.lastInsertRowid}); });
-app.get('/api/discounts/validate/:code',(req,res)=>{ const c=db.prepare('SELECT * FROM discount_codes WHERE code=? AND active=1').get(String(req.params.code).toUpperCase()); if(!c) return res.status(404).json({valid:false}); if(c.expires_at && new Date(c.expires_at)<new Date()) return res.status(400).json({valid:false,error:'Expired'}); if(c.usage_limit && c.usage_count>=c.usage_limit) return res.status(400).json({valid:false,error:'Usage limit reached'}); res.json({valid:true,discount:c}); });
+app.get('/api/discounts/validate/:code',(req,res)=>{ const v=validateDiscountCode(req.params.code); if(!v.valid) return res.status(400).json(v); res.json({valid:true, discount:{code:v.discount.code, percent:v.discount.percent}}); });
 app.put('/api/discounts/:id',adminAuth('discounts','write'),(req,res)=>{ const b=req.body||{}; const existing=db.prepare('SELECT * FROM discount_codes WHERE id=?').get(req.params.id); if(!existing) return res.status(404).json({error:'Discount not found'}); db.prepare('UPDATE discount_codes SET code=COALESCE(?,code), percent=COALESCE(?,percent), active=COALESCE(?,active), expires_at=COALESCE(?,expires_at), usage_limit=COALESCE(?,usage_limit) WHERE id=?').run(b.code?String(b.code).toUpperCase():null, b.percent!=null?b.percent:null, b.active!=null?(b.active?1:0):null, b.expires_at!==undefined?b.expires_at:null, b.usage_limit!=null?b.usage_limit:null, req.params.id); auditLog(req,'discount.update','discount_code',req.params.id,{active:b.active}); res.json({ok:true}); });
 app.delete('/api/discounts/:id',adminAuth('discounts','write'),(req,res)=>{ const existing=db.prepare('SELECT * FROM discount_codes WHERE id=?').get(req.params.id); if(!existing) return res.status(404).json({error:'Discount not found'}); db.prepare('DELETE FROM discount_codes WHERE id=?').run(req.params.id); auditLog(req,'discount.delete','discount_code',req.params.id,{code:existing.code}); res.json({ok:true}); });
-app.post('/api/orders', writeLimiter, async (req,res)=>{ const b=req.body; const customer=b.customer||{}; let cid=null; if(customer.email){ const existing=db.prepare('SELECT id FROM customers WHERE lower(email)=lower(?)').get(customer.email); cid=existing?.id || db.prepare('INSERT INTO customers(name,email,mobile,city,address) VALUES(?,?,?,?,?)').run(customer.name||'Customer',customer.email,customer.mobile,b.city,b.address).lastInsertRowid; }
- const orderNo='CV-'+Date.now(); const subtotal=(b.items||[]).reduce((s,i)=>s+Number(i.unit_price_before_vat||i.price||0)*Number(i.qty||1),0); const vat=(b.items||[]).reduce((s,i)=>s+(Number(i.unit_price_before_vat||i.price||0)*Number(i.qty||1)*Number(i.vat_rate||15)/100),0); const deliveryBefore=Number(b.delivery_before_vat||0); const deliveryVat=deliveryBefore*0.15; const discount=Number(b.discount_amount||0); const cogs=(b.items||[]).reduce((s,i)=>s+Number(i.unit_cost||i.cost||0)*Number(i.qty||1),0); const total=subtotal+vat+deliveryBefore+deliveryVat-discount;
- const r=db.prepare('INSERT INTO orders(order_no,customer_id,customer_json,city,address,notes,subtotal_before_vat,vat_amount,delivery_before_vat,delivery_vat,discount_amount,total_amount,cogs_amount) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').run(orderNo,cid,JSON.stringify(customer),b.city,b.address,b.notes,subtotal,vat,deliveryBefore,deliveryVat,discount,total,cogs);
- const orderId=r.lastInsertRowid; const ins=db.prepare('INSERT INTO order_items(order_id,product_id,variant_id,name,size,fabric,color,qty,unit_price_before_vat,vat_rate,unit_cost,line_total,line_cogs,data_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)'); (b.items||[]).forEach(i=>ins.run(orderId,i.product_id||null,i.variant_id||null,i.name,i.size,i.fabric,i.color,i.qty||1,i.unit_price_before_vat||i.price||0,i.vat_rate||15,i.unit_cost||i.cost||0,Number(i.price||i.unit_price_before_vat||0)*Number(i.qty||1),Number(i.cost||i.unit_cost||0)*Number(i.qty||1),JSON.stringify(i)));
- db.prepare('INSERT INTO crm_activities(customer_id,order_id,type,channel,subject,body,status) VALUES(?,?,?,?,?,?,?)').run(cid,orderId,'order_created','system','New order '+orderNo,`Order ${orderNo} created with total SAR ${Math.round(total)}`,'done');
- res.json({id:orderId,order_no:orderNo,total_amount:total}); });
+app.post('/api/orders', writeLimiter, async (req,res)=>{
+  const b=req.body || {};
+  const rawItems = Array.isArray(b.items) ? b.items : [];
+  if(!rawItems.length) return res.status(400).json({error:'Cart is empty'});
+  const customer=b.customer||{};
+  if(customer.email && !isEmail(customer.email)) return res.status(400).json({error:'Invalid customer email'});
+  let cid=null;
+  if(customer.email){
+    const email = String(customer.email).trim().toLowerCase();
+    const existing=db.prepare('SELECT id FROM customers WHERE lower(email)=lower(?)').get(email);
+    cid=existing?.id || db.prepare('INSERT INTO customers(name,email,mobile,city,address) VALUES(?,?,?,?,?)')
+      .run(cleanStr(customer.name,120)||'Customer',email,cleanStr(customer.mobile,50),cleanStr(b.city,100),cleanStr(b.address,500)).lastInsertRowid;
+  }
+  const preparedItems = [];
+  for(const item of rawItems){
+    const product = findProductForCartItem(item);
+    if(!product) return res.status(400).json({error:`Product not found or inactive: ${cleanStr(item.name || item.id || '',120)}`});
+    const variant = findVariantForCartItem(product, item);
+    const qty = Math.max(1, Math.min(99, Math.floor(toNum(item.qty,1,1,99))));
+    const originalBefore = variant ? toNum(variant.selling_price_before_vat,0,0) : toNum(product.base_price,0,0);
+    const vatRate = toNum(product.vat_rate,15,0,100);
+    const unitCost = variant ? toNum(variant.cost,0,0) : 0;
+    if(originalBefore <= 0) return res.status(400).json({error:`Product price is missing: ${product.name_en}`});
+    const data = json(product.data_json,{});
+    const productDiscount = toNum(data.discountPercent || data.discount_percent || 0,0,0,100);
+    const unitBefore = Math.max(0, originalBefore * (1 - productDiscount / 100));
+    preparedItems.push({
+      product_id: product.id,
+      variant_id: variant?.id || null,
+      name: product.name_en,
+      size: variant?.size || cleanStr(item.size,120),
+      fabric: variant?.fabric || cleanStr(item.fabric,120),
+      color: variant?.color || cleanStr(item.color,120),
+      qty, unit_price_before_vat: unitBefore, vat_rate: vatRate, unit_cost: unitCost,
+      product_discount_percent: productDiscount,
+      exclude_code_discount: productDiscount > 0,
+      data_json: JSON.stringify({requested:item})
+    });
+  }
+  const subtotal = preparedItems.reduce((s,i)=>s+i.unit_price_before_vat*i.qty,0);
+  const code = b.discount_code || b.discountCode?.code || b.discount?.code || '';
+  let discount = 0;
+  let discountRow = null;
+  if(code){
+    const v = validateDiscountCode(code);
+    if(!v.valid) return res.status(400).json({error:v.error || 'Invalid discount code'});
+    discountRow = v.discount;
+    const eligible = preparedItems.filter(i=>!i.exclude_code_discount).reduce((s,i)=>s+i.unit_price_before_vat*i.qty,0);
+    discount = eligible * discountRow.percent / 100;
+  }
+  const vat = preparedItems.reduce((s,i)=>{
+    const lineBefore = i.unit_price_before_vat*i.qty;
+    const lineDiscount = (!i.exclude_code_discount && discountRow) ? lineBefore * discountRow.percent / 100 : 0;
+    return s + Math.max(0,lineBefore-lineDiscount) * i.vat_rate / 100;
+  },0);
+  const deliveryBefore = deliveryBeforeVatForCity(b.city);
+  const deliveryVat=deliveryBefore*0.15;
+  const cogs=preparedItems.reduce((s,i)=>s+i.unit_cost*i.qty,0);
+  const total=Math.max(0,subtotal-discount)+vat+deliveryBefore+deliveryVat;
+  const orderNo='CV-'+Date.now();
+  const tx = db.transaction(()=>{
+    const r=db.prepare('INSERT INTO orders(order_no,customer_id,customer_json,city,address,notes,subtotal_before_vat,vat_amount,delivery_before_vat,delivery_vat,discount_amount,total_amount,cogs_amount) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(orderNo,cid,JSON.stringify({name:cleanStr(customer.name,120),email:cleanStr(customer.email,180),mobile:cleanStr(customer.mobile,50)}),cleanStr(b.city,100),cleanStr(b.address,500),cleanStr(b.notes,1000),subtotal,vat,deliveryBefore,deliveryVat,discount,total,cogs);
+    const ins=db.prepare('INSERT INTO order_items(order_id,product_id,variant_id,name,size,fabric,color,qty,unit_price_before_vat,vat_rate,unit_cost,line_total,line_cogs,data_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    preparedItems.forEach(i=>ins.run(r.lastInsertRowid,i.product_id,i.variant_id,i.name,i.size,i.fabric,i.color,i.qty,i.unit_price_before_vat,i.vat_rate,i.unit_cost,(i.unit_price_before_vat*i.qty)*(1+i.vat_rate/100),i.unit_cost*i.qty,i.data_json));
+    if(discountRow) db.prepare('UPDATE discount_codes SET usage_count=usage_count+1 WHERE id=?').run(discountRow.id);
+    return r.lastInsertRowid;
+  });
+  const orderId = tx();
+  res.json({id:orderId, order_no:orderNo, total_amount:total, subtotal_before_vat:subtotal, vat_amount:vat, discount_amount:discount});
+});
 app.get('/api/orders',adminAuth('orders','read'),(req,res)=>res.json(db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all().map(o=>({...o,customer:json(o.customer_json,{})}))));
 app.get('/api/orders/:orderNo',(req,res)=>{ const o=db.prepare('SELECT * FROM orders WHERE order_no=?').get(req.params.orderNo); if(!o) return res.status(404).json({error:'Not found'}); const items=db.prepare('SELECT * FROM order_items WHERE order_id=?').all(o.id); res.json({...o,customer:json(o.customer_json,{}),items}); });
 app.put('/api/orders/:id/status',adminAuth('orders','write'),async (req,res)=>{ const {status,payment_status,payment_method,notify=true}=req.body; const o=db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id); if(!o) return res.status(404).json({error:'Not found'}); db.prepare('UPDATE orders SET status=COALESCE(?,status), payment_status=COALESCE(?,payment_status), payment_method=COALESCE(?,payment_method), updated_at=CURRENT_TIMESTAMP WHERE id=?').run(status,payment_status,payment_method,req.params.id); const c=json(o.customer_json,{}); const body=`Dear ${c.name||'Customer'}, your order ${o.order_no} is now ${status||o.status}. Payment status: ${payment_status||o.payment_status}. Thank you, Crafted Visual.`; db.prepare('INSERT INTO crm_activities(customer_id,order_id,type,channel,subject,body,status) VALUES(?,?,?,?,?,?,?)').run(o.customer_id,o.id,'order_update','automation','Order update '+o.order_no,body,'done'); if(notify){ if(c.email) db.prepare('INSERT INTO automation_outbox(order_id,customer_id,channel,recipient,subject,body) VALUES(?,?,?,?,?,?)').run(o.id,o.customer_id,'email',c.email,'Order update '+o.order_no,body); if(c.mobile) db.prepare('INSERT INTO automation_outbox(order_id,customer_id,channel,recipient,body) VALUES(?,?,?,?,?)').run(o.id,o.customer_id,'whatsapp',c.mobile,body); } res.json({ok:true}); });
@@ -519,7 +725,7 @@ app.delete('/api/admin-users/:id',superAdminOnly,(req,res)=>{
   auditLog(req,'admin_user.disable','admin_user',req.params.id,{email:existing.email});
   res.json({ok:true});
 });
-app.post('/api/upload', writeLimiter, adminAuth('products','write'), (req,res,next)=>{ upload.single('file')(req,res,(err)=>{ if(err) return res.status(400).json({error:err.message}); next(); }); }, (req,res)=>{ if(!req.file) return res.status(400).json({error:'No file uploaded'}); res.json({url:'/uploads/'+req.file.filename, original:req.file.originalname}); });
+app.post('/api/upload', writeLimiter, adminAuth('products','write'), (req,res,next)=>{ upload.single('file')(req,res,(err)=>{ if(err) return res.status(400).json({error:err.message}); next(); }); }, validateUploadedImage, (req,res)=>{ res.json({url:'/uploads/'+req.file.filename, original:req.file.originalname}); });
 
 // ===== Media Library =====
 // Backed by media_assets (metadata) + media_assignments (links to products/banners/pages/sections).
@@ -536,8 +742,8 @@ app.get('/api/media', adminAuth('media','read'), (req,res)=>{
 
 app.post('/api/media', writeLimiter, adminAuth('media','write'),
   (req,res,next)=>{ upload.single('file')(req,res,(err)=>{ if(err) return res.status(400).json({error:err.message}); next(); }); },
+  validateUploadedImage,
   (req,res)=>{
-    if(!req.file) return res.status(400).json({error:'No image file uploaded'});
     const url = '/uploads/' + req.file.filename;
     const alt = sanitizeText(req.body?.alt_text || req.body?.alt || '', 300);
     const r = db.prepare(`INSERT INTO media_assets(filename,original_name,url,mime,type,size_bytes,alt_text,uploaded_by) VALUES(?,?,?,?,?,?,?,?)`)
@@ -616,7 +822,7 @@ app.delete('/api/media/assignments/:assignId', adminAuth('media','write'), (req,
   res.json({ok:true});
 });
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(express.static(__dirname));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { fallthrough:false, setHeaders(res){ res.setHeader('X-Content-Type-Options','nosniff'); } }));
+app.use(express.static(path.join(__dirname, 'public'), { extensions:['html'], fallthrough:true }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: IS_PROD ? 'Server error' : err.message }); });
 app.listen(PORT,()=>console.log(`Crafted Visual platform running securely: http://localhost:${PORT}`));
