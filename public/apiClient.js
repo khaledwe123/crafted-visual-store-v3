@@ -50,4 +50,4 @@ const CV_API = {
 
 
 // Expose helper for legacy admin scripts that check window.CV_API.
-try { window.CV_API = CV_API; } catch(e) {}
+try { window.CV_API = CV_API; window.cvApi = CV_API; } catch(e) {}

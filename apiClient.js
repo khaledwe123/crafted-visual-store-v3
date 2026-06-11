@@ -3,6 +3,29 @@ const CV_API = {
   tokenKey: 'cvApiToken',
   adminTokenKey: 'cvAdminApiToken',
   async available(){ try{ const r=await fetch('/api/health'); return r.ok; }catch(e){ return false; } },
+  async request(path, options={}){
+    const endpoint = String(path || '').startsWith('/api/') ? String(path) : '/api' + (String(path || '').startsWith('/') ? String(path) : '/' + String(path || ''));
+    const headers = Object.assign({}, options.headers || {});
+    const isFormData = (typeof FormData !== 'undefined') && options.body instanceof FormData;
+    if(!isFormData) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    if(options.admin){
+      const t = this.token(true);
+      if(!t) throw new Error('Missing admin token. Please logout and login again.');
+      headers.Authorization = 'Bearer ' + t;
+    } else {
+      const t = this.token(false);
+      if(t) headers.Authorization = 'Bearer ' + t;
+    }
+    const body = isFormData ? options.body : (options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body);
+    const res = await fetch(endpoint, Object.assign({}, options, { headers, body, credentials:'same-origin' }));
+    const ct = res.headers.get('content-type') || '';
+    const data = ct.includes('application/json') ? await res.json().catch(()=>({})) : await res.text().catch(()=>'');
+    if(!res.ok){
+      const msg = (data && data.error) || (data && data.message) || (typeof data === 'string' && data) || ('HTTP ' + res.status);
+      throw new Error(msg);
+    }
+    return data;
+  },
   token(admin=false){
       if(admin) return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || localStorage.getItem('token') || sessionStorage.getItem('token') || '';
       return localStorage.getItem('customerToken') || sessionStorage.getItem('customerToken') || '';
@@ -20,4 +43,4 @@ const CV_API = {
 
 
 // Expose CV_API for legacy admin scripts that check window.CV_API.
-try { window.CV_API = CV_API; } catch(e) {}
+try { window.CV_API = CV_API; window.cvApi = CV_API; } catch(e) {}
