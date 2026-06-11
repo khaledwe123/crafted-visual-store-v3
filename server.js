@@ -673,6 +673,59 @@ app.get('/api/admin/me', auth, (req,res)=>{
 });
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
+
+// ===== Public Product Reviews =====
+// Customers can submit a star rating plus written review for each product.
+// Reviews are public and validated/sanitized; admin authorization is not required to submit.
+function reviewPublicRow(r){
+  return {
+    id: r.id,
+    product_id: r.product_id,
+    customer_name: r.customer_name || 'Customer',
+    rating: Number(r.rating || 0),
+    review_text: r.review_text || '',
+    created_at: r.created_at
+  };
+}
+function getProductReviewSummary(productId){
+  const row = db.prepare(`SELECT COUNT(*)::int count, COALESCE(AVG(rating),0)::numeric avg FROM product_reviews WHERE product_id=? AND status='approved'`).get(String(productId));
+  return { count: Number(row?.count || 0), avg: Number(row?.avg || 0) };
+}
+app.get('/api/product-reviews', (req,res)=>{
+  const productId = req.query.product_id || req.query.productId;
+  if(productId){
+    const rows = db.prepare(`SELECT id,product_id,customer_name,rating,review_text,created_at FROM product_reviews WHERE product_id=? AND status='approved' ORDER BY created_at DESC, id DESC LIMIT 100`).all(String(productId));
+    return res.json({ product_id:String(productId), summary:getProductReviewSummary(productId), reviews:rows.map(reviewPublicRow) });
+  }
+  const rows = db.prepare(`SELECT id,product_id,customer_name,rating,review_text,created_at FROM product_reviews WHERE status='approved' ORDER BY created_at DESC, id DESC LIMIT 500`).all();
+  const grouped = {};
+  rows.forEach(r => { (grouped[r.product_id] = grouped[r.product_id] || []).push(reviewPublicRow(r)); });
+  const summaries = {};
+  Object.keys(grouped).forEach(pid => { summaries[pid] = getProductReviewSummary(pid); });
+  res.json({reviews:grouped, summaries});
+});
+app.get('/api/products/:id/reviews', (req,res)=>{
+  const productId = String(req.params.id);
+  const rows = db.prepare(`SELECT id,product_id,customer_name,rating,review_text,created_at FROM product_reviews WHERE product_id=? AND status='approved' ORDER BY created_at DESC, id DESC LIMIT 100`).all(productId);
+  res.json({ product_id:productId, summary:getProductReviewSummary(productId), reviews:rows.map(reviewPublicRow) });
+});
+app.post('/api/product-reviews', writeLimiter, (req,res)=>{
+  const b = req.body || {};
+  const productId = sanitizeText(b.product_id || b.productId || '', 120);
+  const rating = Math.round(toNum(b.rating, 0, 1, 5));
+  const customerName = sanitizeText(b.customer_name || b.customerName || 'Customer', 80) || 'Customer';
+  const reviewText = sanitizeText(b.review_text || b.reviewText || '', 1000);
+  if(!productId) return res.status(400).json({error:'Product is required'});
+  if(!rating || rating < 1 || rating > 5) return res.status(400).json({error:'Rating must be between 1 and 5'});
+  if(reviewText.length < 3) return res.status(400).json({error:'Please write a short review'});
+  const ipHash = crypto.createHash('sha256').update(String(req.ip || '') + ACTIVE_JWT_SECRET).digest('hex').slice(0,32);
+  const r = db.prepare(`INSERT INTO product_reviews(product_id,customer_name,rating,review_text,status,ip_hash) VALUES(?,?,?,?,?,?)`)
+    .run(productId, customerName, rating, reviewText, 'approved', ipHash);
+  try{ auditLog(req,'product_review.create','product_review',r.lastInsertRowid,{productId,rating}); }catch(e){}
+  const saved = db.prepare('SELECT id,product_id,customer_name,rating,review_text,created_at FROM product_reviews WHERE id=?').get(r.lastInsertRowid);
+  res.json({ok:true, review:reviewPublicRow(saved), summary:getProductReviewSummary(productId)});
+});
+
 app.get('/api/products',(req,res)=>res.json(db.prepare(`SELECT p.*, c.name_en category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.active=1 ORDER BY p.created_at DESC`).all().map(p=>({...p,data:json(p.data_json,{})}))));
 app.get('/api/products/:id',(req,res)=>{ const p=db.prepare('SELECT * FROM products WHERE id=?').get(req.params.id); if(!p) return res.status(404).json({error:'Not found'}); const variants=db.prepare('SELECT * FROM product_variants WHERE product_id=?').all(p.id); res.json({...p,data:json(p.data_json,{}),variants}); });
 app.post('/api/products',adminAuth('products','write'),(req,res)=>{ const b=req.body; const categoryId=categoryIdFromBody(b); const existing=b.sku?db.prepare('SELECT id FROM products WHERE sku=?').get(b.sku):null; if(existing){ db.prepare('UPDATE products SET name_en=?,name_ar=?,category_id=?,description_en=?,description_ar=?,base_price=?,vat_rate=?,active=?,data_json=? WHERE id=?').run(b.name_en,b.name_ar,categoryId,b.description_en,b.description_ar,b.base_price||0,b.vat_rate||15,b.active!==false?1:0,JSON.stringify(b.data||{}),existing.id); return res.json({id:existing.id, updated:true}); } const r=db.prepare('INSERT INTO products(sku,name_en,name_ar,category_id,description_en,description_ar,base_price,vat_rate,active,data_json) VALUES(?,?,?,?,?,?,?,?,?,?)').run(b.sku,b.name_en,b.name_ar,categoryId,b.description_en,b.description_ar,b.base_price||0,b.vat_rate||15,b.active!==false?1:0,JSON.stringify(b.data||{})); res.json({id:r.lastInsertRowid}); });
