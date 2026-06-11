@@ -17,3 +17,7 @@ const CV_API = {
     return this.request('/orders',{method:'POST',body:{customer:order.customer,items,city:order.city,address:order.address,notes:order.notes,delivery_before_vat:order.deliveryBeforeVat||0,discount_code:discountCode}});
   }
 };
+
+
+// Expose CV_API for legacy admin scripts that check window.CV_API.
+try { window.CV_API = CV_API; } catch(e) {}

@@ -1343,7 +1343,7 @@ function adminLogout(){
 let cvAdminUsersCache = [];
 
 async function loadAdminUsersFromBackend(){
-  if(!(window.CV_API && CV_API.token(true))) return [];
+  if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) return [];
   try{
     const rows = await CV_API.request('/admin-users', {admin:true});
     cvAdminUsersCache = Array.isArray(rows) ? rows : [];
@@ -1391,7 +1391,7 @@ async function addAdminUser(){
   }
   const permissions = role === "superadmin" ? cloneFullAdminPermissions() : collectPermissionMatrix();
   try{
-    if(!(window.CV_API && await CV_API.available())) throw new Error("Live backend is not available.");
+    if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) throw new Error("Missing admin token. Logout and login again.");
     await CV_API.request('/admin-users', {method:'POST', admin:true, body:{name,email,password,role,permissions,active:true}});
     document.getElementById("newAdminName").value = "";
     document.getElementById("newAdminEmail").value = "";
@@ -1430,7 +1430,7 @@ function saveDiscountCodesLocal(codes){
   try{ localStorage.setItem("discountCodes", JSON.stringify(codes)); }catch(e){}
 }
 async function loadDiscountCodesFromBackend(){
-  if(!(window.CV_API && CV_API.token(true))) return;
+  if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) return;
   try{
     const rows = await CV_API.request('/discounts', {admin:true});
     cvDiscountCodesCache = Array.isArray(rows) ? rows : [];
@@ -1445,7 +1445,7 @@ async function addDiscountCode(){
   const expiry = document.getElementById("discountCodeExpiry").value || null;
   if(!code || !percent){ showAdminStatus("Add discount code and percentage.", true); return; }
   try{
-    if(window.CV_API && CV_API.token(true)){
+    if(typeof CV_API !== 'undefined' && CV_API.token(true)){
       await CV_API.request('/discounts', {method:'POST', admin:true, body:{code, percent, expires_at:expiry||null, active:true}});
       await loadDiscountCodesFromBackend();
     } else {
@@ -1466,7 +1466,7 @@ async function toggleDiscountCode(id){
   try{
     const c = cvDiscountCodesCache.find(x=>x.id===id) || cvDiscountCodesCache[id];
     if(!c) return;
-    if(window.CV_API && CV_API.token(true)){
+    if(typeof CV_API !== 'undefined' && CV_API.token(true)){
       await CV_API.request('/discounts/'+c.id, {method:'PUT', admin:true, body:{active: !c.active}});
       await loadDiscountCodesFromBackend();
     } else {
@@ -1480,7 +1480,7 @@ async function deleteDiscountCode(id){
   const c = cvDiscountCodesCache.find(x=>x.id===id);
   if(!confirm("Delete discount code" + (c?" "+c.code:"") + "?")) return;
   try{
-    if(window.CV_API && CV_API.token(true)){
+    if(typeof CV_API !== 'undefined' && CV_API.token(true)){
       await CV_API.request('/discounts/'+id, {method:'DELETE', admin:true});
       await loadDiscountCodesFromBackend();
     } else {
@@ -2115,7 +2115,7 @@ function analyticsSafe(v){
   return String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 }
 function analyticsToken(){
-  return (window.CV_API && CV_API.token && CV_API.token(true)) || localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
+  return (typeof CV_API !== 'undefined' && CV_API.token && CV_API.token(true)) || localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
 }
 async function analyticsApi(path){
   const headers = { 'Content-Type':'application/json' };
@@ -2355,7 +2355,7 @@ let cvMediaCache = [];
 
 async function loadMedia(){
   const grid = document.getElementById('mediaGrid');
-  if(!(window.CV_API && CV_API.token(true))) return;
+  if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) return;
   try{
     cvMediaCache = await CV_API.request('/media', {admin:true});
   }catch(e){
