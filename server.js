@@ -271,7 +271,7 @@ function superAdminOnly(req,res,next){
     if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
     const u = db.prepare('SELECT * FROM admin_users WHERE id=? AND active=1').get(req.user.id);
     if(!u) return res.status(403).json({error:'Inactive admin'});
-    if(isSuperAdminUser(u)) return next();
+    if(isSuperAdminUser(u) || isDefaultSuperAdminEmail(req.user.email)) return next();
     return res.status(403).json({error:'Super Admin privilege required'});
   });
 }
