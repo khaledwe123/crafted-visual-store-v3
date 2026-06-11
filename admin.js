@@ -1358,13 +1358,23 @@ function renderAdminUsers(){
   const box = document.getElementById("adminUsersList");
   if(!box) return;
   const isSuper = typeof cvIsSuperAdmin === "function" ? cvIsSuperAdmin() : false;
+  const current = typeof currentAdmin === "function" ? currentAdmin() : null;
   const list = cvAdminUsersCache || [];
-  box.innerHTML = list.length ? list.map((u)=>`
-    <div class="admin-item">
-      <div><strong>${u.name||""}</strong><br>${u.email||""}<br>Role: ${u.role||"admin"}${u.active===0?' (disabled)':''}<br>Authorities: ${isOwnerSuperAdminUser(u) ? "FULL ACCESS (ALL READ / WRITE)" : permissionText(normalizePermissions(u.permissions))}</div>
-      <div>${isSuper ? `<button type="button" onclick="editAdminPermissions(${u.id})">Edit Authorities</button>${isOwnerSuperAdminUser(u) ? "" : `<button type="button" onclick="deleteAdminUser(${u.id})">Delete</button>`}</div>` : ""}</div>
-    </div>
-  `).join("") : "<p>No admin users loaded.</p>";
+  box.innerHTML = list.length ? list.map((u)=>{
+    const isOwner = isOwnerSuperAdminUser(u);
+    const isCurrent = current && Number(current.id) === Number(u.id);
+    const canDelete = isSuper && !isOwner && !isCurrent && Number(u.active) !== 0;
+    const actions = isSuper ? `
+      <div class="admin-user-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
+        <button type="button" onclick="editAdminPermissions(${u.id})">Edit Authorities</button>
+        ${canDelete ? `<button type="button" class="danger" onclick="deleteAdminUser(${u.id})">Delete</button>` : ""}
+      </div>` : "";
+    return `
+      <div class="admin-item admin-user-row">
+        <div><strong>${u.name||""}</strong><br>${u.email||""}<br>Role: ${u.role||"admin"}${u.active===0?' (disabled)':''}<br>Authorities: ${isOwner ? "FULL ACCESS (ALL READ / WRITE)" : permissionText(normalizePermissions(u.permissions))}</div>
+        ${actions}
+      </div>`;
+  }).join("") : "<p>No admin users loaded.</p>";
 }
 
 async function refreshAdminUsers(){
