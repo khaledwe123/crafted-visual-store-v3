@@ -1,46 +1,161 @@
-/* Crafted Visual real backend API helper. Existing localStorage prototype remains as offline fallback. */
-const CV_API = {
-  tokenKey: 'cvApiToken',
-  adminTokenKey: 'cvAdminApiToken',
-  async available(){ try{ const r=await fetch('/api/health'); return r.ok; }catch(e){ return false; } },
-  async request(path, options={}){
-    const endpoint = String(path || '').startsWith('/api/') ? String(path) : '/api' + (String(path || '').startsWith('/') ? String(path) : '/' + String(path || ''));
-    const headers = Object.assign({}, options.headers || {});
-    const isFormData = (typeof FormData !== 'undefined') && options.body instanceof FormData;
-    if(!isFormData) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-    if(options.admin){
-      const t = this.token(true);
-      if(!t) throw new Error('Missing admin token. Please logout and login again.');
-      headers.Authorization = 'Bearer ' + t;
-    } else {
-      const t = this.token(false);
-      if(t) headers.Authorization = 'Bearer ' + t;
+var CV_API;
+/* Crafted Visual production API helper. Keeps legacy token keys for the existing admin UI while using secure server-side authorization checks. */
+(function(){
+  'use strict';
+
+  const ADMIN_TOKEN_KEYS = ['cvAdminApiToken','adminToken','token','authToken'];
+  const ADMIN_SESSION_KEYS = ['cvAdminSession','adminSession'];
+  const CUSTOMER_TOKEN_KEYS = ['customerToken','cvApiToken'];
+
+  function firstStored(keys){
+    for (const key of keys) {
+      try {
+        const v = sessionStorage.getItem(key) || localStorage.getItem(key);
+        if (v) return v;
+      } catch (_) {}
     }
-    const body = isFormData ? options.body : (options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body);
-    const res = await fetch(endpoint, Object.assign({}, options, { headers, body, credentials:'same-origin' }));
-    const ct = res.headers.get('content-type') || '';
-    const data = ct.includes('application/json') ? await res.json().catch(()=>({})) : await res.text().catch(()=>'');
-    if(!res.ok){
-      const msg = (data && data.error) || (data && data.message) || (typeof data === 'string' && data) || ('HTTP ' + res.status);
-      throw new Error(msg);
-    }
-    return data;
-  },
-  token(admin=false){
-      if(admin) return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || localStorage.getItem('token') || sessionStorage.getItem('token') || '';
-      return localStorage.getItem('customerToken') || sessionStorage.getItem('customerToken') || '';
-    },
-  async adminLogin(email,password){ const r=await this.request('/admin/login',{method:'POST',body:{email,password}}); localStorage.setItem(this.adminTokenKey,r.token); sessionStorage.setItem(this.adminTokenKey,r.token); localStorage.setItem('cvAdminSession', JSON.stringify(r.user)); sessionStorage.setItem('cvAdminSession', JSON.stringify(r.user)); return r; },
-  currentAdmin(){ try{return JSON.parse(sessionStorage.getItem('cvAdminSession') || localStorage.getItem('cvAdminSession') || 'null');}catch(e){return null;} },
-  async customerLogin(email,password){ const r=await this.request('/customers/login',{method:'POST',body:{email,password}}); localStorage.setItem(this.tokenKey,r.token); localStorage.setItem('currentUser', JSON.stringify(r.user)); return r; },
-  async customerRegister(payload){ const r=await this.request('/customers/register',{method:'POST',body:payload}); localStorage.setItem(this.tokenKey,r.token); localStorage.setItem('currentUser', JSON.stringify(r.user)); return r; },
-  async createOrderFromPrototype(order){
-    const items = (order.items||[]).map(i=>({id:i.id, product_id:i.product_id, productId:i.productId, sku:i.sku, name:i.name, size:i.size, fabric:i.fabric, color:i.color, qty:i.qty||1, discountPercent:i.discountPercent||0, data:i}));
-    const discountCode = order.discountCode && order.discountCode.code ? order.discountCode.code : '';
-    return this.request('/orders',{method:'POST',body:{customer:order.customer,items,city:order.city,address:order.address,notes:order.notes,delivery_before_vat:order.deliveryBeforeVat||0,discount_code:discountCode}});
+    return '';
   }
-};
 
+  function setBoth(key, value){
+    try { sessionStorage.setItem(key, value); } catch (_) {}
+    try { localStorage.setItem(key, value); } catch (_) {}
+  }
 
-// Expose CV_API for legacy admin scripts that check window.CV_API.
-try { window.CV_API = CV_API; window.cvApi = CV_API; } catch(e) {}
+  function removeBoth(key){
+    try { sessionStorage.removeItem(key); } catch (_) {}
+    try { localStorage.removeItem(key); } catch (_) {}
+  }
+
+  function normalizeApiPath(path){
+    const raw = String(path || '').trim();
+    if (!raw) return '/api/health';
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith('/api/')) return raw;
+    if (raw === '/api') return raw;
+    return '/api/' + raw.replace(/^\/+/, '');
+  }
+
+  async function parseResponse(res){
+    const text = await res.text().catch(() => '');
+    if (!text) return {};
+    try { return JSON.parse(text); } catch (_) { return { raw: text }; }
+  }
+
+  const API = {
+    tokenKey: 'cvApiToken',
+    adminTokenKey: 'cvAdminApiToken',
+
+    async available(){
+      try {
+        const r = await fetch('/api/health', { credentials:'same-origin', cache:'no-store' });
+        return r.ok;
+      } catch (_) {
+        return false;
+      }
+    },
+
+    token(admin=false){
+      return admin ? firstStored(ADMIN_TOKEN_KEYS) : firstStored(CUSTOMER_TOKEN_KEYS);
+    },
+
+    currentAdmin(){
+      for (const key of ADMIN_SESSION_KEYS) {
+        try {
+          const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+          if (raw) return JSON.parse(raw);
+        } catch (_) {}
+      }
+      return null;
+    },
+
+    async request(path, options={}){
+      const admin = !!options.admin;
+      const url = normalizeApiPath(path);
+      const headers = Object.assign({}, options.headers || {});
+      const isFormData = options.body instanceof FormData;
+
+      if (!isFormData && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+
+      const token = admin ? this.token(true) : this.token(false);
+      if (token && !headers.Authorization) headers.Authorization = 'Bearer ' + token;
+
+      let body = options.body;
+      if (body !== undefined && !isFormData && typeof body !== 'string') body = JSON.stringify(body);
+
+      const res = await fetch(url, {
+        method: options.method || 'GET',
+        headers,
+        body,
+        credentials: 'same-origin',
+        cache: options.cache || 'no-store'
+      });
+
+      const data = await parseResponse(res);
+      if (!res.ok) {
+        const msg = data.error || data.message || data.raw || ('HTTP ' + res.status);
+        const err = new Error(msg);
+        err.status = res.status;
+        err.data = data;
+        throw err;
+      }
+      return data;
+    },
+
+    async adminLogin(email,password){
+      const r = await this.request('/admin/login', { method:'POST', body:{ email, password } });
+      if (r.token) ADMIN_TOKEN_KEYS.forEach(k => setBoth(k, r.token));
+      if (r.user) ADMIN_SESSION_KEYS.forEach(k => setBoth(k, JSON.stringify(r.user)));
+      return r;
+    },
+
+    async refreshAdmin(){
+      const r = await this.request('/admin/me', { admin:true });
+      if (r.user) ADMIN_SESSION_KEYS.forEach(k => setBoth(k, JSON.stringify(r.user)));
+      return r.user;
+    },
+
+    async customerLogin(email,password){
+      const r = await this.request('/customers/login', { method:'POST', body:{ email, password } });
+      if (r.token) CUSTOMER_TOKEN_KEYS.forEach(k => setBoth(k, r.token));
+      if (r.user) setBoth('currentUser', JSON.stringify(r.user));
+      return r;
+    },
+
+    async customerRegister(payload){
+      const r = await this.request('/customers/register', { method:'POST', body:payload });
+      if (r.token) CUSTOMER_TOKEN_KEYS.forEach(k => setBoth(k, r.token));
+      if (r.user) setBoth('currentUser', JSON.stringify(r.user));
+      return r;
+    },
+
+    async forgotPassword(email){
+      return this.request('/customers/forgot-password', { method:'POST', body:{ email } });
+    },
+
+    async logout(){
+      try { await this.request('/auth/logout', { method:'POST', body:{} }); } catch (_) {}
+      ADMIN_TOKEN_KEYS.concat(ADMIN_SESSION_KEYS, CUSTOMER_TOKEN_KEYS, ['currentUser']).forEach(removeBoth);
+    },
+
+    async createOrderFromPrototype(order){
+      const items = (order.items || []).map(i => ({
+        id:i.id, product_id:i.product_id, productId:i.productId, sku:i.sku, name:i.name,
+        size:i.size, fabric:i.fabric, color:i.color, qty:i.qty || 1,
+        discountPercent:i.discountPercent || 0, data:i
+      }));
+      const discountCode = order.discountCode && order.discountCode.code ? order.discountCode.code : '';
+      return this.request('/orders', {
+        method:'POST',
+        body:{
+          customer:order.customer, items, city:order.city, address:order.address,
+          notes:order.notes, discount_code:discountCode
+        }
+      });
+    }
+  };
+
+  window.CV_API = API;
+  try { CV_API = API; } catch (_) {}
+  try { if (typeof globalThis !== 'undefined') globalThis.CV_API = API; } catch (_) {}
+})();
