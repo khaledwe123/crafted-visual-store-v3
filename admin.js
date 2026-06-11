@@ -1391,7 +1391,11 @@ async function addAdminUser(){
   }
   const permissions = role === "superadmin" ? cloneFullAdminPermissions() : collectPermissionMatrix();
   try{
-    if(!(window.CV_API && await CV_API.available())) throw new Error("Live backend is not available.");
+    if(!(window.CV_API && typeof CV_API.request === "function")) throw new Error("Admin API helper is not loaded. Refresh the page and login again.");
+    const adminToken = CV_API.token(true) || localStorage.getItem("cvAdminApiToken") || localStorage.getItem("adminToken") || localStorage.getItem("token") || sessionStorage.getItem("cvAdminApiToken") || sessionStorage.getItem("adminToken") || sessionStorage.getItem("token");
+    if(!adminToken) throw new Error("Admin session is missing. Please logout and login again.");
+    if(!localStorage.getItem("cvAdminApiToken")) localStorage.setItem("cvAdminApiToken", adminToken);
+    if(!sessionStorage.getItem("cvAdminApiToken")) sessionStorage.setItem("cvAdminApiToken", adminToken);
     await CV_API.request('/admin-users', {method:'POST', admin:true, body:{name,email,password,role,permissions,active:true}});
     document.getElementById("newAdminName").value = "";
     document.getElementById("newAdminEmail").value = "";
@@ -2454,56 +2458,3 @@ async function assignMedia(id, targetType, targetId){
     showAdminStatus('Image assigned to ' + targetType + (targetId?(' #'+targetId):'') + '.');
   }catch(e){ showAdminStatus('Could not assign image: ' + (e.message || e), true); }
 }
-
-/* === CSP-SAFE ADMIN LOGOUT FIX ===
-   Railway production CSP blocks inline onclick handlers via script-src-attr 'none'.
-   This listener handles the logout button without inline JavaScript and clears all
-   legacy admin token/session keys used across the admin panel. */
-(function installCspSafeAdminLogout(){
-  const ADMIN_LOGOUT_KEYS = [
-    'cvAdminApiToken',
-    'cvAdminSession',
-    'adminToken',
-    'token',
-    'adminSession',
-    'authToken'
-  ];
-
-  function clearAdminSessionAndRedirect(){
-    ADMIN_LOGOUT_KEYS.forEach((key) => {
-      try { localStorage.removeItem(key); } catch (e) {}
-      try { sessionStorage.removeItem(key); } catch (e) {}
-    });
-    window.location.assign('/admin-login.html');
-  }
-
-  // Keep the existing global function name working for legacy code,
-  // but do not rely on inline onclick execution.
-  window.adminLogout = clearAdminSessionAndRedirect;
-
-  function isLogoutElement(el){
-    if (!el || !el.closest) return false;
-    const target = el.closest('#adminLogoutBtn, [data-admin-logout], .admin-logout, .logout-btn, button, a');
-    if (!target) return false;
-    if (target.id === 'adminLogoutBtn') return true;
-    if (target.hasAttribute('data-admin-logout')) return true;
-    const text = (target.textContent || '').trim().toLowerCase();
-    return text === 'logout' || text === 'log out' || text === 'sign out';
-  }
-
-  document.addEventListener('click', function(event){
-    if (!isLogoutElement(event.target)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    clearAdminSessionAndRedirect();
-  }, true);
-
-  document.addEventListener('DOMContentLoaded', function(){
-    const existing = document.getElementById('adminLogoutBtn');
-    if (existing) {
-      existing.setAttribute('type', 'button');
-      existing.setAttribute('data-admin-logout', 'true');
-    }
-  });
-})();
-
