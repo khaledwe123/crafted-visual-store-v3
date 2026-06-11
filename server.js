@@ -29,6 +29,11 @@ const ACTIVE_JWT_SECRET = JWT_SECRET || 'local-dev-secret-change-before-live-onl
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
+app.use((req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
+
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
@@ -50,11 +55,11 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       "default-src": ["'self'"],
-      "script-src": ["'self'", "'unsafe-inline'"],
-      "script-src-attr": ["'unsafe-inline'"],
+      "script-src": ["'self'", (_req, res) => `'nonce-${res.locals.cspNonce}'`],
+      "script-src-attr": ["'none'"],
       "style-src": ["'self'", "'unsafe-inline'"],
       "img-src": ["'self'", "data:", "blob:", "https:"],
-      "connect-src": ["'self'"],
+      "connect-src": ["'self'", "https://api.cloudinary.com"],
       "font-src": ["'self'", "data:"],
       "object-src": ["'none'"],
       "base-uri": ["'self'"],
@@ -135,6 +140,81 @@ function validateUploadedImage(req,res,next){
     return res.status(400).json({error:'Uploaded file is not a valid image.'});
   }
   next();
+}
+
+function cloudinaryConfig(){
+  if(process.env.CLOUDINARY_URL){
+    const m = /^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/.exec(process.env.CLOUDINARY_URL);
+    if(m) return {api_key:m[1], api_secret:m[2], cloud_name:m[3]};
+  }
+  return {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  };
+}
+async function uploadToCloudinary(file){
+  const cfg = cloudinaryConfig();
+  if(!cfg.cloud_name || !cfg.api_key || !cfg.api_secret) throw new Error('Cloudinary environment variables are not configured');
+  const timestamp = Math.floor(Date.now()/1000);
+  const folder = process.env.CLOUDINARY_FOLDER || 'crafted-visual/uploads';
+  const publicId = path.basename(file.filename, path.extname(file.filename));
+  const paramsToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${cfg.api_secret}`;
+  const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
+  const form = new FormData();
+  form.append('file', new Blob([fs.readFileSync(file.path)], {type:file.mimetype}), file.originalname || file.filename);
+  form.append('api_key', cfg.api_key);
+  form.append('timestamp', String(timestamp));
+  form.append('signature', signature);
+  form.append('folder', folder);
+  form.append('public_id', publicId);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cfg.cloud_name}/image/upload`, {method:'POST', body:form});
+  const data = await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(data.error?.message || 'Cloudinary upload failed');
+  return {url:data.secure_url, provider:'cloudinary', provider_id:data.public_id, filename:file.filename};
+}
+function hmac(key, data, enc){ return crypto.createHmac('sha256', key).update(data).digest(enc); }
+function sha256(data, enc='hex'){ return crypto.createHash('sha256').update(data).digest(enc); }
+function awsSigningKey(secret, date, region, service){ return hmac(hmac(hmac(hmac('AWS4'+secret, date), region), service), 'aws4_request'); }
+async function uploadToS3(file){
+  const bucket = process.env.AWS_S3_BUCKET;
+  const region = process.env.AWS_REGION || 'us-east-1';
+  const accessKey = process.env.AWS_ACCESS_KEY_ID;
+  const secretKey = process.env.AWS_SECRET_ACCESS_KEY;
+  if(!bucket || !accessKey || !secretKey) throw new Error('S3 environment variables are not configured');
+  const prefix = (process.env.AWS_S3_PREFIX || 'uploads').replace(/^\/+|\/+$/g,'');
+  const key = `${prefix}/${file.filename}`;
+  const host = `${bucket}.s3.${region}.amazonaws.com`;
+  const body = fs.readFileSync(file.path);
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g,'');
+  const dateStamp = amzDate.slice(0,8);
+  const payloadHash = sha256(body);
+  const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const canonicalRequest = ['PUT', '/' + key.split('/').map(encodeURIComponent).join('/'), '', canonicalHeaders, signedHeaders, payloadHash].join('\n');
+  const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, sha256(canonicalRequest)].join('\n');
+  const signature = hmac(awsSigningKey(secretKey, dateStamp, region, 's3'), stringToSign, 'hex');
+  const authorization = `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  const res = await fetch(`https://${host}/${key}`, {method:'PUT', headers:{Authorization:authorization,'x-amz-date':amzDate,'x-amz-content-sha256':payloadHash,'Content-Type':file.mimetype}, body});
+  if(!res.ok) throw new Error(`S3 upload failed: HTTP ${res.status}`);
+  const base = (process.env.AWS_PUBLIC_BASE_URL || `https://${host}`).replace(/\/$/,'');
+  return {url:`${base}/${key}`, provider:'s3', provider_id:key, filename:file.filename};
+}
+async function storeUploadedImage(file){
+  const provider = String(process.env.UPLOAD_PROVIDER || '').toLowerCase();
+  if(provider === 'cloudinary'){
+    const out = await uploadToCloudinary(file);
+    try{ fs.unlinkSync(file.path); }catch(e){}
+    return out;
+  }
+  if(provider === 's3'){
+    const out = await uploadToS3(file);
+    try{ fs.unlinkSync(file.path); }catch(e){}
+    return out;
+  }
+  return {url:'/uploads/' + file.filename, provider:'local', provider_id:file.filename, filename:file.filename};
 }
 
 function sanitizeText(v, max = 5000) {
@@ -218,7 +298,10 @@ function clearAuthCookie(res, name){
 }
 function bearerOrCookieToken(req){
   const h = req.headers.authorization || '';
-  if (h.startsWith('Bearer ')) return h.slice(7);
+  if (h.startsWith('Bearer ')) {
+    const bearer = h.slice(7);
+    if(bearer && bearer !== 'cookie-auth' && bearer !== 'cv-cookie-auth') return bearer;
+  }
   const cookies = parseCookies(req);
   return cookies.cv_admin_auth || cookies.cv_customer_auth || '';
 }
@@ -515,8 +598,9 @@ app.post('/api/admin/login', authLimiter, (req,res)=>{
   const permissions = (role === 'superadmin' || isDefaultSuperAdminEmail(user.email)) ? fullPermissions() : json(user.permissions_json,{});
   const adminJwt = token(user,'admin');
   setAuthCookie(res, 'cv_admin_auth', adminJwt);
+  auditLog({ ...req, user:{id:user.id} }, 'auth.admin_login', 'admin_user', user.id, {email:user.email});
   res.json({
-    token: adminJwt,
+    token: IS_PROD ? undefined : adminJwt,
     user:{id:user.id,name:user.name,email:user.email,role:user.role,permissions}
   });
 });
@@ -726,7 +810,7 @@ app.delete('/api/admin-users/:id',superAdminOnly,(req,res)=>{
   auditLog(req,'admin_user.disable','admin_user',req.params.id,{email:existing.email});
   res.json({ok:true});
 });
-app.post('/api/upload', writeLimiter, adminAuth('products','write'), (req,res,next)=>{ upload.single('file')(req,res,(err)=>{ if(err) return res.status(400).json({error:err.message}); next(); }); }, validateUploadedImage, (req,res)=>{ res.json({url:'/uploads/'+req.file.filename, original:req.file.originalname}); });
+app.post('/api/upload', writeLimiter, adminAuth('products','write'), (req,res,next)=>{ upload.single('file')(req,res,(err)=>{ if(err) return res.status(400).json({error:err.message}); next(); }); }, validateUploadedImage, async (req,res,next)=>{ try{ const stored = await storeUploadedImage(req.file); auditLog(req,'upload.create','upload',stored.provider_id,{provider:stored.provider,url:stored.url}); res.json({url:stored.url, original:req.file.originalname, provider:stored.provider}); }catch(e){ next(e); } });
 
 // ===== Media Library =====
 // Backed by media_assets (metadata) + media_assignments (links to products/banners/pages/sections).
@@ -744,13 +828,16 @@ app.get('/api/media', adminAuth('media','read'), (req,res)=>{
 app.post('/api/media', writeLimiter, adminAuth('media','write'),
   (req,res,next)=>{ upload.single('file')(req,res,(err)=>{ if(err) return res.status(400).json({error:err.message}); next(); }); },
   validateUploadedImage,
-  (req,res)=>{
-    const url = '/uploads/' + req.file.filename;
-    const alt = sanitizeText(req.body?.alt_text || req.body?.alt || '', 300);
-    const r = db.prepare(`INSERT INTO media_assets(filename,original_name,url,mime,type,size_bytes,alt_text,uploaded_by) VALUES(?,?,?,?,?,?,?,?)`)
-      .run(req.file.filename, sanitizeText(req.file.originalname || '', 300), url, req.file.mimetype, 'image', req.file.size || 0, alt, req.user?.id || null);
-    auditLog(req,'media.upload','media',r.lastInsertRowid,{url, size:req.file.size});
-    res.json(db.prepare('SELECT * FROM media_assets WHERE id=?').get(r.lastInsertRowid));
+  async (req,res,next)=>{
+    try{
+      const stored = await storeUploadedImage(req.file);
+      const url = stored.url;
+      const alt = sanitizeText(req.body?.alt_text || req.body?.alt || '', 300);
+      const r = db.prepare(`INSERT INTO media_assets(filename,original_name,url,mime,type,size_bytes,alt_text,uploaded_by) VALUES(?,?,?,?,?,?,?,?)`)
+        .run(stored.filename || req.file.filename, sanitizeText(req.file.originalname || '', 300), url, req.file.mimetype, 'image', req.file.size || 0, alt, req.user?.id || null);
+      auditLog(req,'media.upload','media',r.lastInsertRowid,{url, size:req.file.size, provider:stored.provider});
+      res.json(db.prepare('SELECT * FROM media_assets WHERE id=?').get(r.lastInsertRowid));
+    }catch(e){ next(e); }
   }
 );
 
@@ -768,8 +855,10 @@ app.delete('/api/media/:id', adminAuth('media','write'), (req,res)=>{
   db.prepare('DELETE FROM media_assignments WHERE media_id=?').run(m.id);
   db.prepare('DELETE FROM media_assets WHERE id=?').run(m.id);
   try{
-    const safeName = path.basename(m.filename || '');
-    if(safeName) fs.unlinkSync(path.join(uploadDir, safeName));
+    if(String(m.url || '').startsWith('/uploads/')){
+      const safeName = path.basename(m.filename || '');
+      if(safeName) fs.unlinkSync(path.join(uploadDir, safeName));
+    }
   }catch(e){ /* file already gone */ }
   auditLog(req,'media.delete','media',req.params.id,{url:m.url});
   res.json({ok:true});
@@ -821,6 +910,35 @@ app.delete('/api/media/assignments/:assignId', adminAuth('media','write'), (req,
   if(!a) return res.status(404).json({error:'Assignment not found'});
   db.prepare('DELETE FROM media_assignments WHERE id=?').run(a.id);
   res.json({ok:true});
+});
+
+
+function htmlFileForRequest(req){
+  let requested = req.path === '/' ? '/index.html' : req.path;
+  if(!path.extname(requested)) requested += '.html';
+  if(path.extname(requested).toLowerCase() !== '.html') return null;
+  const publicCandidate = path.join(__dirname, 'public', requested.replace(/^\/+/, ''));
+  const rootCandidate = path.join(__dirname, requested.replace(/^\/+/, ''));
+  for(const candidate of [publicCandidate, rootCandidate]){
+    if(candidate.startsWith(__dirname) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+  }
+  return null;
+}
+function applyHtmlSecurityTransforms(html, nonce){
+  let out = html;
+  if(!out.includes('cv-csp-action-bridge.js')){
+    out = out.replace(/<head([^>]*)>/i, `<head$1>\n  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
+  }
+  out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+  return out;
+}
+app.get(['/', '/*.html'], (req,res,next)=>{
+  const file = htmlFileForRequest(req);
+  if(!file) return next();
+  try{
+    const html = fs.readFileSync(file, 'utf8');
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
+  }catch(e){ next(e); }
 });
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { fallthrough:false, setHeaders(res){ res.setHeader('X-Content-Type-Options','nosniff'); } }));

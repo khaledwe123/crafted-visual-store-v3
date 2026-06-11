@@ -48,9 +48,9 @@
     const session = getSession();
     if(session){ setSession(session); return; }
     const t = adminToken();
-    if(!t){ location.href = 'admin-login.html'; return; }
     try{
-      const res = await fetch('/api/admin/me', {credentials:'same-origin', headers:{Authorization:'Bearer '+t}});
+      const headers = t ? {Authorization:'Bearer '+t} : {};
+      const res = await fetch('/api/admin/me', {credentials:'same-origin', headers});
       if(!res.ok) throw new Error('not authenticated');
       const data = await res.json();
       setSession(data.user || data);
