@@ -5,48 +5,13 @@
 (function(){
   'use strict';
 
-/* === CV compatibility fix: missing getMenuItems / setMenuItems === */
-(function(){
-  'use strict';
-  if(!window.getMenuItems){
-    window.getMenuItems = function(){
-      try{
-        if(Array.isArray(window.menu)) return window.menu;
-      }catch(e){}
-      try{
-        if(typeof menu !== 'undefined' && Array.isArray(menu)) return menu;
-      }catch(e){}
-      try{
-        var raw = localStorage.getItem('cms_menu') || sessionStorage.getItem('cms_menu') || '[]';
-        var parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      }catch(e){
-        console.warn('getMenuItems fallback failed', e);
-        return [];
-      }
-    };
-  }
-  if(!window.setMenuItems){
-    window.setMenuItems = function(items){
-      if(!Array.isArray(items)) items = [];
-      try{ window.menu = items; }catch(e){}
-      try{ if(typeof menu !== 'undefined') menu = items; }catch(e){}
-      try{ localStorage.setItem('cms_menu', JSON.stringify(items)); }catch(e){}
-      try{ sessionStorage.setItem('cms_menu', JSON.stringify(items)); }catch(e){}
-      try{ if(typeof window.renderMenu === 'function') window.renderMenu(); }catch(e){}
-      return items;
-    };
-  }
-})();
-
-
   const OWNER_EMAIL = 'admin@craftedvisual.com';
   const ALL_PERMISSIONS = ['menu','pictures','products','categories','seo','discounts','orders','finance','crm','users','analytics','security','inventory','media','settings'];
 
   function q(id){ return document.getElementById(id); }
   function val(id){ return (q(id)?.value || '').trim(); }
   function fullPermissions(){ const o={}; ALL_PERMISSIONS.forEach(k=>o[k]={read:true,write:true}); return o; }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   function session(){ try{return JSON.parse(sessionStorage.getItem('cvAdminSession') || localStorage.getItem('cvAdminSession') || 'null');}catch(e){return null;} }
   function isSuper(){ const u=session(); return !!u && (String(u.role||'').toLowerCase()==='superadmin' || String(u.email||'').toLowerCase()===OWNER_EMAIL); }
   function status(msg, err){ if(typeof window.showAdminStatus==='function') window.showAdminStatus(msg, !!err); else alert(msg); }
@@ -68,10 +33,10 @@
 
   async function api(path, options={}){
     const t = token();
-    if(!t) throw new Error('Missing admin token. Logout and login again.');
-    const headers = Object.assign({}, options.headers || {}, {Authorization:'Bearer '+t});
+    const headers = Object.assign({}, options.headers || {});
+    if(t) headers.Authorization = 'Bearer '+t;
     if(!(options.body instanceof FormData)) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-    const res = await fetch(path, Object.assign({}, options, {headers, body: options.body instanceof FormData ? options.body : (options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body)}));
+    const res = await fetch(path, Object.assign({}, options, {headers, credentials:'same-origin', body: options.body instanceof FormData ? options.body : (options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body)}));
     const ct = res.headers.get('content-type') || '';
     const data = ct.includes('json') ? await res.json().catch(()=>({})) : await res.text().catch(()=>'');
     if(!res.ok) throw new Error((data && data.error) || (typeof data === 'string' && data) || 'HTTP '+res.status);
@@ -1416,7 +1381,7 @@
     else if(typeof window.status==='function') window.status(msg, !!err);
     else console[err?'error':'log'](msg);
   }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   async function api(path, options={}){
     const headers = Object.assign({}, options.headers || {});
     if(!(options.body instanceof FormData)) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
@@ -1911,7 +1876,7 @@
 
   function q(id){ return document.getElementById(id); }
   function msg(m, err){ if(typeof window.showAdminStatus === 'function') window.showAdminStatus(m, !!err); else console[err?'error':'log'](m); }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   function cleanName(v){ return String(v || '').trim(); }
   function normalizeCategory(c){
     const label = cleanName(c?.label_en || c?.name_en || c?.name || c?.label || c?.category || '');
@@ -2009,7 +1974,7 @@
       }
 
       const t = token();
-      if(!t) throw new Error('Missing admin token. Login again.');
+      
       const settings = await fetchJson('/api/settings');
       await fetchJson('/api/settings', {
         method:'PUT',
@@ -2062,7 +2027,7 @@
   ];
 
   function msg(m, err){ if(typeof window.showAdminStatus === 'function') window.showAdminStatus(m, !!err); else console[err?'error':'log'](m); }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   function clean(v){ return String(v || '').trim(); }
   function key(v){ return clean(v).toLowerCase(); }
   function canWrite(){ return !window.hasAdminPermission || window.hasAdminPermission('categories','write'); }
@@ -2141,7 +2106,7 @@
   async function getSettings(){ try{ return await fetchJson('/api/settings'); }catch(e){ return {}; } }
   async function putSettings(patch){
     const t = token();
-    if(!t) throw new Error('Missing admin token. Login again.');
+    
     const current = await getSettings();
     return fetchJson('/api/settings', {
       method:'PUT',
@@ -3080,7 +3045,7 @@
   function esc(x){ return String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function msg(text, err){ if(typeof window.showAdminStatus === 'function') window.showAdminStatus(text, !!err); else alert(text); }
   function slugify(x){ return String(x || '').toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06FF]+/g,'-').replace(/^-|-$/g,''); }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
 
   async function apiSettings(next){
     if(typeof publishSettings === 'function') return publishSettings(next);

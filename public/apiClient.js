@@ -3,16 +3,10 @@ const CV_API = {
   tokenKey: 'cvApiToken',
   adminTokenKey: 'cvAdminApiToken',
   async available(){ try{ const r=await fetch('/api/health',{credentials:'same-origin'}); return r.ok; }catch(e){ return false; } },
-  token(admin=false){ return sessionStorage.getItem(admin ? this.adminTokenKey : this.tokenKey) || ''; },
-  async request(path, options={}){
-    const admin = options.admin === true;
-    const headers = Object.assign({'Content-Type':'application/json'}, options.headers || {});
-    const t = this.token(admin); if(t) headers.Authorization = 'Bearer ' + t; // local dev fallback only
-    const res = await fetch('/api' + path, Object.assign({}, options, {credentials:'same-origin', headers, body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body}));
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(data.error || 'API request failed');
-    return data;
-  },
+  token(admin=false){
+      if(admin) return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+      return localStorage.getItem('customerToken') || sessionStorage.getItem('customerToken') || '';
+    },
   async adminLogin(email,password){
     const r=await this.request('/admin/login',{method:'POST',body:{email,password}});
     sessionStorage.removeItem(this.adminTokenKey); localStorage.removeItem(this.adminTokenKey);

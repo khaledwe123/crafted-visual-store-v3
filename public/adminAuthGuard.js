@@ -3,16 +3,26 @@
   if(isLoginPage) return;
   const OWNER_EMAIL = 'admin@craftedvisual.com';
 
+  function adminToken(){
+    return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+  }
+  window.cvAdminToken = adminToken;
   function normalizeOwner(session){
     if(session && String(session.email || '').toLowerCase() === OWNER_EMAIL){
-      session.name = 'Super Admin';
+      session.name = session.name || 'Super Admin';
       session.role = 'superadmin';
       session.permissions = session.permissions || {};
     }
     return session;
   }
-  function setSession(session){ sessionStorage.setItem('cvAdminSession', JSON.stringify(normalizeOwner(session))); }
-  function getSession(){ try { return normalizeOwner(JSON.parse(sessionStorage.getItem('cvAdminSession') || 'null')); } catch(e) { return null; } }
+  function setSession(session){
+    session = normalizeOwner(session);
+    try{ sessionStorage.setItem('cvAdminSession', JSON.stringify(session)); }catch(e){}
+    try{ localStorage.setItem('cvAdminSession', JSON.stringify(session)); }catch(e){}
+  }
+  function getSession(){
+    try { return normalizeOwner(JSON.parse(sessionStorage.getItem('cvAdminSession') || localStorage.getItem('cvAdminSession') || 'null')); } catch(e) { return null; }
+  }
 
   window.cvCurrentAdmin = getSession;
   window.cvIsSuperAdmin = function(){
@@ -37,8 +47,10 @@
   async function verify(){
     const session = getSession();
     if(session){ setSession(session); return; }
+    const t = adminToken();
+    if(!t){ location.href = 'admin-login.html'; return; }
     try{
-      const res = await fetch('/api/admin/me', {credentials:'same-origin'});
+      const res = await fetch('/api/admin/me', {credentials:'same-origin', headers:{Authorization:'Bearer '+t}});
       if(!res.ok) throw new Error('not authenticated');
       const data = await res.json();
       setSession(data.user);
