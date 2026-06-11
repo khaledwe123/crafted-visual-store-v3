@@ -515,7 +515,7 @@ app.post('/api/admin/login', authLimiter, (req,res)=>{
   const adminJwt = token(user,'admin');
   setAuthCookie(res, 'cv_admin_auth', adminJwt);
   res.json({
-    token: IS_PROD ? undefined : adminJwt,
+    token: adminJwt,
     user:{id:user.id,name:user.name,email:user.email,role:user.role,permissions}
   });
 });

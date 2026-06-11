@@ -1325,11 +1325,13 @@ function renderAdminUserBar(){
   const box = document.getElementById("adminUserBar");
   const u = currentAdmin();
   if(!box || !u) return;
-  box.innerHTML = `<strong>${u.name}</strong> | ${u.role} | ${u.email} <button type="button" onclick="adminLogout()">Logout</button>`;
+  box.innerHTML = `<strong>${u.name}</strong> | ${u.role} | ${u.email} <button type="button" id="adminLogoutBtn">Logout</button>`;
+  const btn = document.getElementById("adminLogoutBtn");
+  if(btn) btn.addEventListener("click", adminLogout);
 }
 
 function adminLogout(){
-  ['cvAdminApiToken','cvAdminSession','adminToken'].forEach(k=>{
+  ['cvAdminApiToken','cvAdminSession','adminToken','token'].forEach(k=>{
     localStorage.removeItem(k);
     sessionStorage.removeItem(k);
   });

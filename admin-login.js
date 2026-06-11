@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ email, password })
       });
 
@@ -36,8 +37,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      localStorage.setItem("cvAdminApiToken", data.token);
-      sessionStorage.setItem("cvAdminApiToken", data.token);
+      if (data.token) {
+        localStorage.setItem("cvAdminApiToken", data.token);
+        sessionStorage.setItem("cvAdminApiToken", data.token);
+        localStorage.setItem("adminToken", data.token);
+        sessionStorage.setItem("adminToken", data.token);
+      }
       sessionStorage.setItem("cvAdminSession", JSON.stringify(data.user));
       localStorage.setItem("cvAdminSession", JSON.stringify(data.user));
 
