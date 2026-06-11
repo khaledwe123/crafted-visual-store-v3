@@ -1391,11 +1391,22 @@ async function addAdminUser(){
   }
   const permissions = role === "superadmin" ? cloneFullAdminPermissions() : collectPermissionMatrix();
   try{
-    if(!(window.CV_API && typeof CV_API.request === "function")) throw new Error("Admin API helper is not loaded. Refresh the page and login again.");
-    const adminToken = CV_API.token(true) || localStorage.getItem("cvAdminApiToken") || localStorage.getItem("adminToken") || localStorage.getItem("token") || sessionStorage.getItem("cvAdminApiToken") || sessionStorage.getItem("adminToken") || sessionStorage.getItem("token");
-    if(!adminToken) throw new Error("Admin session is missing. Please logout and login again.");
-    if(!localStorage.getItem("cvAdminApiToken")) localStorage.setItem("cvAdminApiToken", adminToken);
-    if(!sessionStorage.getItem("cvAdminApiToken")) sessionStorage.setItem("cvAdminApiToken", adminToken);
+    if(!(window.CV_API && typeof CV_API.request === "function")){
+      throw new Error("Admin API helper is not loaded. Refresh the page and try again.");
+    }
+    const adminToken = (typeof CV_API.token === "function" && CV_API.token(true)) ||
+      localStorage.getItem("cvAdminApiToken") ||
+      sessionStorage.getItem("cvAdminApiToken") ||
+      localStorage.getItem("adminToken") ||
+      sessionStorage.getItem("adminToken") ||
+      localStorage.getItem("token") ||
+      sessionStorage.getItem("token") ||
+      "";
+    if(!adminToken){
+      throw new Error("Admin token is missing. Please logout and login again.");
+    }
+    localStorage.setItem("cvAdminApiToken", adminToken);
+    sessionStorage.setItem("cvAdminApiToken", adminToken);
     await CV_API.request('/admin-users', {method:'POST', admin:true, body:{name,email,password,role,permissions,active:true}});
     document.getElementById("newAdminName").value = "";
     document.getElementById("newAdminEmail").value = "";
