@@ -1214,3 +1214,15 @@ img, video, iframe { max-width: 100%; }
 .product-review-empty{font-size:13px;color:#7b7065;background:#faf7ef;border-radius:12px;padding:10px;}
 [dir="rtl"] .product-review-item span{margin-inline-start:0;margin-inline-end:8px;}
 @media(max-width:520px){.product-review-box{padding:12px;border-radius:14px}.product-review-form .btn{width:100%}.product-review-stars button{min-width:42px;min-height:42px}}
+
+
+/* Product card written review form */
+.product-card-review{margin:8px 0 12px;display:grid;gap:8px;}
+.product-review-toggle{align-self:flex-start;border:1px solid rgba(24,61,50,.22);background:#fff;border-radius:999px;padding:7px 12px;font-weight:800;color:#183d32;cursor:pointer;min-height:36px;}
+.product-review-card-form{display:grid;gap:8px;padding:10px;border:1px solid rgba(24,61,50,.14);border-radius:14px;background:#fffdf8;}
+.product-review-card-form.hidden{display:none!important;}
+.product-review-card-form input,.product-review-card-form textarea{width:100%;box-sizing:border-box;border:1px solid #d8cbb9;border-radius:12px;padding:9px 10px;font:inherit;background:#fff;}
+.product-card-review .product-review-list{display:grid;gap:6px;}
+.product-card-review .product-review-item{font-size:13px;}
+.product-card-review .product-review-empty{font-size:12px;}
+.product-review-stars button.active{background:#183d32!important;color:#fff!important;border-color:#183d32!important;}
