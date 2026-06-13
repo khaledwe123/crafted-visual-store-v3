@@ -376,3 +376,104 @@
   setTimeout(translatePremiumToolsStatic, 1200);
   setTimeout(translatePremiumToolsStatic, 2200);
 })();
+
+/* CV QUICK VIEW / CUSTOMIZE ACTION BINDING FIX - 20260613
+   Scope: shop product action buttons only.
+   Uses delegated click handling so buttons still work after filtering/sorting/re-rendering.
+   Does not change product rendering, pricing, cart, discounts, admin, or layout.
+*/
+(function(){
+  'use strict';
+  if(window.__cvQuickCustomizeDelegationFix20260613) return;
+  window.__cvQuickCustomizeDelegationFix20260613 = true;
+
+  function norm(v){ return String(v == null ? '' : v).trim(); }
+  function lower(v){ return norm(v).toLowerCase(); }
+
+  function getProducts(){
+    try{ return Array.isArray(window.products) ? window.products : []; }catch(e){ return []; }
+  }
+
+  function productIdFromCard(el){
+    if(!el || !el.closest) return '';
+    var explicit = el.getAttribute('data-product-id') || el.getAttribute('data-cj-open-product');
+    if(explicit) return explicit;
+
+    var card = el.closest('[data-product-id],[data-cj-product-id],.product-card,.cj-product-card,.card');
+    if(!card) return '';
+
+    explicit = card.getAttribute('data-product-id') || card.getAttribute('data-cj-product-id') || card.getAttribute('data-cj-open-product');
+    if(explicit) return explicit;
+
+    var title = card.querySelector('h3,h2,strong,.product-title,.card-title');
+    var titleText = lower(title ? title.textContent : '');
+    if(titleText){
+      var found = getProducts().find(function(p){
+        return lower(p.name || p.name_en) === titleText || lower(p.name_ar) === titleText;
+      });
+      if(found) return found.id || found._dbId || found.sku || '';
+    }
+
+    var cards = Array.prototype.slice.call(document.querySelectorAll('#productGrid .card,#productGrid .product-card,#productGrid .cj-product-card'));
+    var index = cards.indexOf(card);
+    if(index >= 0 && getProducts()[index]) return getProducts()[index].id || getProducts()[index]._dbId || getProducts()[index].sku || '';
+    return '';
+  }
+
+  function findProductByAnyId(id){
+    var sid = norm(id);
+    if(!sid) return null;
+    return getProducts().find(function(p){
+      return norm(p.id) === sid || norm(p._dbId) === sid || norm(p.sku) === sid;
+    }) || null;
+  }
+
+  function openShopProduct(id, mode){
+    var product = findProductByAnyId(id);
+    var realId = product ? (product.id || product._dbId || product.sku || id) : id;
+
+    if(mode === 'customize' && typeof window.openCustomizeProduct === 'function'){
+      window.openCustomizeProduct(realId);
+      return true;
+    }
+
+    if(typeof window.openProduct === 'function'){
+      window.openProduct(realId);
+      return true;
+    }
+
+    if(mode === 'customize' && typeof window.openProductInternal === 'function'){
+      window.openProductInternal(realId, 'customize');
+      return true;
+    }
+
+    return false;
+  }
+
+  function actionFromElement(el){
+    if(!el) return '';
+    var action = el.getAttribute('data-shop-action') || '';
+    var mode = el.getAttribute('data-cj-mode') || '';
+    if(action === 'quick' || mode === 'quick') return 'quick';
+    if(action === 'customize' || mode === 'customize') return 'customize';
+
+    if(el.matches && (el.matches('.quick-view-btn,.quickViewBtn,.quick-view,[data-quick-view]') || lower(el.textContent) === 'quick view' || lower(el.textContent) === 'عرض سريع')) return 'quick';
+    if(el.matches && (el.matches('.customize-btn,.customizeBtn,.customize,[data-customize]') || lower(el.textContent) === 'customize' || lower(el.textContent) === 'خصص المنتج')) return 'customize';
+    return '';
+  }
+
+  document.addEventListener('click', function(e){
+    var target = e.target && e.target.closest ? e.target.closest('[data-cj-open-product],[data-shop-action="quick"],[data-shop-action="customize"],.quick-view-btn,.quickViewBtn,.quick-view,[data-quick-view],.customize-btn,.customizeBtn,.customize,[data-customize],button') : null;
+    if(!target) return;
+
+    var action = actionFromElement(target);
+    if(!action) return;
+
+    var id = target.getAttribute('data-product-id') || target.getAttribute('data-cj-open-product') || productIdFromCard(target);
+    if(!id) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    openShopProduct(id, action);
+  }, true);
+})();
