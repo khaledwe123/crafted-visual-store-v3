@@ -116,9 +116,9 @@
     try{ currentProduct = p; }catch(e){ window.currentProduct = p; }
 
     const colorKeys = Object.keys(p.colors || {});
-    const selectedColor = colorKeys[0] || '';
-    try{ window.selectedColor = selectedColor; }catch(e){}
-    try{ selectedColor = selectedColor; }catch(e){}
+    const initialColor = colorKeys[0] || '';
+    try{ window.selectedColor = initialColor; }catch(e){}
+    try{ selectedColor = initialColor; }catch(e){}
 
     const sizeOptions = Array.isArray(p.sizeOptions) && p.sizeOptions.length ? p.sizeOptions : [{label:'Custom Size', price:Number(p.price || 0)}];
     const fabricOptions = Array.isArray(p.fabricOptions) && p.fabricOptions.length ? p.fabricOptions : [{label:'Standard Fabric', sizePrices:{}}];
@@ -167,7 +167,7 @@
       sizeSelect.value = '0';
     }
     if(fabricDesc) fabricDesc.textContent = (fabricOptions[0] && (fabricOptions[0].description || fabricOptions[0].description_ar)) || '';
-    setImages(selectedColor);
+    setImages(initialColor);
     setPrice();
 
     const badgeId = 'customizeModeBadge';
@@ -188,28 +188,37 @@
     modal.classList.remove('hidden');
     modal.style.display = '';
     document.body.classList.add('modal-open');
+    ensureModalStructureVisible();
     cleanDuplicateToolButtons();
     return true;
   }
 
-  function openProductSafe(product, productId, customizeMode){
-    let opened = false;
-    try{
-      if(customizeMode && typeof window.openCustomizeProduct === 'function'){
-        window.openCustomizeProduct(String(productId || product.id || product._dbId));
-        opened = true;
-      }else if(typeof window.openProduct === 'function'){
-        window.openProduct(String(productId || product.id || product._dbId));
-        opened = true;
-      }
-    }catch(e){ opened = false; }
 
-    setTimeout(function(){
-      const modal = document.getElementById('productModal');
-      const visible = modal && !modal.classList.contains('hidden') && (document.getElementById('modalName') || {}).textContent;
-      if(!visible) directOpenProduct(product, customizeMode);
-      cleanDuplicateToolButtons();
-    }, opened ? 120 : 0);
+  function ensureModalStructureVisible(){
+    const modal = document.getElementById('productModal');
+    if(!modal) return;
+    const content = modal.querySelector('.modal-content');
+    const grid = modal.querySelector('.modal-grid');
+    if(content){
+      content.style.maxWidth = content.style.maxWidth || '980px';
+      content.style.width = content.style.width || 'min(92vw, 980px)';
+      content.style.maxHeight = content.style.maxHeight || '88vh';
+      content.style.overflow = content.style.overflow || 'auto';
+    }
+    if(grid){
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = window.innerWidth < 760 ? '1fr' : '1.05fr .95fr';
+      grid.style.gap = '24px';
+      grid.style.alignItems = 'start';
+    }
+  }
+
+  function openProductSafe(product, productId, customizeMode){
+    // Production-safe fix: do not call older openProduct/openCustomizeProduct handlers here.
+    // Several legacy scripts also patch those functions and can open a half-empty modal.
+    // This recovery script owns Quick View / Customize and fills the existing #productModal directly.
+    directOpenProduct(product, customizeMode);
+    setTimeout(cleanDuplicateToolButtons, 80);
   }
 
   function cleanDuplicateToolButtons(){
