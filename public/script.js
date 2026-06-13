@@ -2572,7 +2572,8 @@ openProduct = function(id){
 
   function activeFabricLabel(){
     try{
-      if(window.selectedFabricOption && selectedFabricOption.label) return String(selectedFabricOption.label);
+      if(typeof selectedFabricOption !== 'undefined' && selectedFabricOption && selectedFabricOption.label) return String(selectedFabricOption.label);
+      if(window.selectedFabricOption && window.selectedFabricOption.label) return String(window.selectedFabricOption.label);
       const sel = document.getElementById('fabricSelect');
       if(sel && sel.selectedOptions && sel.selectedOptions[0]) return sel.selectedOptions[0].textContent || '';
     }catch(e){}
@@ -2632,7 +2633,7 @@ openProduct = function(id){
   }
 
   window.getColorImages = function(color){
-    const product = window.currentProduct || null;
+    const product = (typeof currentProduct !== 'undefined' && currentProduct) ? currentProduct : (window.currentProduct || null);
     if(!product) return [];
     const actualKey = findColorKey(product, color);
     const colors = product.colors || {};
@@ -2645,7 +2646,7 @@ openProduct = function(id){
   };
 
   window.selectColor = function(color){
-    const product = window.currentProduct || null;
+    const product = (typeof currentProduct !== 'undefined' && currentProduct) ? currentProduct : (window.currentProduct || null);
     if(!product) return;
     const actualKey = findColorKey(product, color);
     window.selectedColor = actualKey;
@@ -2665,16 +2666,27 @@ openProduct = function(id){
   function removeDuplicateModalToolGroups(){
     const modal = document.getElementById('productModal');
     if(!modal) return;
-    modal.querySelectorAll('#cvModalTools, #cvPremiumTools').forEach(el => el.remove());
+    // Remove the secondary injected tool blocks, keeping the single native UX95 inline buttons only.
+    modal.querySelectorAll('#cvModalTools, #cvPremiumTools, .cv-modal-tools, .cv-standalone-tools').forEach(el => el.remove());
     const groups = Array.from(modal.querySelectorAll('.ux95-tools-inline'));
     groups.slice(1).forEach(el => el.remove());
+    // Last safety net: if any other wrapper contains the same 3 tool actions, keep only the first wrapper.
+    const toolWrappers = Array.from(modal.querySelectorAll('div')).filter(el => {
+      const btns = Array.from(el.querySelectorAll('button[data-ux95-tool],button[data-cv-tool]'));
+      const types = new Set(btns.map(b => b.dataset.ux95Tool || b.dataset.cvTool).filter(Boolean));
+      return types.has('360') && types.has('room') && types.has('measure');
+    });
+    toolWrappers.slice(1).forEach(el => el.remove());
   }
 
   document.addEventListener('click', function(e){
     const colorBtn = e.target && e.target.closest ? e.target.closest('.color-chip, [data-color], [data-product-color]') : null;
     if(!colorBtn) return;
     const color = colorBtn.getAttribute('data-color') || colorBtn.getAttribute('data-product-color') || (colorBtn.textContent || '').replace(/#[0-9a-fA-F]{3,8}/g,'').trim();
-    if(color && window.currentProduct){
+    const product = (typeof currentProduct !== 'undefined' && currentProduct) ? currentProduct : (window.currentProduct || null);
+    if(color && product){
+      e.preventDefault();
+      e.stopPropagation();
       setTimeout(function(){ window.selectColor(color); }, 0);
     }
   }, true);

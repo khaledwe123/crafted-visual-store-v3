@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2">
+  <script src="translate-ar.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
+</head>
+<body>
+<header class="nav">
+  <div class="brand">Crafted Visual</div>
+  <nav class="simple-page-nav">
+    <a href="index.html">Home</a>
+    <a href="index.html#shop">Shop</a>
+    <a href="account.html">My Account</a>
+  </nav>
+</header>
+
+<main class="contact-page">
+  <section class="contact-hero">
+    <h1>Contact Crafted Visual</h1>
+    <p>For furniture inquiries, custom orders, delivery, after-sales support, and project requests.</p>
+  </section>
+
+  <section class="contact-grid">
+    <div class="contact-card">
+      <h2>Contact Information</h2>
+      <p><strong>WhatsApp:</strong> <a id="whatsappLink" href="#" target="_blank">Chat with us</a></p>
+      <p><strong>Email:</strong> <a href="mailto:orders@craftedvisual.com">orders@craftedvisual.com</a></p>
+      <p><strong>Location:</strong> Riyadh, Saudi Arabia</p>
+      <p><strong>Working Hours:</strong> Saturday to Thursday, 9:00 AM - 9:00 PM</p>
+      <div class="social-icons contact-social" id="contactSocial">
+        <a id="instagramLink" href="#" target="_blank" title="Instagram">◎</a>
+        <a id="tiktokLink" href="#" target="_blank" title="TikTok">♪</a>
+        <a id="facebookLink" href="#" target="_blank" title="Facebook">f</a>
+        <a id="linkedinLink" href="#" target="_blank" title="LinkedIn">in</a>
+      </div>
+    </div>
+
+    <div class="contact-card">
+      <h2>Send Inquiry</h2>
+      <input id="contactName" placeholder="Full Name">
+      <input id="contactMobile" placeholder="Mobile Number">
+      <input id="contactEmail" placeholder="Email">
+      <select id="contactSubject">
+        <option>Product Inquiry</option>
+        <option>Custom Furniture</option>
+        <option>Delivery Follow-Up</option>
+        <option>After-Sales Support</option>
+        <option>Project / B2B Request</option>
+      </select>
+      <textarea id="contactMessage" placeholder="Message"></textarea>
+      <button class="btn primary" type="button" onclick="sendContact()">Send Inquiry</button>
+      <div id="contactStatus" class="admin-save-status"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+let settings = {};
+async function load(){
+  const local = localStorage.getItem("cms_settings") || sessionStorage.getItem("cms_settings");
+  settings = local ? JSON.parse(local) : await fetch("settings.json").then(r=>r.json()).catch(()=>({}));
+  const wa = settings.whatsapp_number || "966500000000";
+  document.getElementById("whatsappLink").href = "https://wa.me/" + wa;
+  const links = {
+    instagramLink:"instagram_url",
+    tiktokLink:"tiktok_url",
+    facebookLink:"facebook_url",
+    linkedinLink:"linkedin_url"
+  };
+  Object.entries(links).forEach(([id,key])=>{
+    const el = document.getElementById(id);
+    if(el && settings[key]) el.href = settings[key];
+  });
+}
+load();
+
+function sendContact(){
+  const inquiry = {
+    id:"INQ-" + Date.now(),
+    name:document.getElementById("contactName").value.trim(),
+    mobile:document.getElementById("contactMobile").value.trim(),
+    email:document.getElementById("contactEmail").value.trim(),
+    subject:document.getElementById("contactSubject").value,
+    message:document.getElementById("contactMessage").value.trim(),
+    date:new Date().toISOString(),
+    status:"New Inquiry"
+  };
+  const box = document.getElementById("contactStatus");
+  if(!inquiry.name || !inquiry.mobile || !inquiry.message){
+    box.textContent = "Please add name, mobile and message.";
+    box.className = "admin-save-status error";
+    return;
+  }
+  const inquiries = JSON.parse(localStorage.getItem("contactInquiries") || "[]");
+  inquiries.push(inquiry);
+  localStorage.setItem("contactInquiries", JSON.stringify(inquiries));
+
+  const acts = JSON.parse(localStorage.getItem("crmActivities") || "[]");
+  acts.push({id:"ACT-" + Date.now(), type:"Contact Inquiry", payload:inquiry, date:new Date().toISOString()});
+  localStorage.setItem("crmActivities", JSON.stringify(acts));
+
+  const wa = settings.whatsapp_number || "966500000000";
+  const msg = `New Website Inquiry
+Name: ${inquiry.name}
+Mobile: ${inquiry.mobile}
+Email: ${inquiry.email}
+Subject: ${inquiry.subject}
+Message: ${inquiry.message}`;
+  window.open("https://wa.me/" + wa + "?text=" + encodeURIComponent(msg), "_blank");
+
+  box.textContent = "Inquiry saved and WhatsApp message prepared.";
+  box.className = "admin-save-status success";
+}
+</script>
+<!-- CV_STATIC_ARABIC_PATCH -->
+
+<script>
+(function(){
+  const lang = localStorage.getItem('lang') || 'en';
+  if(lang !== 'ar') return;
+  document.documentElement.lang='ar';
+  document.documentElement.dir='rtl';
+  const map = {
+    'Crafted Visual':'كرافتد فيجوال','Home':'الرئيسية','Shop':'المتجر','My Account':'حسابي','Contact Us':'تواصل معنا','Track Order':'تتبع الطلب',
+    'Contact Crafted Visual':'تواصل مع كرافتد فيجوال','For furniture inquiries, custom orders, delivery, after-sales support, and project requests.':'لاستفسارات الأثاث والطلبات الخاصة والتوصيل وخدمة ما بعد البيع وطلبات المشاريع.','Contact Information':'معلومات التواصل','Send Inquiry':'إرسال استفسار','WhatsApp:':'واتساب:','Chat with us':'تواصل معنا','Email:':'البريد الإلكتروني:','Location: Riyadh, Saudi Arabia':'الموقع: الرياض، المملكة العربية السعودية','Working Hours: Saturday to Thursday, 9:00 AM - 9:00 PM':'ساعات العمل: من السبت إلى الخميس، 9:00 صباحاً - 9:00 مساءً','Product Inquiry':'استفسار عن منتج',
+    'Track Your Order':'تتبع طلبك','Enter the full order number exactly as received.':'أدخل رقم الطلب الكامل كما وصل إليك.','Track Order':'تتبع الطلب',
+    'My Account':'حسابي','Manage your saved delivery details.':'إدارة بيانات التوصيل المحفوظة.','Full Name':'الاسم الكامل','Email':'البريد الإلكتروني','Phone Number':'رقم الجوال','City':'المدينة','Delivery Address':'عنوان التوصيل','Building / Villa / Apartment':'المبنى / الفيلا / الشقة','Additional Notes':'ملاحظات إضافية','Save Account':'حفظ الحساب','Logout':'تسجيل الخروج'
+  };
+  function walk(node){
+    if(node.nodeType===3){
+      const t=node.nodeValue.trim();
+      if(map[t]) node.nodeValue=node.nodeValue.replace(t,map[t]);
+    } else if(node.nodeType===1 && !['SCRIPT','STYLE'].includes(node.tagName)) {
+      [...node.childNodes].forEach(walk);
+    }
+  }
+  walk(document.body);
+  const ph = {'Full Name':'الاسم الكامل','Mobile Number':'رقم الجوال','Email':'البريد الإلكتروني','Message':'الرسالة','Full Order Number e.g. CV-...':'رقم الطلب الكامل مثال CV-...','Phone Number':'رقم الجوال','Full delivery address':'عنوان التوصيل الكامل','Building, villa or apartment':'المبنى أو الفيلا أو الشقة','Preferred delivery notes':'ملاحظات التوصيل المفضلة'};
+  document.querySelectorAll('input,textarea').forEach(el=>{ if(ph[el.placeholder]) el.placeholder=ph[el.placeholder]; });
+  document.querySelectorAll('select option').forEach(o=>{ if(map[o.textContent.trim()]) o.textContent=map[o.textContent.trim()]; });
+})();
+</script>
+
+  <script src="analytics-tracker.js"></script>
+  <script src="customer-journey-95.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+</body>
+</html>
