@@ -946,6 +946,34 @@ function applyHtmlSecurityTransforms(html, nonce){
   out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
   return out;
 }
+
+// Safe frontend asset resolver: serve whitelisted CSS/JS/JSON/image assets from /public first,
+// then from project root as a Railway fallback. This prevents unstyled pages when a deploy
+// contains root-level frontend files but no populated /public folder.
+const SAFE_ASSET_EXTENSIONS = new Set(['.css','.js','.json','.png','.jpg','.jpeg','.webp','.gif','.svg','.ico','.map','.txt']);
+function safeAssetFileForRequest(req){
+  const pathname = decodeURIComponent(req.path || '');
+  const fileName = pathname.replace(/^\/+/, '');
+  if(!fileName || fileName.includes('..')) return null;
+  const ext = path.extname(fileName).toLowerCase();
+  if(!SAFE_ASSET_EXTENSIONS.has(ext)) return null;
+  if(fileName.match(/^(server|db|schema|seed|pg-sync-worker)\.js$/i)) return null;
+  if(fileName.match(/^(package|package-lock|railway|nixpacks)\./i)) return null;
+  if(fileName.startsWith('security/') || fileName.startsWith('test/') || fileName.startsWith('crm/')) return null;
+  const publicDir = path.join(__dirname, 'public');
+  const rootDir = __dirname;
+  const publicCandidate = path.join(publicDir, fileName);
+  const rootCandidate = path.join(rootDir, fileName);
+  if(safeInside(publicDir, publicCandidate) && fs.existsSync(publicCandidate) && fs.statSync(publicCandidate).isFile()) return publicCandidate;
+  if(safeInside(rootDir, rootCandidate) && fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
+  return null;
+}
+app.get('*', (req,res,next)=>{
+  const file = safeAssetFileForRequest(req);
+  if(!file) return next();
+  res.sendFile(file);
+});
+
 app.get(['/', '/*.html'], (req,res,next)=>{
   const file = htmlFileForRequest(req);
   if(!file) return next();

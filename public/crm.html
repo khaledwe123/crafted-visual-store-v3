@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>CRM | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <script src="adminAuthGuard.js"></script>
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
+</head>
+<body>
+<header class="nav">
+  <div class="brand">Crafted Visual CRM</div>
+  <nav><a href="admin.html">Admin</a><a href="orders.html">Orders</a><a href="index.html">Website</a></nav>
+</header>
+<main class="admin-wrap">
+  <h1>CRM & Follow Up</h1>
+  <div class="crm-grid" id="crmGrid"></div>
+</main>
+<script>
+const users = JSON.parse(localStorage.getItem("users") || "[]");
+const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+const acts = JSON.parse(localStorage.getItem("crmActivities") || "[]").slice().reverse();
+const emailOutbox = JSON.parse(localStorage.getItem("crmEmailOutbox") || "[]").slice().reverse();
+const whatsappOutbox = JSON.parse(localStorage.getItem("crmWhatsAppOutbox") || "[]").slice().reverse();
+const inquiries = JSON.parse(localStorage.getItem("contactInquiries") || "[]").slice().reverse();
+const resets = JSON.parse(localStorage.getItem("passwordResetRequests") || "[]").slice().reverse();
+const state = {};
+function followTasks(){
+  return orders.filter(o=>!["Delivered","Cancelled"].includes(o.orderStatus || "New Order")).map(o=>({order:o.id, customer:o.customer?.name, mobile:o.customer?.mobile, status:o.orderStatus||"New Order"}));
+}
+const sections = [
+  ["customers","Customers",users,u=>`<strong>${u.name||""}</strong><br>${u.email||""}<br>${u.mobile||""}`],
+  ["tasks","Follow-Up Tasks",followTasks(),t=>`<strong>${t.order}</strong><br>${t.customer||""} | ${t.mobile||""}<br>Status: ${t.status}`],
+  ["activities","CRM Activities",acts,a=>`<strong>${a.type}</strong><br>${new Date(a.date).toLocaleString()}<br><small>${JSON.stringify(a.payload)}</small>`],
+  ["email","Email Outbox",emailOutbox,e=>`<strong>${e.subject||e.id}</strong><br>To: ${e.to||""}<br>Status: ${e.status||""}<br><small>${new Date(e.date).toLocaleString()}</small>`],
+  ["whatsapp","WhatsApp Outbox",whatsappOutbox,w=>`<strong>${w.id}</strong><br>To: ${w.to||""}<br>Status: ${w.status||""}<br><small>${new Date(w.date).toLocaleString()}</small>`],
+  ["inquiries","Contact Inquiries",inquiries,i=>`<strong>${i.subject}</strong><br>${i.name} | ${i.mobile}<br>${i.message}`],
+  ["resets","Password Reset Requests",resets,r=>`<strong>${r.email}</strong><br>${r.status}<br><small>${new Date(r.date).toLocaleString()}</small>`]
+];
+function renderShell(){
+  document.getElementById("crmGrid").innerHTML = sections.map(([id,title])=>`
+    <section class="admin-panel">
+      <h2>${title}</h2>
+      <input id="search-${id}" placeholder="Search ${title}" oninput="renderSection('${id}')">
+      <div id="list-${id}"></div>
+      <div id="pager-${id}" class="crm-pager"></div>
+    </section>
+  `).join("");
+  sections.forEach(([id])=>{state[id]=1; renderSection(id);});
+}
+function renderSection(id,page=state[id]||1){
+  state[id]=page;
+  const sec = sections.find(s=>s[0]===id);
+  const [,title,data,template] = sec;
+  const q = (document.getElementById("search-"+id)?.value || "").toLowerCase();
+  const filtered = data.filter(x=>JSON.stringify(x).toLowerCase().includes(q));
+  const per=10, pages=Math.max(1,Math.ceil(filtered.length/per));
+  if(state[id]>pages) state[id]=pages;
+  const list = filtered.slice((state[id]-1)*per,state[id]*per);
+  document.getElementById("list-"+id).innerHTML = list.length ? list.map(x=>`<div class="admin-item"><div>${template(x)}</div></div>`).join("") : `<p>No ${title.toLowerCase()} found.</p>`;
+  document.getElementById("pager-"+id).innerHTML = `<button onclick="renderSection('${id}',${Math.max(1,state[id]-1)})">Prev</button><span> Page ${state[id]} of ${pages} </span><button onclick="renderSection('${id}',${Math.min(pages,state[id]+1)})">Next</button>`;
+}
+renderShell();
+</script>
+<script>
+function enforcePageWritePermission(section){
+  if(typeof cvHasPermission === "function" && !cvHasPermission(section,"write")){
+    document.querySelectorAll("button,input,textarea,select").forEach(el=>{
+      const text = (el.textContent || el.value || "").toLowerCase();
+      if(el.tagName === "A") return;
+      el.disabled = true;
+    });
+    document.body.insertAdjacentHTML("afterbegin", '<div class="read-only-note page-note">Read-only access. You cannot edit this page.</div>');
+  }
+}
+document.addEventListener("DOMContentLoaded", ()=>enforcePageWritePermission('crm'));
+</script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+</body>
+</html>

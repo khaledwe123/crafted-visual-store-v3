@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Signage Estimator | Crafted Visual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutral (Beige, Slate, Accent Blue) -->
+    <!-- Application Structure Plan: A two-column dashboard layout. The left column contains all user inputs (project details, cost entry forms) for a clear, step-by-step workflow. The right column serves as a real-time summary panel, displaying the calculated quote and a cost breakdown chart. This separation of input and output provides immediate feedback and a clear overview, enhancing usability. The structure is designed for a seamless quote-building process, logically progressing from data entry to final calculation. -->
+    <!-- Visualization & Content Choices: 
+        - Project Info -> Goal: Input -> Viz: HTML Forms -> Interaction: Text entry -> Justification: Standard method for data capture.
+        - Cost Items (Materials/Labor/Other) -> Goal: Organize/Calculate -> Viz: Dynamic HTML Tables -> Interaction: Select from dropdown, input quantity/hours, add/delete rows -> Justification: Efficiently handles a variable number of line items, making data entry flexible and clear.
+        - Quote Summary -> Goal: Inform/Compare -> Viz: Donut Chart (Chart.js) & Text values -> Interaction: Updates in real-time based on inputs -> Justification: The donut chart provides a quick, high-level visual comparison of cost categories (materials, labor, other), offering an insight not immediately available in the original spreadsheet.
+        - Markup -> Goal: Input/Change -> Viz: HTML Range Slider -> Interaction: User drags slider -> Justification: A tactile, interactive way to see how profit margin impacts the final price, superior to manual typing.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 280px;
+            }
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a8a8a8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #888;
+        }
+    </style>
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
+</head>
+<body class="bg-[#FDFBF7] text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <img src="https://placehold.co/80x80/2C3E50/FFFFFF?text=CV" alt="Crafted Visual Logo" class="mb-4 rounded-lg mx-auto">
+            <h1 class="text-4xl font-bold text-gray-900">Crafted Visual</h1>
+            <p class="text-xl text-gray-600 mt-2">Interactive Signage Production Estimator</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+            <!-- Left Column: Inputs -->
+            <div class="lg:col-span-3 bg-white p-6 rounded-2xl shadow-lg">
+                
+                <!-- Project Details Section -->
+                <section id="project-details">
+                    <h2 class="text-2xl font-semibold border-b pb-3 mb-4">Project Details</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" placeholder="Client Name" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <input type="text" placeholder="Project Name" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <input type="text" placeholder="Contact Person" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <input type="text" placeholder="Signage Type (e.g., 3D Backlit)" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                    </div>
+                </section>
+
+                <!-- Material Costs Section -->
+                <section id="material-costs" class="mt-8">
+                    <h2 class="text-2xl font-semibold border-b pb-3 mb-4">1. Material Costs</h2>
+                    <p class="text-sm text-gray-500 mb-4">Search for a material, select it from the filtered list, and specify the quantity. The application will automatically calculate the cost.</p>
+                    <div class="space-y-3 mb-4">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="p-2">Material</th>
+                                    <th class="p-2 w-24">Quantity</th>
+                                    <th class="p-2 w-32 text-right">Line Total</th>
+                                    <th class="p-2 w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="material-list">
+                                <!-- Dynamic rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mb-4">
+                        <input id="material-search" type="text" placeholder="Search for a material..." class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <select id="material-select" class="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]"></select>
+                        <input id="material-quantity" type="number" placeholder="Qty" class="w-24 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <button id="add-material-btn" class="bg-[#5A98D0] text-white font-semibold px-4 py-3 rounded-lg hover:bg-opacity-90 transition-all">Add</button>
+                    </div>
+                </section>
+
+                <!-- Labor Costs Section -->
+                <section id="labor-costs" class="mt-8">
+                    <h2 class="text-2xl font-semibold border-b pb-3 mb-4">2. Labor Costs</h2>
+                    <p class="text-sm text-gray-500 mb-4">Add different labor tasks and the estimated hours for each. The cost is calculated based on predefined hourly rates.</p>
+                     <div class="space-y-3 mb-4">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="p-2">Task</th>
+                                    <th class="p-2 w-24">Hours</th>
+                                    <th class="p-2 w-32 text-right">Line Total</th>
+                                    <th class="p-2 w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="labor-list">
+                                <!-- Dynamic rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <select id="labor-select" class="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]"></select>
+                        <input id="labor-hours" type="number" placeholder="Hours" class="w-24 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <button id="add-labor-btn" class="bg-[#5A98D0] text-white font-semibold px-4 py-3 rounded-lg hover:bg-opacity-90 transition-all">Add</button>
+                    </div>
+                </section>
+
+                 <!-- Other Costs Section -->
+                <section id="other-costs" class="mt-8">
+                    <h2 class="text-2xl font-semibold border-b pb-3 mb-4">3. Other Costs</h2>
+                    <p class="text-sm text-gray-500 mb-4">Include any additional expenses such as machine rentals, delivery, or specialized subcontractor fees.</p>
+                     <div class="space-y-3 mb-4">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="p-2">Item</th>
+                                    <th class="p-2 w-32 text-right">Cost</th>
+                                    <th class="p-2 w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="other-list">
+                                <!-- Dynamic rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <input id="other-description" type="text" placeholder="Item Description" class="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <input id="other-cost" type="number" placeholder="Cost" class="w-24 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5A98D0]">
+                        <button id="add-other-btn" class="bg-[#5A98D0] text-white font-semibold px-4 py-3 rounded-lg hover:bg-opacity-90 transition-all">Add</button>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Right Column: Summary -->
+            <div class="lg:col-span-2 sticky top-8 h-fit bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-semibold border-b pb-3 mb-4">Quote Summary</h2>
+                <p class="text-sm text-gray-500 mb-4">This summary updates in real-time as you add or modify costs. The chart below provides a visual breakdown of the primary cost categories.</p>
+
+                <div class="chart-container mb-6">
+                    <canvas id="cost-breakdown-chart"></canvas>
+                </div>
+                
+                <div class="space-y-3 text-lg">
+                    <div class="flex justify-between">
+                        <span>Material Cost</span>
+                        <span id="summary-material" class="font-medium">SAR 0.00</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Labor Cost</span>
+                        <span id="summary-labor" class="font-medium">SAR 0.00</span>
+                    </div>
+                     <div class="flex justify-between">
+                        <span>Other Costs</span>
+                        <span id="summary-other" class="font-medium">SAR 0.00</span>
+                    </div>
+                    <div class="flex justify-between font-semibold border-t pt-3">
+                        <span>Total Direct Cost</span>
+                        <span id="summary-direct-cost">SAR 0.00</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 border-t pt-4">
+                     <label for="markup-slider" class="block font-semibold mb-2">Markup / Profit Margin: <span id="markup-value" class="text-[#5A98D0]">25%</span></label>
+                     <input id="markup-slider" type="range" min="0" max="100" value="25" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                 <div class="mt-6 space-y-3 bg-gray-50 p-4 rounded-lg">
+                    <div class="flex justify-between text-lg">
+                        <span>Subtotal</span>
+                        <span id="summary-subtotal" class="font-semibold">SAR 0.00</span>
+                    </div>
+                     <div class="flex justify-between text-lg">
+                        <span>VAT (15%)</span>
+                        <span id="summary-vat" class="font-semibold">SAR 0.00</span>
+                    </div>
+                    <div class="flex justify-between text-2xl font-bold text-gray-900 border-t-2 border-gray-300 mt-3 pt-3">
+                        <span>GRAND TOTAL</span>
+                        <span id="summary-grand-total">SAR 0.00</span>
+                    </div>
+                 </div>
+                 <button onclick="window.print()" class="w-full mt-6 bg-gray-800 text-white font-bold py-4 rounded-lg hover:bg-gray-700 transition-all">
+                    Print / Save as PDF
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA SOURCE ---
+            const costDatabase = {
+                materials: [
+                    { name: "Banner Matte & Glossy 1,12*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Matte & Glossy 1,32*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Matte & Glossy 1,62*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Matte & Glossy 1,85*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Matte & Glossy 2.20*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Matte & Glossy 2.60*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Matte & Glossy 3.20*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Coated  Matte1.12*50", unit: "Sqm", cost: 4.25 },
+                    { name: "Banner Coated  Matte1.62*50", unit: "Sqm", cost: 4.30 },
+                    { name: "Banner Coated  Matte 2.20*50", unit: "Sqm", cost: 4.30 },
+                    { name: "Banner Coated  Matte 2.60*50", unit: "Sqm", cost: 4.30 },
+                    { name: "Banner Coated  Matte 3.20*50", unit: "Sqm", cost: 4.30 },
+                    { name: "Banner Black Back Matt 2.20*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Banner Black Back  Matt 2.60*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Banner Black Back Matt 3.20*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Banner Black Back Matt 4.20*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Banner Black Back E Matt 5*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Banner Coated Black Back  Matte 1,12*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Coated Black Back  Matte 1,32*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Coated Black Back  Matte 1,62*50", unit: "Sqm", cost: 4.00 },
+                    { name: "Banner Coated Black Back  Matte 2.20*50", unit: "Sqm", cost: 4.25 },
+                    { name: "Banner Coated Black Back  Matte 2.60*50", unit: "Sqm", cost: 4.25 },
+                    { name: "Banner Coated Black Back  Matte 3.20*50", unit: "Sqm", cost: 4.25 },
+                    { name: "Banner Coated Black Back  Matte 3.80*50", unit: "Sqm", cost: 11.21 },
+                    { name: "Banner Coated Black Back  Matte 4.20* 50", unit: "Sqm", cost: 11.21 },
+                    { name: "Banner Coated Black Back  Matte 5 * 50", unit: "Sqm", cost: 5.00 },
+                    { name: "Banner Laminated  Matte & Glossy 50*1.12", unit: "Sqm", cost: 2.90 },
+                    { name: "Banner Laminated  Matte & Glossy50*1.32", unit: "Sqm", cost: 2.90 },
+                    { name: "Banner Laminated  Matte & Glossy50*1.62", unit: "Sqm", cost: 2.90 },
+                    { name: "Banner Laminated  Matte & Glossy50*2.20", unit: "Sqm", cost: 2.90 },
+                    { name: "Banner Laminated  Matte & Glossy50*2.60", unit: "Sqm", cost: 2.90 },
+                    { name: "Banner Laminated  Matte & Glossy50*3.20", unit: "Sqm", cost: 2.90 },
+                    { name: "Banner Laminated  Matte & Glossy50*3.80", unit: "Sqm", cost: 2.90 },
+                    { name: "White Sticker  Matte & Glossy 1.07*50", unit: "Sqm", cost: 3.50 },
+                    { name: "White Sticker  Matte & Glossy 1.27*50", unit: "Sqm", cost: 3.50 },
+                    { name: "White Sticker  Matte & Glossy 1.37*50", unit: "Sqm", cost: 3.50 },
+                    { name: "White Sticker  Matte & Glossy 1.52*50", unit: "Sqm", cost: 3.50 },
+                    { name: "Clear Sticker 1.07*50", unit: "Sqm", cost: 7.00 },
+                    { name: "Clear Sticker 1.27*50", unit: "Sqm", cost: 7.00 },
+                    { name: "Clear Sticker 1.37*50", unit: "Sqm", cost: 7.00 },
+                    { name: "Clear Sticker 1.52*50", unit: "Sqm", cost: 7.00 },
+                    { name: "Sticker Grey Back Matte1.07*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Matte1.27*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Matte1.37*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Matte1.52*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Glossy 1.07*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Glossy 1.27*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Glossy 1.37*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker Grey Back Glossy 1.52*50", unit: "Sqm", cost: 5.00 },
+                    { name: "Sticker One Way Vision 1.07*50", unit: "Sqm", cost: 8.00 },
+                    { name: "Sticker One Way Vision 1.27*50", unit: "Sqm", cost: 8.00 },
+                    { name: "Sticker One Way Vision 1.37*50", unit: "Sqm", cost: 8.00 },
+                    { name: "Sticker One Way Vision 1.52*50", unit: "Sqm", cost: 8.00 },
+                    { name: "Sticker Black Back Glossy 1.07*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Sticker Black Back Glossy 1.27*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Sticker Black Back Glossy 1.37*50", unit: "Sqm", cost: 5.50 },
+                    { name: "Reflective Stickers", unit: "Sqm", cost: 20.00 },
+                    { name: "Frosted Sticker", unit: "Sqm", cost: 13.00 },
+                    { name: "Chinese White reflective Sticker 1.24*50 C1 ", unit: "Sqm", cost: 26.20 },
+                    { name: "Chinese White reflective Sticker 1.24*50 C2", unit: "Sqm", cost: 22.40 },
+                    { name: "Korean sticker printing paper 200 micro size 1.37 x 50", unit: "Sqm", cost: 0.47 },
+                    { name: "Korean sticker printing paper 170 micro size 1.37 x 50 ", unit: "Sqm", cost: 0.43 },
+                    { name: "See Through Sticker 140 Micro 140gsm 1.07 x 50", unit: "Sqm", cost: 2.90 },
+                    { name: "Indoor Lamination  Matte & Glossy 1.07*50", unit: "Sqm", cost: 3.25 },
+                    { name: "Indoor Lamination  Matte & Glossy 1.27*50", unit: "Sqm", cost: 3.25 },
+                    { name: "Indoor Lamination  Matte & Glossy 1.37*50", unit: "Sqm", cost: 3.25 },
+                    { name: "Indoor Lamination  Matte & Glossy 1.52*50", unit: "Sqm", cost: 3.25 },
+                    { name: "Outdoor Lamination 1.07*50", unit: "Sqm", cost: 7.50 },
+                    { name: "Outdoor Lamination 1.27*50", unit: "Sqm", cost: 7.50 },
+                    { name: "Outdoor Lamination 1.37*50", unit: "Sqm", cost: 7.50 },
+                    { name: "Outdoor Lamination 1.07*45", unit: "Sqm", cost: 8.00 },
+                    { name: "Outdoor Lamination 1.52*50", unit: "Sqm", cost: 7.50 },
+                    { name: "Floor Lamination 1.07*50", unit: "Sqm", cost: 10.90 },
+                    { name: "Floor Lamination 1.27*50", unit: "Sqm", cost: 10.90 },
+                    { name: "Floor Lamination 1.37*50", unit: "Sqm", cost: 10.90 },
+                    { name: "Floor Lamination 1.52*50", unit: "Sqm", cost: 10.90 },
+                    { name: "Forex 1mm 122 x 244)", unit: "Sheet", cost: 21.00 },
+                    { name: "Forex 2mm 122 x 244)", unit: "Sheet", cost: 28.00 },
+                    { name: "Forex 3mm 122 x 244)", unit: "Sheet", cost: 34.00 },
+                    { name: "Forex 4mm 122 x 244)", unit: "Sheet", cost: 41.00 },
+                    { name: "Forex 5mm 122 x 244)", unit: "Sheet", cost: 52.00 },
+                    { name: "Forex 6mm 122 x 244)", unit: "Sheet", cost: 60.00 },
+                    { name: "Forex 8mm 122 x 244)", unit: "Sheet", cost: 75.00 },
+                    { name: "Forex 10mm 122 x 244)", unit: "Sheet", cost: 88.00 },
+                    { name: "Forex 12mm 122 x 244)", unit: "Sheet", cost: 110.00 },
+                    { name: "Forex 15mm 122 x 244)", unit: "Sheet", cost: 135.00 },
+                    { name: "Forex 18mm 122 x 244)", unit: "Sheet", cost: 165.00 },
+                    { name: "Forex 20mm 122 x 244)", unit: "Sheet", cost: 205.00 },
+                    { name: "Forex 25mm 122 x 244)", unit: "Sheet", cost: 270.00 },
+                    { name: "Forex 30mm 122 x 244 PVC", unit: "Sheet", cost: 430.00 },
+                    { name: "Corrugated 2mm 122*244", unit: "Sheet", cost: 18.00 },
+                    { name: "Corrugated 3mm 122*244", unit: "Sheet", cost: 21.00 },
+                    { name: "Corrugated 4mm 122*244", unit: "Sheet", cost: 25.00 },
+                    { name: "Corrugated 5mm 122*244", unit: "Sheet", cost: 32.00 },
+                    { name: "Corrugated 6mm 122*244", unit: "Sheet", cost: 40.00 },
+                    { name: "Led samsung  white", unit: "Pcs", cost: 1.25 },
+                    { name: "Led samsung warm white", unit: "Pcs", cost: 1.80 },
+                    { name: "Led samsung  red", unit: "Pcs", cost: 1.80 },
+                    { name: "power supplies 60  W", unit: "Pcs", cost: 55.00 },
+                    { name: "power supplies 100 W", unit: "Pcs", cost: 115.00 },
+                    { name: "power supplies 150 W", unit: "Pcs", cost: 135.00 },
+                    { name: "power supplies 200 W", unit: "Pcs", cost: 155.00 },
+                    { name: "power supplies 300 W", unit: "Pcs", cost: 170.00 },
+                    { name: "SILICON NEON STRIP GREEN COLOR 5 MT ROLL", unit: "Pcs", cost: 150.00 },
+                    { name: "SILICON NEON STRIP RED COLOR 5 MT ROLL", unit: "Pcs", cost: 250.00 },
+                    { name: "SILICON NEON STRIP WARM WHITE COLOR  5 MT ROLL", unit: "Pcs", cost: 150.00 },
+                    { name: "SILICON NEON STRIP WHITE COLOR  5 MT ROLL ", unit: "Pcs", cost: 150.00 },
+                    { name: "SILICON NEON STRIP PINK COLOR 5 MT ROL", unit: "Pcs", cost: 87.00 },
+                    { name: "SILICON NEON STRIP BLUE COLOR 5 MT ROLL", unit: "Pcs", cost: 150.00 },
+                    { name: "SILICON NEON STRIP YELLOW COLOR 5 MT ROLL", unit: "Pcs", cost: 150.00 },
+                    { name: "5M LED 12V 5.5W/M 60LEDS/M 3000K WARM", unit: "Pcs", cost: 70.00 },
+                    { name: "5M LED REEL 12V 5.5W/M 60LEDS/M COOL", unit: "Pcs", cost: 35.00 },
+                    { name: "5M LED REEL 12V 6W/M 60LEDS/M COOL ECO", unit: "Pcs", cost: 35.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M GREEN", unit: "Pcs", cost: 30.00 },
+                    { name: "5M LED REEL 12V 12W/M 60LEDS/M WARM WHITE 3000K ", unit: "Pcs", cost: 40.00 },
+                    { name: "5M LED REEL 12V 6.5W/M 60LEDS/M COOL WHITE", unit: "Pcs", cost: 40.00 },
+                    { name: "5M LED REEL 12V 8.6W/M 120LEDS/M 5000K", unit: "Pcs", cost: 56.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M 6500K", unit: "Pcs", cost: 33.00 },
+                    { name: "5M LED REEL 12V 12W/M 60LEDS/M BLUE ", unit: "Pcs", cost: 40.00 },
+                    { name: "5M LED REEL 12V 12W/M 60LEDS/M GREEN ", unit: "Pcs", cost: 40.00 },
+                    { name: "5M LED REEL 12V 5.5W/M 60LEDS/M YELLOW", unit: "Pcs", cost: 33.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M YELLOW ", unit: "Pcs", cost: 33.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M 4000K", unit: "Pcs", cost: 33.00 },
+                    { name: "5M LED REEL 12V 8.6W/M 120LEDS/M COOL", unit: "Pcs", cost: 56.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M RED", unit: "Pcs", cost: 33.00 },
+                    { name: "5M LED REEL 12V 7.2W/M 72LEDS/M COOL", unit: "Pcs", cost: 65.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M COOL", unit: "Pcs", cost: 70.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M BLUE ", unit: "Pcs", cost: 33.00 },
+                    { name: "5M LED REEL 12V 4.8W/M 60LEDS/M COOL", unit: "Pcs", cost: 70.00 },
+                    { name: "5M LED REEL 12V 12W/M 60LEDS/M COOL", unit: "Pcs", cost: 40.00 },
+                    { name: "5050 5M LED REEL 12V 12W/M 60LEDS/M RED", unit: "Pcs", cost: 40.00 },
+                    { name: "5M LED 12V 7W/M 60LEDS/M Cool White Eco", unit: "Pcs", cost: 23.00 },
+                    { name: "5M LED 12V 7W/M 60LEDS/M 3000K Eco", unit: "Pcs", cost: 28.00 },
+                    { name: "5M LED 12V 7W/M 60LEDS/M Cool White ", unit: "Pcs", cost: 30.00 },
+                    { name: "5M LED 12V 7W/M 60LEDS/M 2800k/3500k/4000k/5000k", unit: "Pcs", cost: 46.00 },
+                    { name: "5M LED 12V 7W/M 60LEDS/M Other Colors", unit: "Pcs", cost: 36.00 },
+                    { name: "5M LED 12V 14.4W/M 60/120LEDS/M Cool White and White", unit: "Pcs", cost: 53.00 },
+                    { name: "5M LED 12V 14.4W/M 60/120LEDS/M other colors", unit: "Pcs", cost: 63.00 },
+                    { name: "5M LED 12V 7.2W/M 60LEDS/M ZigZag", unit: "Pcs", cost: 40.00 },
+                    { name: "5M LED 12V 1404W/M 120LEDS/M ZigZag", unit: "Pcs", cost: 65.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 8 MM", unit: "Pcs", cost: 16.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 9 MM", unit: "Pcs", cost: 14.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 12 MM", unit: "Pcs", cost: 20.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 18 MM", unit: "Pcs", cost: 25.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 19 MM", unit: "Pcs", cost: 30.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 25 MM", unit: "Pcs", cost: 40.00 },
+                    { name: "DOUBLE SIDE RED  TAPES 50 MM", unit: "Pcs", cost: 70.00 },
+                    { name: "Clear Acrylic 1mm 122x244", unit: "Sheet", cost: 70.00 },
+                    { name: "Clear Acrylic 2mm 122x244", unit: "Sheet", cost: 125.00 },
+                    { name: "Clear Acrylic 2.5 mm 122x244", unit: "Sheet", cost: 127.00 },
+                    { name: "Clear Acrylic 2.8 mm 122x244", unit: "Sheet", cost: 144.00 },
+                    { name: "Clear Acrylic 3mm 122x244", unit: "Sheet", cost: 155.00 },
+                    { name: "Clear Acrylic 4mm 122x244", unit: "Sheet", cost: 211.00 },
+                    { name: "Clear Acrylic 5mm 122x244", unit: "Sheet", cost: 278.00 },
+                    { name: "Clear Acrylic 6mm 122x244", unit: "Sheet", cost: 323.00 },
+                    { name: "Clear Acrylic 8mm 122x244", unit: "Sheet", cost: 480.00 },
+                    { name: "Clear Acrylic 10mm 122x244", unit: "Sheet", cost: 600.00 },
+                    { name: "Clear Acrylic 12mm 122x244", unit: "Sheet", cost: 730.00 },
+                    { name: "Clear Acrylic 15mm 122x244", unit: "Sheet", cost: 925.00 },
+                    { name: "Clear Acrylic 18 mm 122x244", unit: "Sheet", cost: 1100.00 },
+                    { name: "Clear Acrylic 20mm 122x244", unit: "Sheet", cost: 1320.00 },
+                    { name: "Clear Acrylic 25 mm 122x244", unit: "Sheet", cost: 1500.00 },
+                    { name: "Clear Acrylic 30mm 122x244", unit: "Sheet", cost: 2235.00 },
+                    { name: "White  Acrylic 1mm 122x244", unit: "Sheet", cost: 80.00 },
+                    { name: "White  Acrylic 2mm 122x244", unit: "Sheet", cost: 127.00 },
+                    { name: "White  Acrylic 2.5 mm 122x244", unit: "Sheet", cost: 136.00 },
+                    { name: "White  Acrylic 2.8 mm 122x244", unit: "Sheet", cost: 160.00 },
+                    { name: "White Acrylic 3mm 122x244", unit: "Sheet", cost: 164.00 },
+                    { name: "White Acrylic 4mm 122x244", unit: "Sheet", cost: 225.00 },
+                    { name: "White Acrylic 5mm 122x244", unit: "Sheet", cost: 300.00 },
+                    { name: "White Acrylic 6mm 122x244", unit: "Sheet", cost: 370.00 },
+                    { name: "White Acrylic 8mm 122x244", unit: "Sheet", cost: 480.00 },
+                    { name: "White Acrylic 10mm 122x244", unit: "Sheet", cost: 578.00 },
+                    { name: "White Acrylic 12mm 122x244", unit: "Sheet", cost: 690.00 },
+                    { name: "White Acrylic 15mm 122x244", unit: "Sheet", cost: 940.00 },
+                    { name: "White Acrylic 18mm 122x244", unit: "Sheet", cost: 1075.00 },
+                    { name: "White Acrylic 20mm 122x244", unit: "Sheet", cost: 1250.00 },
+                    { name: "White  Acrylic 25 mm 122x244", unit: "Sheet", cost: 1550.00 },
+                    { name: "White Acrylic 0mm 122x244", unit: "Sheet", cost: 2600.00 },
+                    { name: "White Acrylic 2 mm 122x244", unit: "Sheet", cost: 120.00 },
+                    { name: "White Acrylic 2.5 mm 122x244", unit: "Sheet", cost: 135.00 },
+                    { name: "White Acrylic 2. 8 mm 122x244", unit: "Sheet", cost: 150.00 },
+                    { name: "White Acrylic 4 mm 122x244", unit: "Sheet", cost: 220.00 },
+                    { name: "White Acrylic 5 mm 122x244", unit: "Sheet", cost: 265.00 },
+                    { name: "White Acrylic 6 mm 122x244", unit: "Sheet", cost: 325.00 },
+                    { name: "White Acrylic 8 mm 122x244", unit: "Sheet", cost: 450.00 },
+                    { name: "White Acrylic 10 mm 122x244", unit: "Sheet", cost: 555.00 },
+                    { name: "White Acrylic 12 mm 122x244", unit: "Sheet", cost: 655.00 },
+                    { name: "White Acrylic 15 mm 122x244", unit: "Sheet", cost: 850.00 },
+                    { name: "White Acrylic 18 mm 122x244", unit: "Sheet", cost: 1065.00 },
+                    { name: "White Acrylic 20 mm 122x244", unit: "Sheet", cost: 1220.00 },
+		    { name: "Color Acrylic 2 mm 122x244", unit: "Sheet", cost: 100.00 },
+		    { name: "Color Acrylic 2.5 mm 122x244", unit: "Sheet", cost: 11300 },
+		    { name: "Color Acrylic 2.8 mm 122x244", unit: "Sheet", cost: 180.00 },
+		    { name: "Color Acrylic 4 mm 122x244", unit: "Sheet", cost: 280.00 },
+		    { name: "Color Acrylic 6 mm 122x244", unit: "Sheet", cost: 420.00 },
+		    { name: "Color Acrylic 8 mm 122x244", unit: "Sheet", cost: 480.00 },
+		    { name: "Color Acrylic 10 mm 122x244", unit: "Sheet", cost: 566.00 },
+		    { name: "Color Acrylic 15 mm 122x244", unit: "Sheet", cost: 925.00 },
+		    { name: "Color Acrylic 20 mm 122x244", unit: "Sheet", cost: 1320.00 },
+		    { name: "Color Acrylic 30 mm 122x244", unit: "Sheet", cost: 2200.00 },
+		    { name: "Gold Mirror Acrylic 2 mm 122x200", unit: "Sheet", cost: 182.00 },
+		    { name: "Silver Mirror Acrylic  2 mm 122x200", unit: "Sheet", cost: 182.00 },
+		    { name: "Gold Mirror Acrylic 3 mm 122x200", unit: "Sheet", cost: 320.00 },
+		    { name: "Silver Mirror Acrylic 3 mm 122x200", unit: "Sheet", cost: 320.00 },
+		    { name: "Gold Sandwich Acrylic 1 mm 122x60", unit: "Sheet", cost: 50.00 },
+		    { name: "Silver Sandwich Acrylic 1 mm 122x60", unit: "Sheet", cost: 50.00 },
+		    { name: "Day Night Acrylic Acrylic  2.8 mm 122*244", unit: "Sheet", cost: 430.00 },
+ 		    { name: "Black Acrylic 1 mm 122x244", unit: "Sheet", cost: 80.00 },
+		    { name: "Black Acrylic 2 mm 122x244", unit: "Sheet", cost: 120.00 },
+		    { name: "Black Acrylic 2.5 mm 122x24", unit: "Sheet", cost: 132.00 },
+		    { name: "Black Acrylic  2.8 mm 122x24 matt", unit: "Sheet", cost: 250.00 },
+		    { name: "Black Acrylic 2.8 mm 122x24", unit: "Sheet", cost: 160.00 },
+		    { name: "Black Acrylic 3 mm 122x24", unit: "Sheet", cost: 164.00 },
+		    { name: "Black Acrylic 4 mm 122x24", unit: "Sheet", cost: 225.00 },
+		    { name: "Black Acrylic 5 mm 122x24", unit: "Sheet", cost: 285.00 },
+		    { name: "Black Acrylic 6 mm 122x24", unit: "Sheet", cost: 370.00 },
+		    { name: "Black Acrylic 8 mm 122x24", unit: "Sheet", cost: 480.00 },
+		    { name: "Black Acrylic 10 mm 122x24", unit: "Sheet", cost: 571.00 },
+		    { name: "Black Acrylic 12 mm 122x24", unit: "Sheet", cost: 690.00 },
+		    { name: "Black Acrylic 15 mm 122x24", unit: "Sheet", cost: 860.00 },
+		    { name: "Black Acrylic 18 mm 122x24", unit: "Sheet", cost: 1075.00 },
+		    { name: "Black Acrylic 20 mm 122x24", unit: "Sheet", cost: 1140.00 },
+		    { name: "Black Acrylic 25 mm 122x24", unit: "Sheet", cost: 1550.00 },
+		    { name: "Black Acrylic 30 mm 122x24", unit: "Sheet", cost: 1980.00 },
+                    { name: "White Acrylic 3 mm 122x244", unit: "Pcs", cost: 250.00 },
+                    { name: "Clear Acrylic 5 mm 122x244", unit: "Pcs", cost: 300.00 },
+                    { name: "LED Modules", unit: "Pcs", cost: 5.00 },
+                    { name: "KT Foam Board 5 mm 122x244", unit: "Sheet", cost: 37.00 },
+                    { name: "KT Foam Board 10 mm 122x244", unit: "Sheet", cost: 53.00 },
+                    { name: "Rigmajet Solvent Polyster Canvas 360gsm 1.072X30M", unit: "Sqm", cost: 17.00 },
+                    { name: "Rigmajet Solvent Polyster Canvas 360gsm 1.27X30M", unit: "Sqm", cost: 17.00 },
+                    { name: "Rigmajet Solvent Polyster Canvas 260gsm 1.52X30M", unit: "Sqm", cost: 17.00 },
+                    { name: "Rigmajet Solvent Polyster Canvas 260gsm 1.52X30M", unit: "Sqm", cost: 17.00 },
+                    { name: "ROLL UP STAND 85*200", unit: "Pcs", cost: 38.00 },
+                    { name: "ROLL UP STAND 100*200", unit: "Pcs", cost: 60.00 },
+                    { name: "ROLL UP STAND 120*200", unit: "Pcs", cost: 70.00 },
+                    { name: "ROLL UP STAND 150*200", unit: "Pcs", cost: 95.00 },
+                    { name: "ROLL UP STAND 200*200", unit: "Pcs", cost: 190.00 },
+                    { name: "Roll up media grey back", unit: "Pcs", cost: 7.75 },
+                    { name: "Roll up media white back", unit: "Pcs", cost: 7.75 },
+                    { name: "Pop up 3 × 2", unit: "Pcs", cost: 650.00 },
+                    { name: "Pop up 3 × 3 90*80", unit: "Pcs", cost: 700.00 },
+                    { name: "Pop up 3 × 4 130x90", unit: "Pcs", cost: 750.00 },
+                    { name: "Pop up table", unit: "Pcs", cost: 300.00 },
+                    { name: "Promotion table", unit: "Pcs", cost: 165.00 },
+                    { name: "Cladding LD Normal Regular Colors", unit: "Sqm", cost: 64.00 },
+                    { name: "Cladding LD Normal Decorative Colors", unit: "Sqm", cost: 79.00 },
+                    { name: "Cladding LD Normal Silver & Gold Colors", unit: "Sqm", cost: 84.00 },
+                    { name: "Cladding مقاوم للحريق  FR 3 =FR B1 Regular Colors", unit: "Sqm", cost: 77.00 },
+                    { name: "Cladding مقاوم للحريق  FR 3 =FR B1 LD Normal Decorative Colors", unit: "Sqm", cost: 82.00 },
+                    { name: "Cladding مقاوم للحريق  FR 3 =FR B1  Silver & Gold Colors", unit: "Sqm", cost: 89.00 },
+                    { name: "Cladding مقاوم للحريق  FR 2 =FR A1 LD Normal Decorative Colors", unit: "Sqm", cost: 117.00 },
+                    { name: "Cladding مقاوم للحريق  FR 2 =FR A1 Silver and Gold Mirrors", unit: "Sqm", cost: 125.00 },
+                    { name: "Metal H Beam 300x300x10x15mm 12 Meters ", unit: "Pcs", cost: 4020.00 },
+                    { name: "Metal Tube 5x5 1.5mm   ", unit: "Pcs", cost: 50.00 },
+                    { name: "Metal Tube 2x4 2mm", unit: "Pcs", cost: 39.00 },
+                    { name: "Metal H Beam 250x260x7.5x12.5mm 12 Meters", unit: "Pcs", cost: 2950.00 },
+                    { name: "Metal 30 x 30 2.5 mmقطاعات حديد زوايا متساوية الأضلاع", unit: "Pcs", cost: 25.00 },
+                    { name: "Aluminium Sheet 2 mm 122x244 ", unit: "Sheet", cost: 325.00 },
+                    { name: "Aluminium Sheet 3 mm 122x244", unit: "Sheet", cost: 485.00 },
+                    { name: "Aluminium Sheet 1 mm 122x244)", unit: "Sheet", cost: 130.00 },
+                    { name: "Aluminium Sheet 4 mm 122x244", unit: "Sheet", cost: 470.00 },
+                    { name: "Aluminium Sheet 1.2 mm 122x244", unit: "Sheet", cost: 130.00 },
+                    { name: "Zincore roll 0.6 100 m", unit: "Meter", cost: 2.13 },
+                    { name: "Silicone GP", unit: "Pcs", cost: 13.00 },
+                    { name: "Silicone Fix All White", unit: "Pcs", cost: 43.00 },
+                    { name: "Silicone Fix All Clear", unit: "Pcs", cost: 40.00 },
+                    { name: "Super Glue", unit: "Pcs", cost: 10.00 },
+                    { name: "Chloroform 500", unit: "Pcs", cost: 20.00 },
+                    { name: "UV Printing", unit: "Sqm", cost: 12.00 },
+                    { name: "Solvent Printing", unit: "Sqm", cost: 8.00 },
+
+
+
+                    { name: "Wood (MDF)", unit: "Pcs", cost: 150.00 },
+                ],
+                labor: [
+                    { task: "Design & Layout", rate: 100.00 },
+                    { task: "Metal/Wood Fabrication", rate: 80.00 },
+                    { task: "Acrylic/Vinyl Work", rate: 80.00 },
+                    { task: "Wiring & Assembly", rate: 80.00 },
+                    { task: "On-site Installation", rate: 90.00 },
+                    { task: "Painter/Finisher", rate: 80.00 },
+                    { task: "Printing", rate: 90.00 },
+
+                ]
+            };
+
+            // --- STATE MANAGEMENT ---
+            let quote = {
+                materials: [],
+                labor: [],
+                other: [],
+                markup: 0.25, // 25%
+                vatRate: 0.15 // 15%
+            };
+            
+            // --- UI ELEMENTS ---
+            const materialSearchInput = document.getElementById('material-search');
+            const materialSelect = document.getElementById('material-select');
+            const materialQuantityInput = document.getElementById('material-quantity');
+            const addMaterialBtn = document.getElementById('add-material-btn');
+            const materialListBody = document.getElementById('material-list');
+
+            const laborSelect = document.getElementById('labor-select');
+            const laborHoursInput = document.getElementById('labor-hours');
+            const addLaborBtn = document.getElementById('add-labor-btn');
+            const laborListBody = document.getElementById('labor-list');
+            
+            const otherDescriptionInput = document.getElementById('other-description');
+            const otherCostInput = document.getElementById('other-cost');
+            const addOtherBtn = document.getElementById('add-other-btn');
+            const otherListBody = document.getElementById('other-list');
+
+            const markupSlider = document.getElementById('markup-slider');
+            const markupValueSpan = document.getElementById('markup-value');
+
+            // --- CHART SETUP ---
+            const ctx = document.getElementById('cost-breakdown-chart').getContext('2d');
+            let costChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Materials', 'Labor', 'Other'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#F8350B', '#0Bf83A', '#A9D6F5'],
+                        borderColor: '#FFFFFF',
+                        borderWidth: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += new Intl.NumberFormat('en-SA', { style: 'currency', currency: 'SAR' }).format(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+
+            // --- INITIALIZATION ---
+            function populateInitialData() {
+                updateMaterialSelect(costDatabase.materials);
+                costDatabase.labor.forEach(item => {
+                    const option = new Option(item.task, item.task);
+                    laborSelect.add(option);
+                });
+            }
+
+            function updateMaterialSelect(materials) {
+                materialSelect.innerHTML = '';
+                if (materials.length === 0) {
+                    const option = new Option('No materials found', '');
+                    option.disabled = true;
+                    materialSelect.add(option);
+                } else {
+                    materials.forEach(item => {
+                        const option = new Option(`${item.name} (${item.unit})`, item.name);
+                        materialSelect.add(option);
+                    });
+                }
+            }
+
+            // --- CORE LOGIC ---
+            function updateQuote() {
+                let materialTotal = quote.materials.reduce((sum, item) => sum + item.totalCost, 0);
+                let laborTotal = quote.labor.reduce((sum, item) => sum + item.totalCost, 0);
+                let otherTotal = quote.other.reduce((sum, item) => sum + item.cost, 0);
+
+                let directCost = materialTotal + laborTotal + otherTotal;
+                let markupAmount = directCost * quote.markup;
+                let subtotal = directCost + markupAmount;
+                let vatAmount = subtotal * quote.vatRate;
+                let grandTotal = subtotal + vatAmount;
+
+                // Update summary UI
+                document.getElementById('summary-material').textContent = formatCurrency(materialTotal);
+                document.getElementById('summary-labor').textContent = formatCurrency(laborTotal);
+                document.getElementById('summary-other').textContent = formatCurrency(otherTotal);
+                document.getElementById('summary-direct-cost').textContent = formatCurrency(directCost);
+                markupValueSpan.textContent = `${(quote.markup * 100).toFixed(0)}%`;
+                document.getElementById('summary-subtotal').textContent = formatCurrency(subtotal);
+                document.getElementById('summary-vat').textContent = formatCurrency(vatAmount);
+                document.getElementById('summary-grand-total').textContent = formatCurrency(grandTotal);
+
+                // Update chart
+                costChart.data.datasets[0].data = [materialTotal, laborTotal, otherTotal];
+                costChart.update();
+            }
+
+            function renderLists() {
+                renderMaterialList();
+                renderLaborList();
+                renderOtherList();
+            }
+            
+            function renderItemRow(item, listBody, columns, removeFn) {
+                const row = document.createElement('tr');
+                row.className = 'border-b last:border-b-0';
+                
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.className = 'p-2';
+                    if(col.className) td.className += ` ${col.className}`;
+                    td.textContent = col.content;
+                    row.appendChild(td);
+                });
+                
+                const deleteTd = document.createElement('td');
+                deleteTd.className = 'p-2 text-center';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '✖';
+                deleteBtn.className = 'text-red-500 hover:text-red-700 font-bold';
+                deleteBtn.onclick = () => removeFn(item.id);
+                deleteTd.appendChild(deleteBtn);
+                row.appendChild(deleteTd);
+
+                listBody.appendChild(row);
+            }
+
+            function renderMaterialList() {
+                materialListBody.innerHTML = '';
+                quote.materials.forEach(item => {
+                    renderItemRow(item, materialListBody, [
+                        { content: `${item.name} (${formatCurrency(item.unitCost)}/${item.unit})` },
+                        { content: item.quantity },
+                        { content: formatCurrency(item.totalCost), className: 'text-right font-medium' },
+                    ], removeMaterial);
+                });
+            }
+
+            function renderLaborList() {
+                laborListBody.innerHTML = '';
+                quote.labor.forEach(item => {
+                     renderItemRow(item, laborListBody, [
+                        { content: `${item.task} (${formatCurrency(item.rate)}/hr)` },
+                        { content: item.hours },
+                        { content: formatCurrency(item.totalCost), className: 'text-right font-medium' },
+                    ], removeLabor);
+                });
+            }
+
+            function renderOtherList() {
+                otherListBody.innerHTML = '';
+                quote.other.forEach(item => {
+                     renderItemRow(item, otherListBody, [
+                        { content: item.description },
+                        { content: formatCurrency(item.cost), className: 'text-right font-medium' },
+                    ], removeOther);
+                });
+            }
+
+
+            function addMaterial() {
+                const selectedName = materialSelect.value;
+                const quantity = parseFloat(materialQuantityInput.value);
+                if (!selectedName || !quantity || quantity <= 0) return;
+
+                const materialData = costDatabase.materials.find(m => m.name === selectedName);
+                if (!materialData) return;
+                
+                quote.materials.push({
+                    id: Date.now(),
+                    name: materialData.name,
+                    unit: materialData.unit,
+                    unitCost: materialData.cost,
+                    quantity: quantity,
+                    totalCost: materialData.cost * quantity
+                });
+                
+                materialQuantityInput.value = '';
+                renderMaterialList();
+                updateQuote();
+            }
+
+            function removeMaterial(id) {
+                quote.materials = quote.materials.filter(item => item.id !== id);
+                renderMaterialList();
+                updateQuote();
+            }
+            
+            function addLabor() {
+                const selectedTask = laborSelect.value;
+                const hours = parseFloat(laborHoursInput.value);
+                if (!selectedTask || !hours || hours <= 0) return;
+
+                const laborData = costDatabase.labor.find(l => l.task === selectedTask);
+                if (!laborData) return;
+
+                quote.labor.push({
+                    id: Date.now(),
+                    task: laborData.task,
+                    rate: laborData.rate,
+                    hours: hours,
+                    totalCost: laborData.rate * hours
+                });
+
+                laborHoursInput.value = '';
+                renderLaborList();
+                updateQuote();
+            }
+            
+            function removeLabor(id) {
+                quote.labor = quote.labor.filter(item => item.id !== id);
+                renderLaborList();
+                updateQuote();
+            }
+
+            function addOther() {
+                const description = otherDescriptionInput.value;
+                const cost = parseFloat(otherCostInput.value);
+                if (!description || !cost || cost <= 0) return;
+
+                quote.other.push({
+                    id: Date.now(),
+                    description: description,
+                    cost: cost
+                });
+
+                otherDescriptionInput.value = '';
+                otherCostInput.value = '';
+                renderOtherList();
+                updateQuote();
+            }
+
+            function removeOther(id) {
+                quote.other = quote.other.filter(item => item.id !== id);
+                renderOtherList();
+                updateQuote();
+            }
+
+            // --- EVENT LISTENERS ---
+            materialSearchInput.addEventListener('input', () => {
+                const searchTerm = materialSearchInput.value.toLowerCase();
+                const filteredMaterials = costDatabase.materials.filter(material =>
+                    material.name.toLowerCase().includes(searchTerm)
+                );
+                updateMaterialSelect(filteredMaterials);
+            });
+            addMaterialBtn.addEventListener('click', addMaterial);
+            addLaborBtn.addEventListener('click', addLabor);
+            addOtherBtn.addEventListener('click', addOther);
+
+            markupSlider.addEventListener('input', (e) => {
+                quote.markup = parseFloat(e.target.value) / 100;
+                updateQuote();
+            });
+
+            // --- UTILITY ---
+            function formatCurrency(value) {
+                return new Intl.NumberFormat('en-SA', { style: 'currency', currency: 'SAR' }).format(value);
+            }
+
+            // --- RUN ---
+            populateInitialData();
+            updateQuote();
+        });
+    </script>
+</body>
+</html>
