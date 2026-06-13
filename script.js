@@ -2553,3 +2553,136 @@ openProduct = function(id){
     if(typeof updateCartCount === 'function') updateCartCount();
   });
 })();
+
+
+/* CV COLOR SWITCH + MODAL TOOL DEDUPE ONLY FIX 20260613
+   Scope: fixes product color image switching and removes duplicated modal tool button groups.
+   No admin/backend/cart/auth behavior is changed.
+*/
+(function(){
+  if(window.__cvColorSwitchToolDedupeFix20260613) return;
+  window.__cvColorSwitchToolDedupeFix20260613 = true;
+
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+  function safeUrl(v){
+    v = String(v || '').trim();
+    return v && !v.startsWith('file://') && !v.includes('/Users/') ? v : '';
+  }
+  function unique(list){ return Array.from(new Set((list || []).map(safeUrl).filter(Boolean))); }
+
+  function activeFabricLabel(){
+    try{
+      if(window.selectedFabricOption && selectedFabricOption.label) return String(selectedFabricOption.label);
+      const sel = document.getElementById('fabricSelect');
+      if(sel && sel.selectedOptions && sel.selectedOptions[0]) return sel.selectedOptions[0].textContent || '';
+    }catch(e){}
+    return '';
+  }
+
+  function findColorKey(product, color){
+    const colors = product && product.colors ? product.colors : {};
+    const keys = Object.keys(colors);
+    if(!keys.length) return '';
+    if(colors[color]) return color;
+    const wanted = norm(color);
+    return keys.find(k => norm(k) === wanted) ||
+           keys.find(k => norm(k).includes(wanted) || wanted.includes(norm(k))) ||
+           keys[0];
+  }
+
+  function urlsFromColorValue(value, requestedFabric){
+    if(!value) return [];
+    const fabric = norm(requestedFabric);
+    const preferred = [];
+    const fallback = [];
+
+    if(Array.isArray(value.imageMeta)){
+      value.imageMeta.forEach(item => {
+        if(!item) return;
+        const url = safeUrl(item.url || item.src || item.image);
+        if(!url) return;
+        const itemFabric = norm(item.fabric || item.fabricLabel || item.fabric_name);
+        if(fabric && itemFabric && itemFabric === fabric) preferred.push(url);
+        fallback.push(url);
+      });
+    }
+    if(Array.isArray(value.images)) fallback.push(...value.images);
+    if(value.image) fallback.push(value.image);
+    if(value.url) fallback.push(value.url);
+    if(value.src) fallback.push(value.src);
+    return unique(preferred.length ? preferred : fallback);
+  }
+
+  function globalColorUrls(product, color){
+    const wanted = norm(color);
+    const out = [];
+    const arrays = [product && product.imageMeta, product && product.galleryMeta, product && product.images, product && product.gallery];
+    arrays.forEach(arr => {
+      if(!Array.isArray(arr)) return;
+      arr.forEach(item => {
+        if(typeof item === 'string'){ return; }
+        if(!item) return;
+        const itemColor = norm(item.color || item.colorName || item.colour || item.label);
+        if(itemColor && (itemColor === wanted || itemColor.includes(wanted) || wanted.includes(itemColor))){
+          out.push(item.url || item.src || item.image);
+        }
+      });
+    });
+    return unique(out);
+  }
+
+  window.getColorImages = function(color){
+    const product = window.currentProduct || null;
+    if(!product) return [];
+    const actualKey = findColorKey(product, color);
+    const colors = product.colors || {};
+    const fabric = activeFabricLabel();
+    const direct = urlsFromColorValue(colors[actualKey], fabric);
+    if(direct.length) return direct;
+    const global = globalColorUrls(product, actualKey || color);
+    if(global.length) return global;
+    try{ return window.firstImage ? [firstImage(product)].filter(Boolean) : []; }catch(e){ return []; }
+  };
+
+  window.selectColor = function(color){
+    const product = window.currentProduct || null;
+    if(!product) return;
+    const actualKey = findColorKey(product, color);
+    window.selectedColor = actualKey;
+    try{ selectedColor = actualKey; }catch(e){}
+    const images = window.getColorImages(actualKey);
+    const nextImage = images[0] || (window.firstImage ? firstImage(product) : '');
+    window.selectedImage = nextImage;
+    try{ selectedImage = nextImage; }catch(e){}
+    if(typeof window.renderColors === 'function') renderColors();
+    if(typeof window.renderThumbs === 'function') renderThumbs();
+    const main = document.getElementById('modalImage') || document.getElementById('cvFinalMainImg');
+    if(main && nextImage) main.src = nextImage;
+    if(typeof window.updateModalImage === 'function') updateModalImage();
+    if(typeof window.renderSelectionSummary === 'function') setTimeout(window.renderSelectionSummary, 20);
+  };
+
+  function removeDuplicateModalToolGroups(){
+    const modal = document.getElementById('productModal');
+    if(!modal) return;
+    modal.querySelectorAll('#cvModalTools, #cvPremiumTools').forEach(el => el.remove());
+    const groups = Array.from(modal.querySelectorAll('.ux95-tools-inline'));
+    groups.slice(1).forEach(el => el.remove());
+  }
+
+  document.addEventListener('click', function(e){
+    const colorBtn = e.target && e.target.closest ? e.target.closest('.color-chip, [data-color], [data-product-color]') : null;
+    if(!colorBtn) return;
+    const color = colorBtn.getAttribute('data-color') || colorBtn.getAttribute('data-product-color') || (colorBtn.textContent || '').replace(/#[0-9a-fA-F]{3,8}/g,'').trim();
+    if(color && window.currentProduct){
+      setTimeout(function(){ window.selectColor(color); }, 0);
+    }
+  }, true);
+
+  const observer = new MutationObserver(removeDuplicateModalToolGroups);
+  document.addEventListener('DOMContentLoaded', function(){
+    removeDuplicateModalToolGroups();
+    observer.observe(document.body, {childList:true, subtree:true});
+  });
+  setInterval(removeDuplicateModalToolGroups, 1000);
+})();
