@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shop | Crafted Visual Furniture</title>
+  <title>Discounted Items | Crafted Visual Furniture</title>
   <link rel="stylesheet" href="styles.css?v=20260607premium" />
   <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2" />
   <script src="translate-ar.js"></script>
@@ -24,32 +24,18 @@
   </header>
 
   <section class="page-hero">
-    <h1 id="shopPageTitle" data-i18n="shopCollection">Shop Collection</h1>
-    <p>Browse products by category, fabric, color, size, and price.</p>
-  </section>
-
-
-  <section id="room-tools" class="ux95-section alt">
-    <h2>Premium Furniture Tools</h2>
-    <p class="lead">Use these customer journey tools before ordering.</p>
-    <div class="ux95-tool-grid">
-      <div class="ux95-tool"><h3>360° Viewer</h3><p>Rotate the furniture preview.</p><button type="button" data-ux95-tool="360">Open Viewer</button></div>
-      <div class="ux95-tool"><h3>Room Visualizer</h3><p>Preview the product in a room layout.</p><button type="button" data-ux95-tool="room">Open Visualizer</button></div>
-      <div class="ux95-tool"><h3>Measure-in-Room</h3><p>Confirm width, depth, height and delivery path.</p><button type="button" data-ux95-tool="measure">Open Tool</button></div>
-    </div>
+    <h1 id="shopPageTitle">Discounted Items</h1>
+    <p>Only products with active discounts are shown here.</p>
   </section>
 
   <section id="shop" class="shop">
     <div id="shopControls" class="shop-controls">
       <select id="sortSelect" onchange="applySortAndFilter()">
-        <option value="featured">Featured</option>
+        <option value="discount">Highest Discount</option>
         <option value="priceHigh">Price: High to Low</option>
         <option value="priceLow">Price: Low to High</option>
-        <option value="discount">Highest Discount</option>
-        <option value="rating">Best Rating</option>
         <option value="nameAZ">Name A-Z</option>
       </select>
-      <select id="categoryFilter" onchange="applySortAndFilter()"></select>
     </div>
     <div id="productGrid" class="product-grid"></div>
   </section>
@@ -90,7 +76,9 @@
     <h3 id="cartTotal"></h3>
     <button type="button" class="btn primary" onclick="checkout()" data-i18n="checkout">Checkout</button>
   </aside>
-  <script src="script.js?v=20260607premium"></script>
+
+  <script>window.CV_DISCOUNTED_ONLY = true;</script>
+  <script src="script.js?v=20260610discountedPageOnly"></script>
   <script src="language-toggle-fix.js?v=20260611langstable"></script>
   <script src="analytics-tracker.js"></script>
   <script src="customer-journey-95.js"></script>

@@ -17,9 +17,9 @@
     <div class="brand" id="brandText">Crafted Visual</div>
     <nav id="mainMenu"></nav>
     <div class="nav-actions">
-      <button class="lang-btn" data-cv-lang-toggle="true" >عربي</button>
+      <button class="lang-btn" data-cv-lang-toggle="true" onclick="toggleLang()">عربي</button>
       <button class="lang-btn" id="authBtn" type="button">Sign In</button>
-      <button class="cart-btn" type="button" data-cv-action="open-cart"><span data-i18n="cart">Cart</span> <span id="cartCount">0</span></button>
+      <button class="cart-btn" onclick="openCart()"><span data-i18n="cart">Cart</span> <span id="cartCount">0</span></button>
     </div>
   </header>
 
@@ -41,7 +41,7 @@
 
   <section id="shop" class="shop">
     <div id="shopControls" class="shop-controls">
-      <select id="sortSelect" >
+      <select id="sortSelect" onchange="applySortAndFilter()">
         <option value="featured">Featured</option>
         <option value="priceHigh">Price: High to Low</option>
         <option value="priceLow">Price: Low to High</option>
@@ -49,14 +49,14 @@
         <option value="rating">Best Rating</option>
         <option value="nameAZ">Name A-Z</option>
       </select>
-      <select id="categoryFilter" ></select>
+      <select id="categoryFilter" onchange="applySortAndFilter()"></select>
     </div>
     <div id="productGrid" class="product-grid"></div>
   </section>
 
   <div id="productModal" class="modal hidden">
     <div class="modal-content">
-      <button class="close modal-close" data-cv-action="close-modal" type="button">×</button>
+      <button class="close modal-close" onclick="closeModal()" type="button">×</button>
       <div class="modal-grid">
         <div>
           <img id="modalImage" class="modal-img" src="" alt="" />
@@ -75,8 +75,8 @@
           <label data-i18n="size">Size</label>
           <select id="sizeSelect"></select>
           <div class="modal-actions">
-            <button class="btn primary" data-cv-action="add-cart" data-i18n="addCart">Add to Cart</button>
-            <button class="btn secondary" data-cv-action="whatsapp-current" data-i18n="whatsappInquiry">WhatsApp Inquiry</button>
+            <button class="btn primary" onclick="addCurrentToCart()" data-i18n="addCart">Add to Cart</button>
+            <button class="btn secondary" onclick="whatsappCurrent()" data-i18n="whatsappInquiry">WhatsApp Inquiry</button>
           </div>
         </div>
       </div>
@@ -84,14 +84,13 @@
   </div>
 
   <aside id="cartPanel" class="cart hidden">
-    <button type="button" class="close" data-cv-action="close-cart">×</button>
+    <button type="button" class="close" onclick="closeCart()">×</button>
     <h2 data-i18n="yourCart">Your Cart</h2>
     <div id="cartItems"></div>
     <h3 id="cartTotal"></h3>
-    <button type="button" class="btn primary" data-cv-action="checkout" data-i18n="checkout">Checkout</button>
+    <button type="button" class="btn primary" onclick="checkout()" data-i18n="checkout">Checkout</button>
   </aside>
   <script src="script.js?v=20260607premium"></script>
-  <script src="product-reviews.js?v=20260611reviews2"></script>
   <script src="language-toggle-fix.js?v=20260611langstable"></script>
   <script src="analytics-tracker.js"></script>
   <script src="customer-journey-95.js"></script>

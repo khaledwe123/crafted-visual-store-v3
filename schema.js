@@ -116,18 +116,6 @@ CREATE TABLE IF NOT EXISTS audit_logs(
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY(admin_id) REFERENCES admin_users(id)
 );
-CREATE TABLE IF NOT EXISTS product_reviews(
- id SERIAL PRIMARY KEY,
- product_id TEXT NOT NULL,
- customer_name TEXT DEFAULT '',
- rating INTEGER NOT NULL,
- review_text TEXT NOT NULL,
- status TEXT NOT NULL DEFAULT 'approved',
- ip_hash TEXT,
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_product_reviews_product ON product_reviews(product_id);
-CREATE INDEX IF NOT EXISTS idx_product_reviews_status ON product_reviews(status);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS media_assets(
  id SERIAL PRIMARY KEY,
