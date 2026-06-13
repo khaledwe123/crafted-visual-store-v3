@@ -3912,12 +3912,21 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   async function api(path, options={}){
     const headers = Object.assign({}, options.headers || {});
     if(!(options.body instanceof FormData)) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-    headers.Authorization = 'Bearer ' + token();
-    const res = await fetch('/api' + path, Object.assign({}, options, {headers}));
+    const t = token();
+    if(t && t !== 'cookie-auth' && t !== 'cv-cookie-auth') headers.Authorization = 'Bearer ' + t;
+    const res = await fetch('/api' + path, Object.assign({}, options, {headers, credentials:'same-origin', cache:options.cache || 'no-store'}));
     const text = await res.text();
     let data = {};
     try{ data = text ? JSON.parse(text) : {}; }catch(e){ data = {raw:text}; }
-    if(!res.ok) throw new Error(data.error || data.raw || ('API error ' + res.status));
+    if(!res.ok){
+      if(res.status === 401 || res.status === 403){
+        ['cvAdminApiToken','adminToken','token','authToken','cvAdminSession','adminSession'].forEach(function(k){
+          try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch(_e){}
+        });
+        if(!location.pathname.endsWith('/admin-login.html')) setTimeout(function(){ location.href='/admin-login.html'; }, 80);
+      }
+      throw new Error(data.error || data.raw || ('API error ' + res.status));
+    }
     return data;
   }
   function arr(name){ if(!Array.isArray(window[name])) window[name]=[]; return window[name]; }

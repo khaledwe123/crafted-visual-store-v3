@@ -21,7 +21,9 @@
       if(!url.startsWith('/api/')) url = '/api/' + url.replace(/^\/+/, '').replace(/^api\//, '');
       const headers = Object.assign({}, options.headers || {});
       const t = this.token(admin);
-      if(t) headers.Authorization = 'Bearer ' + t;
+      // Do not send the non-secret cookie marker as a Bearer token. The server will read
+      // the HttpOnly cookie through credentials:'same-origin'.
+      if(t && t !== 'cookie-auth' && t !== 'cv-cookie-auth') headers.Authorization = 'Bearer ' + t;
       let body = options.body;
       if(body !== undefined && !(body instanceof FormData)){
         headers['Content-Type'] = headers['Content-Type'] || 'application/json';
@@ -39,6 +41,12 @@
       try{ data = text ? JSON.parse(text) : {}; }catch(e){ data = text; }
       if(!res.ok){
         const msg = data && data.error ? data.error : (typeof data === 'string' && data ? data : ('HTTP ' + res.status));
+        if(admin && (res.status === 401 || res.status === 403)){
+          ['cvAdminApiToken','adminToken','token','authToken','cvAdminSession','adminSession'].forEach(k=>{
+            try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch(_e){}
+          });
+          if(!location.pathname.endsWith('/admin-login.html')) setTimeout(()=>{ location.href='/admin-login.html'; }, 50);
+        }
         throw new Error(msg);
       }
       return data;

@@ -44,17 +44,29 @@
     return !!perms[section]?.[level];
   };
 
+  function clearStaleSession(){
+    ['cvAdminApiToken','adminToken','token','authToken','cvAdminSession','adminSession'].forEach(function(k){
+      try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch(_e){}
+    });
+  }
+
+  // Always verify the live server cookie/session. A localStorage admin profile can be stale
+  // after a Railway redeploy, JWT_SECRET change, browser refresh, or cookie expiry. Showing
+  // the admin UI with a stale profile causes write actions such as product publish to fail
+  // with "Unauthorized". This keeps the UI and server auth state aligned.
   async function verify(){
-    const session = getSession();
-    if(session){ setSession(session); return; }
     const t = adminToken();
     try{
-      const headers = t ? {Authorization:'Bearer '+t} : {};
-      const res = await fetch('/api/admin/me', {credentials:'same-origin', headers});
+      const headers = {};
+      if(t && t !== 'cookie-auth' && t !== 'cv-cookie-auth') headers.Authorization = 'Bearer ' + t;
+      const res = await fetch('/api/admin/me', {credentials:'same-origin', cache:'no-store', headers});
       if(!res.ok) throw new Error('not authenticated');
       const data = await res.json();
       setSession(data.user || data);
-    }catch(e){ location.href = 'admin-login.html'; }
+    }catch(e){
+      clearStaleSession();
+      location.href = 'admin-login.html';
+    }
   }
   verify();
 })();
