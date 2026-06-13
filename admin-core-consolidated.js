@@ -379,6 +379,7 @@ function openTab(id, btn){
   document.querySelectorAll(".cms-tabs button").forEach(b => b.classList.remove("active"));
   if(btn) btn.classList.add("active");
   if(id === "analyticsControl" && typeof loadAnalyticsCenter === "function") loadAnalyticsCenter();
+  if(id === "mediaControl" && typeof loadMedia === "function") loadMedia();
 }
 
 function normalizeSizeOptions(p){
@@ -462,9 +463,8 @@ function renderAll(){
   if(typeof cvIsSuperAdmin === "function" && cvIsSuperAdmin() || (typeof hasAdminPermission === "function" && hasAdminPermission("users","read"))){
     refreshAdminUsers();
   }
-  if(typeof loadMedia === "function" && (typeof cvIsSuperAdmin === "function" && cvIsSuperAdmin() || (typeof hasAdminPermission === "function" && hasAdminPermission("media","read")))){
-    loadMedia();
-  }
+  // Media Library is intentionally lazy-loaded only when the Media Library tab opens.
+  // This prevents stale browser sessions from showing an Unauthorized banner while using unrelated admin sections.
   if(typeof loadDiscountCodesFromBackend === "function" && (typeof cvIsSuperAdmin === "function" && cvIsSuperAdmin() || (typeof hasAdminPermission === "function" && hasAdminPermission("discounts","read")))){
     loadDiscountCodesFromBackend();
   }
