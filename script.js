@@ -2149,407 +2149,62 @@ openProduct = function(id){
 })();
 
 
-/* === CV ARABIC BUTTON CLICK FIX ONLY ===
-   Purpose: make the top-right Arabic/English language button work when CSP blocks inline onclick.
-   No layout, shop, admin, product, discount, or content logic is changed.
-*/
-(function(){
-  function bindArabicButton(){
-    try{
-      if(typeof toggleLang === 'function') window.toggleLang = toggleLang;
-      var buttons = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));
-      var langButton = buttons.find(function(btn){
-        if(btn.id === 'authBtn') return false;
-        var txt = (btn.textContent || '').trim().toLowerCase();
-        return txt === 'عربي' || txt === 'english' || btn.getAttribute('onclick') === 'toggleLang()';
-      }) || buttons.find(function(btn){ return btn.id !== 'authBtn'; });
-      if(!langButton || langButton.__cvArabicButtonBound) return;
-      langButton.__cvArabicButtonBound = true;
-      langButton.setAttribute('type','button');
-      langButton.addEventListener('click', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        if(typeof window.toggleLang === 'function') window.toggleLang();
-      }, true);
-    }catch(e){ console.warn('Arabic button bind failed', e); }
-  }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindArabicButton);
-  else bindArabicButton();
-  setTimeout(bindArabicButton, 500);
-})();
-
-/* === CV EXISTING PAGE BODY DISPLAY FIX ONLY ===
-   Purpose: display content saved in Admin > Page Builder for existing pages.
-   Scope: frontend page content text only. Does not change shop cards, products, discounts,
-   modal, page builder saving, or Shop by Room box rendering.
-*/
-(function(){
-  function cvCurrentPageKey(){
-    var file = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
-    if(file === '' || file === 'index.html') return 'home';
-    if(file === 'shop.html') return 'shop';
-    if(file === 'discounted.html' || file === 'discounted-items.html') return 'discounted';
-    if(file === 'contact.html') return 'contact';
-    if(file === 'track-order.html') return 'track';
-    if(file === 'account.html' || file === 'auth.html') return 'account';
-    return file.replace(/\.html$/,'');
-  }
-
-  function cvReadStoredSettings(){
-    try{
-      if(window.settings && typeof window.settings === 'object') return window.settings;
-    }catch(e){}
-    try{
-      var raw = localStorage.getItem('cms_settings') || sessionStorage.getItem('cms_settings');
-      return raw ? JSON.parse(raw) : {};
-    }catch(e){ return {}; }
-  }
-
-  function cvPickByLang(obj, base){
-    if(!obj) return '';
-    var isAr = (window.lang || localStorage.getItem('lang') || 'en') === 'ar';
-    return isAr ? (obj[base + '_ar'] || obj[base] || obj[base + '_en'] || '') : (obj[base + '_en'] || obj[base] || obj[base + '_ar'] || '');
-  }
-
-  function cvSetText(id, value){
-    var el = document.getElementById(id);
-    if(el && value) el.textContent = value;
-  }
-
-  function cvEnsureManagedBlock(){
-    var existing = document.getElementById('cvManagedPageContent');
-    if(existing) return existing;
-    var body = document.createElement('section');
-    body.id = 'cvManagedPageContent';
-    body.className = 'intro cv-managed-page-content';
-    body.style.whiteSpace = 'pre-line';
-    var target = document.querySelector('#custom') || document.querySelector('footer') || document.body.firstElementChild;
-    if(target && target.parentNode) target.parentNode.insertBefore(body, target);
-    else document.body.appendChild(body);
-    return body;
-  }
-
-  function cvApplyExistingPageContent(){
-    try{
-      var st = cvReadStoredSettings();
-      var key = cvCurrentPageKey();
-      var content = st && st.page_content ? st.page_content[key] : null;
-      if(!content) return;
-
-      var title = cvPickByLang(content, 'title');
-      var subtitle = cvPickByLang(content, 'subtitle');
-      var body = cvPickByLang(content, 'body');
-      var heroImage = content.hero_image || '';
-      var mainText = body || subtitle;
-
-      if(key === 'home'){
-        cvSetText('heroTitle', title);
-        cvSetText('heroText', subtitle);
-        cvSetText('introTitle', title);
-        cvSetText('introText', mainText);
-        if(heroImage){
-          var hero = document.querySelector('.hero');
-          if(hero) hero.style.background = "linear-gradient(90deg,rgba(24,61,50,.88),rgba(24,61,50,.25)), url('" + heroImage + "') center/cover";
-        }
-        if(mainText){
-          var managed = cvEnsureManagedBlock();
-          managed.innerHTML = (title ? '<h2>' + String(title).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</h2>' : '') + '<p>' + String(mainText).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</p>';
-        }
-        return;
-      }
-
-      var pageTitle = document.querySelector('.page-hero h1, h1');
-      var pageText = document.querySelector('.page-hero p');
-      if(pageTitle && title) pageTitle.textContent = title;
-      if(pageText && (subtitle || body)) pageText.textContent = subtitle || body;
-      if(body){
-        var block = cvEnsureManagedBlock();
-        block.innerHTML = (title ? '<h2>' + String(title).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</h2>' : '') + '<p>' + String(body).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</p>';
-      }
-    }catch(e){ console.warn('Existing page content display skipped', e); }
-  }
-
-  var oldRenderCMS = typeof window.renderCMS === 'function' ? window.renderCMS : (typeof renderCMS === 'function' ? renderCMS : null);
-  if(oldRenderCMS){
-    window.renderCMS = renderCMS = function(){
-      oldRenderCMS.apply(this, arguments);
-      cvApplyExistingPageContent();
-    };
-  }
-
-  var oldApplyLang = typeof window.applyLang === 'function' ? window.applyLang : (typeof applyLang === 'function' ? applyLang : null);
-  if(oldApplyLang){
-    window.applyLang = applyLang = function(){
-      oldApplyLang.apply(this, arguments);
-      setTimeout(cvApplyExistingPageContent, 0);
-    };
-  }
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(cvApplyExistingPageContent, 300); setTimeout(cvApplyExistingPageContent, 1200); });
-  else { setTimeout(cvApplyExistingPageContent, 300); setTimeout(cvApplyExistingPageContent, 1200); }
-})();
-
-/* === CV CART ACTIVATION + CART DISCOUNT CODE ONLY FIX ===
-   Scope: cart panel behavior only.
-   - Activates cart/open/close/add-to-cart without relying on inline onclick.
-   - Adds discount-code box inside the cart before checkout.
-   - Discount codes apply before VAT only to non-discounted products.
-   - Items already under product discount do not receive extra code discount.
+/* CV COLOR TAB IMAGE SWITCH ONLY FIX - 20260613
+   Scope: product modal color buttons only. Keeps shop rendering and pricing unchanged.
 */
 (function(){
   'use strict';
-  if(window.__cvCartActivationDiscountCodeFix) return;
-  window.__cvCartActivationDiscountCodeFix = true;
+  if(window.__cvColorTabImageSwitchOnlyFix) return;
+  window.__cvColorTabImageSwitchOnlyFix = true;
 
-  var appliedCartDiscount = null;
-  try{ appliedCartDiscount = JSON.parse(localStorage.getItem('appliedDiscount') || 'null'); }catch(e){ appliedCartDiscount = null; }
-
-  function money(n){ return 'SAR ' + Math.round(Number(n || 0)).toLocaleString(); }
-  function percentOf(v){ var n = Number(v); return Number.isFinite(n) ? n : 0; }
-  function itemQty(item){ return Math.max(1, Number(item && item.qty || 1)); }
-  function itemVatRate(item){ return Number(item && item.vatRate || (window.settings && settings.vat_rate) || 15); }
-  function itemBeforeVat(item){ return Number(item && (item.priceBeforeVat || item.originalPrice) || 0); }
-  function itemHasProductDiscount(item){ return Number(item && item.discountPercent || 0) > 0; }
-  function itemLineTotalCurrent(item){ return Number(item && item.price || 0) * itemQty(item); }
-  function safeText(v){ return String(v == null ? '' : v).replace(/[&<>'"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]; }); }
-
-  function normalizeDiscountCode(row){
-    row = row || {};
-    return {
-      code: String(row.code || row.discount_code || '').trim().toUpperCase(),
-      percent: Number(row.percent || row.discountPercent || row.discount_percent || row.value || 0),
-      active: row.active === false || row.active === 0 ? false : true,
-      expires_at: row.expires_at || row.expiry || row.expiresAt || null
-    };
+  function clean(v){ return String(v || '').trim().toLowerCase(); }
+  function asUrl(v){
+    try{ return typeof cvImgUrl === 'function' ? cvImgUrl(v) : v; }catch(e){ return v; }
+  }
+  function fallbackImage(p){
+    try{ return typeof firstImage === 'function' ? firstImage(p) : 'assets/products/product_01.png'; }
+    catch(e){ return 'assets/products/product_01.png'; }
+  }
+  function colorSetFor(product, color){
+    const colors = product && product.colors ? product.colors : {};
+    if(colors[color]) return colors[color];
+    const wanted = clean(color);
+    const key = Object.keys(colors).find(k => clean(k) === wanted);
+    return key ? colors[key] : null;
   }
 
-  async function validateCartDiscountCode(code){
-    try{
-      var res = await fetch('/api/discounts/validate/' + encodeURIComponent(code), {cache:'no-store'});
-      var data = await res.json().catch(function(){ return {}; });
-      if(!res.ok || !data.valid) return null;
-      return normalizeDiscountCode(data.discount || data);
-    }catch(e){ return null; }
-  }
-  function isCodeExpired(code){
-    if(!code || !code.expires_at) return false;
-    var d = new Date(code.expires_at);
-    return !isNaN(d.getTime()) && d < new Date();
-  }
+  window.getColorImages = getColorImages = function(color){
+    const p = window.currentProduct;
+    const set = colorSetFor(p, color);
+    if(!set) return [fallbackImage(p)];
 
-  function eligibleBeforeVatSubtotal(){
-    return (window.cart || cart || []).reduce(function(sum,item){
-      if(itemHasProductDiscount(item)) return sum;
-      return sum + itemBeforeVat(item) * itemQty(item);
-    }, 0);
-  }
-
-  function discountedItemsCount(){
-    return (window.cart || cart || []).filter(itemHasProductDiscount).length;
-  }
-
-  function cartTotals(){
-    var code = appliedCartDiscount && Number(appliedCartDiscount.percent || 0) > 0 ? appliedCartDiscount : null;
-    var discountPercent = code ? Number(code.percent || 0) : 0;
-    var subtotalBeforeVat = 0;
-    var productDiscountedCount = 0;
-    var codeDiscountBeforeVat = 0;
-    var vatTotal = 0;
-    var total = 0;
-
-    (window.cart || cart || []).forEach(function(item){
-      var qty = itemQty(item);
-      var before = itemBeforeVat(item);
-      var vatRate = itemVatRate(item);
-      subtotalBeforeVat += before * qty;
-      if(itemHasProductDiscount(item)){
-        productDiscountedCount += qty;
-        total += itemLineTotalCurrent(item);
-        var lineCurrent = itemLineTotalCurrent(item);
-        vatTotal += lineCurrent - (lineCurrent / (1 + vatRate / 100));
-      }else{
-        var lineBefore = before * qty;
-        var lineDiscount = discountPercent ? (lineBefore * discountPercent / 100) : 0;
-        var afterBeforeVat = Math.max(0, lineBefore - lineDiscount);
-        codeDiscountBeforeVat += lineDiscount;
-        vatTotal += afterBeforeVat * vatRate / 100;
-        total += afterBeforeVat * (1 + vatRate / 100);
-      }
-    });
-
-    return {
-      subtotalBeforeVat: subtotalBeforeVat,
-      codeDiscountBeforeVat: codeDiscountBeforeVat,
-      vatTotal: vatTotal,
-      total: total,
-      productDiscountedCount: productDiscountedCount,
-      code: code
-    };
-  }
-
-  function saveCartDiscount(){
-    if(appliedCartDiscount) localStorage.setItem('appliedDiscount', JSON.stringify(appliedCartDiscount));
-    else localStorage.removeItem('appliedDiscount');
-  }
-
-  function cartPanel(){ return document.getElementById('cartPanel'); }
-  function cartWrap(){ return document.getElementById('cartItems'); }
-
-  function cartItemImageSafe(item){
-    try{ return typeof cartItemImage === 'function' ? cartItemImage(item) : ''; }catch(e){ return ''; }
-  }
-
-  window.openCart = openCart = function(){
-    var panel = cartPanel();
-    var wrap = cartWrap();
-    if(!panel || !wrap) return;
-
-    window.cart = cart = (cart || []).map(function(i){ return typeof lightweightCartItem === 'function' ? lightweightCartItem(i) : i; });
-    if(typeof saveCartSafe === 'function') saveCartSafe();
-
-    if(!cart.length){
-      appliedCartDiscount = null;
-      saveCartDiscount();
-      wrap.innerHTML = '<p>' + safeText((window.T && T[lang] && T[lang].empty) || 'Your cart is empty.') + '</p>';
-    }else{
-      wrap.innerHTML = cart.map(function(i,index){
-        var img = cartItemImageSafe(i);
-        var hasDiscount = itemHasProductDiscount(i);
-        return '<div class="cart-item cart-item-rich">' +
-          (img ? '<img src="' + safeText(img) + '" alt="' + safeText(i.name) + '">' : '') +
-          '<div><strong>' + safeText(i.name) + '</strong><br>' +
-          'Color: ' + safeText(i.color || '') + (i.colorCode ? ' (' + safeText(i.colorCode) + ')' : '') + '<br>' +
-          'Fabric: ' + safeText(i.fabric || '') + '<br>' +
-          'Size: ' + safeText(i.size || '') + '<br>' +
-          (hasDiscount ? '<small class="discount-price">Product already under discount: ' + Number(i.discountPercent || 0) + '% — no additional code discount.</small><br>' : '') +
-          '<strong>' + money(itemLineTotalCurrent(i)) + '</strong><br>' +
-          '<button type="button" data-cart-action="qty-minus" data-cart-index="' + index + '">-</button> ' +
-          '<span class="qty">' + itemQty(i) + '</span> ' +
-          '<button type="button" data-cart-action="qty-plus" data-cart-index="' + index + '">+</button> ' +
-          '<button type="button" data-cart-action="remove" data-cart-index="' + index + '">Remove</button>' +
-          '</div></div>';
-      }).join('') +
-      '<div class="cart-discount-box" style="margin-top:14px;padding:12px;border:1px solid #e6d8c5;border-radius:14px;background:#fffaf2;">' +
-        '<strong>Discount Code</strong>' +
-        '<p style="margin:6px 0 10px;font-size:13px;">Code discount applies before VAT only to products without existing discounts.</p>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<input id="cartDiscountCode" value="' + safeText(appliedCartDiscount && appliedCartDiscount.code || '') + '" placeholder="Enter code e.g. CV10" style="flex:1;min-width:160px;padding:10px;border:1px solid #ddd;border-radius:10px;">' +
-          '<button type="button" class="btn secondary" data-cart-action="apply-code">Apply</button>' +
-          '<button type="button" class="btn secondary" data-cart-action="clear-code">Clear</button>' +
-        '</div>' +
-        '<p id="cartDiscountMessage" style="margin:8px 0 0;font-size:13px;"></p>' +
-      '</div>';
+    const fabricLabel = clean(window.selectedFabricOption && window.selectedFabricOption.label);
+    const meta = Array.isArray(set.imageMeta) ? set.imageMeta : [];
+    if(fabricLabel && meta.length){
+      const exact = meta
+        .filter(m => clean(m && m.fabric) === fabricLabel)
+        .map(m => m && m.url)
+        .filter(Boolean)
+        .map(asUrl);
+      if(exact.length) return exact;
     }
 
-    renderCartTotals();
-    panel.classList.remove('hidden');
+    const fromMeta = meta.map(m => m && m.url).filter(Boolean).map(asUrl);
+    if(fromMeta.length) return fromMeta;
+
+    const imgs = Array.isArray(set.images) ? set.images.filter(Boolean).map(asUrl) : [];
+    if(imgs.length) return imgs;
+
+    return [fallbackImage(p)];
   };
 
-  window.closeCart = closeCart = function(){
-    var panel = cartPanel();
-    if(panel) panel.classList.add('hidden');
+  window.selectColor = selectColor = function(color){
+    window.selectedColor = selectedColor = color;
+    const imgs = getColorImages(color);
+    window.selectedImage = selectedImage = imgs[0] || fallbackImage(window.currentProduct);
+    if(typeof renderColors === 'function') renderColors();
+    if(typeof renderThumbs === 'function') renderThumbs();
+    if(typeof updateModalImage === 'function') updateModalImage();
+    if(typeof renderSelectionSummary === 'function') setTimeout(renderSelectionSummary, 20);
   };
-
-  function renderCartTotals(message, isError){
-    var totalEl = document.getElementById('cartTotal');
-    if(!totalEl) return;
-    var t = cartTotals();
-    var html = '<div class="cart-total-lines">' +
-      '<div>Subtotal before VAT: <strong>' + money(t.subtotalBeforeVat) + '</strong></div>';
-    if(t.code){
-      html += '<div class="discount-price">Code discount before VAT (' + safeText(t.code.code) + ' - ' + Number(t.code.percent || 0) + '%): -<strong>' + money(t.codeDiscountBeforeVat) + '</strong></div>';
-    }
-    html += '<div>VAT after discount: <strong>' + money(t.vatTotal) + '</strong></div>' +
-      '<div>Total incl. VAT: <strong>' + money(t.total) + '</strong></div>' +
-      '</div>';
-    totalEl.innerHTML = html;
-
-    var msg = document.getElementById('cartDiscountMessage');
-    if(msg){
-      var baseMsg = '';
-      if(t.productDiscountedCount && t.code){ baseMsg = 'Some products are already under discount, so no additional code discount was added to those products.'; }
-      msg.textContent = message || baseMsg;
-      msg.className = isError ? 'discount-red' : 'discount-price';
-      msg.style.color = isError ? '#b00020' : '#b11226';
-    }
-  }
-
-  async function applyCartDiscountCode(){
-    var input = document.getElementById('cartDiscountCode');
-    var codeText = String(input && input.value || '').trim().toUpperCase();
-    if(!codeText){
-      appliedCartDiscount = null;
-      saveCartDiscount();
-      renderCartTotals('Please add a discount code.', true);
-      return;
-    }
-    var eligible = eligibleBeforeVatSubtotal();
-    if(eligible <= 0){
-      appliedCartDiscount = null;
-      saveCartDiscount();
-      renderCartTotals('This product is already under discount, so no additional discount will be added.', true);
-      return;
-    }
-    var found = await validateCartDiscountCode(codeText);
-    if(!found){
-      appliedCartDiscount = null;
-      saveCartDiscount();
-      renderCartTotals('Invalid discount code.', true);
-      return;
-    }
-    if(isCodeExpired(found)){
-      appliedCartDiscount = null;
-      saveCartDiscount();
-      renderCartTotals('Discount code expired.', true);
-      return;
-    }
-    appliedCartDiscount = found;
-    saveCartDiscount();
-    var msg = 'Code applied: ' + found.percent + '% discount before VAT.';
-    if(discountedItemsCount()) msg += ' Products already under discount were excluded.';
-    renderCartTotals(msg, false);
-  }
-
-  window.checkout = checkout = function(){
-    if(!cart || !cart.length){ alert((window.T && T[lang] && T[lang].empty) || 'Your cart is empty.'); return; }
-    localStorage.setItem('cartTotals', JSON.stringify(cartTotals()));
-    if(typeof saveCartSafe === 'function') saveCartSafe();
-    window.location.href = 'review.html';
-  };
-
-  document.addEventListener('click', function(e){
-    var target = e.target.closest('button, a');
-    if(!target) return;
-
-    var action = target.getAttribute('data-cart-action');
-    if(action){
-      e.preventDefault();
-      e.stopPropagation();
-      var idx = Number(target.getAttribute('data-cart-index'));
-      if(action === 'qty-minus' && cart[idx]){ cart[idx].qty = Math.max(1, itemQty(cart[idx]) - 1); if(typeof saveCartSafe === 'function') saveCartSafe(); if(typeof updateCartCount === 'function') updateCartCount(); openCart(); }
-      if(action === 'qty-plus' && cart[idx]){ cart[idx].qty = itemQty(cart[idx]) + 1; if(typeof saveCartSafe === 'function') saveCartSafe(); if(typeof updateCartCount === 'function') updateCartCount(); openCart(); }
-      if(action === 'remove' && cart[idx]){ cart.splice(idx,1); if(typeof saveCartSafe === 'function') saveCartSafe(); if(typeof updateCartCount === 'function') updateCartCount(); openCart(); }
-      if(action === 'apply-code') applyCartDiscountCode();
-      if(action === 'clear-code'){ appliedCartDiscount = null; saveCartDiscount(); renderCartTotals('Discount code removed.', false); }
-      return;
-    }
-
-    var txt = (target.textContent || '').replace(/\s+/g,' ').trim().toLowerCase();
-    var isCartButton = target.id === 'cartBtn' || target.getAttribute('href') === '#cart' || /^cart\s*\d*/i.test((target.textContent || '').trim()) || txt === 'السلة' || txt.indexOf('السلة') >= 0;
-    if(isCartButton){ e.preventDefault(); e.stopPropagation(); openCart(); return; }
-
-    if(target.closest('#cartPanel') && (txt === 'checkout' || txt === 'الدفع')){ e.preventDefault(); e.stopPropagation(); checkout(); return; }
-    if(target.closest('#cartPanel') && (txt === '×' || txt === 'x')){ e.preventDefault(); e.stopPropagation(); closeCart(); return; }
-    if(target.closest('#productModal') && (target.getAttribute('data-i18n') === 'addCart' || txt === 'add to cart' || txt === 'أضف للسلة')){
-      e.preventDefault(); e.stopPropagation(); if(typeof addCurrentToCart === 'function') addCurrentToCart(); return;
-    }
-  }, true);
-
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape') closeCart();
-  });
-
-  document.addEventListener('DOMContentLoaded', function(){
-    if(typeof updateCartCount === 'function') updateCartCount();
-  });
 })();
