@@ -2,7 +2,7 @@
 NODE_VERSION = "20"
 
 [phases.install]
-cmds = ["npm ci --omit=dev"]
+cmds = ["npm install --omit=dev"]
 
 [start]
 cmd = "npm start"

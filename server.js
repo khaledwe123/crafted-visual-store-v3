@@ -913,13 +913,29 @@ app.delete('/api/media/assignments/:assignId', adminAuth('media','write'), (req,
 });
 
 
+const SAFE_HTML_FILES = new Set([
+  'index.html','shop.html','admin.html','admin-login.html','auth.html','account.html',
+  'contact.html','track-order.html','review.html','payment.html','thankyou.html',
+  'orders.html','financial-dashboard.html','customer-journey-dashboard.html','crm.html',
+  'audit-logs.html','discounted-items.html','page.html','estimator final.html'
+]);
+function safeInside(base, target){
+  const rel = path.relative(base, target);
+  return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
 function htmlFileForRequest(req){
   let requested = req.path === '/' ? '/index.html' : req.path;
   if(!path.extname(requested)) requested += '.html';
   if(path.extname(requested).toLowerCase() !== '.html') return null;
+  const fileName = decodeURIComponent(requested.replace(/^\/+/, ''));
+  if(!SAFE_HTML_FILES.has(fileName)) return null;
   const publicDir = path.join(__dirname, 'public');
-  const candidate = path.join(publicDir, requested.replace(/^\/+/, ''));
-  if(candidate.startsWith(publicDir) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+  const rootCandidate = path.join(__dirname, fileName);
+  const publicCandidate = path.join(publicDir, fileName);
+  if(safeInside(publicDir, publicCandidate) && fs.existsSync(publicCandidate) && fs.statSync(publicCandidate).isFile()) return publicCandidate;
+  // Fallback for Railway deployments where the frontend files were uploaded at project root.
+  // This keeps backend/source files protected by only allowing known HTML entrypoints.
+  if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
 function applyHtmlSecurityTransforms(html, nonce){

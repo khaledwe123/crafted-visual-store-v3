@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crafted Visual | Premium Furniture Saudi Arabia</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium" />
+  <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2" />
+
+  <script>
+    window.CV_ANALYTICS_READY = false;
+    async function loadCVAnalytics(){
+      try{
+        const local = localStorage.getItem("cms_settings");
+        const settings = local ? JSON.parse(local) : await fetch("settings.json").then(r=>r.json());
+
+        if(settings.google_analytics_id && settings.google_analytics_id !== "G-XXXXXXXXXX"){
+          const ga = document.createElement("script");
+          ga.async = true;
+          ga.src = "https://www.googletagmanager.com/gtag/js?id=" + settings.google_analytics_id;
+          document.head.appendChild(ga);
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          window.gtag = gtag;
+          gtag("js", new Date());
+          gtag("config", settings.google_analytics_id);
+        }
+
+        if(settings.google_tag_manager_id && settings.google_tag_manager_id !== "GTM-XXXXXXX"){
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({"gtm.start": new Date().getTime(), event:"gtm.js"});
+          const gtm = document.createElement("script");
+          gtm.async = true;
+          gtm.src = "https://www.googletagmanager.com/gtm.js?id=" + settings.google_tag_manager_id;
+          document.head.appendChild(gtm);
+        }
+
+        if(settings.meta_pixel_id){
+          !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+          n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+          n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+          t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
+          (window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
+          fbq('init', settings.meta_pixel_id); fbq('track', 'PageView');
+        }
+        window.CV_ANALYTICS_READY = true;
+      }catch(e){console.warn("Analytics not loaded", e);}
+    }
+    loadCVAnalytics();
+  </script>
+
+  <script src="translate-ar.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
+</head>
+<body>
+  <header class="nav">
+    <div class="brand" id="brandText">Crafted Visual</div>
+    <nav id="mainMenu"></nav>
+    <div class="nav-actions">
+      <button class="lang-btn" data-cv-lang-toggle="true" onclick="toggleLang()">عربي</button>
+      <button class="lang-btn" id="authBtn" type="button">Sign In</button>
+      <button class="cart-btn" onclick="openCart()"><span data-i18n="cart">Cart</span> <span id="cartCount">0</span></button>
+    </div>
+  </header>
+
+  <section id="home" class="hero">
+    <div class="hero-text">
+      <span class="eyebrow" id="heroEyebrow">2026 Furniture Collection</span>
+      <h1 id="heroTitle">Premium sofas, beds, and chairs made for modern Saudi homes.</h1>
+      <p id="heroText">Custom dimensions, premium fabrics, elegant colors, and a luxury shopping experience.</p>
+<div class="hero-actions">
+        <a href="shop.html" class="btn primary" data-i18n="shopCollection">Shop Collection</a>
+        <a href="#custom" class="btn secondary" data-i18n="requestQuote">Request Custom Quote</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="intro">
+    <h2 id="introTitle">Luxury furniture with custom options</h2>
+    <p id="introText">Choose your product, select fabric, select color, view the correct image, then add to cart or request quotation by WhatsApp.</p>
+  </section>
+
+
+
+  <section id="custom" class="custom">
+    <h2 data-i18n="customTitle">Custom Furniture Request</h2>
+    <form id="customForm">
+      <select name="category" id="customCategorySelect">
+        <option value="" data-i18n="productCategory">Product Category</option>
+      </select>
+      <input name="width" data-placeholder-en="Width in cm" data-placeholder-ar="العرض بالسنتيمتر" placeholder="Width in cm" />
+      <input name="depth" data-placeholder-en="Depth in cm" data-placeholder-ar="العمق بالسنتيمتر" placeholder="Depth in cm" />
+      <input name="height" data-placeholder-en="Height in cm" data-placeholder-ar="الارتفاع بالسنتيمتر" placeholder="Height in cm" />
+      <input name="fabric" data-placeholder-en="Fabric type" data-placeholder-ar="نوع القماش" placeholder="Fabric type" />
+      <input name="color" data-placeholder-en="Color" data-placeholder-ar="اللون" placeholder="Color" />
+      <input name="name" required data-placeholder-en="Customer name" data-placeholder-ar="اسم العميل" placeholder="Customer name" />
+      <input name="mobile" required data-placeholder-en="Mobile number" data-placeholder-ar="رقم الجوال" placeholder="Mobile number" />
+      <select id="customCity" name="city"></select>
+      <textarea name="notes" required data-placeholder-en="Notes" data-placeholder-ar="ملاحظات" placeholder="Notes"></textarea>
+      <button type="submit" class="btn primary" data-i18n="sendWhatsApp">Send by WhatsApp</button>
+    </form>
+  </section>
+
+  <footer id="contact">
+    <h3 id="footerBrand">Crafted Visual</h3>
+    <p id="footerText">Premium customizable furniture in Saudi Arabia.</p>
+    
+    <div class="social-icons" id="socialIcons">
+      <a id="instagramLink" href="#" target="_blank" aria-label="Instagram" title="Instagram">◎</a>
+      <a id="tiktokLink" href="#" target="_blank" aria-label="TikTok" title="TikTok">♪</a>
+      <a id="facebookLink" href="#" target="_blank" aria-label="Facebook" title="Facebook">f</a>
+      <a id="xLink" href="#" target="_blank" aria-label="X" title="X">𝕏</a>
+      <a id="linkedinLink" href="#" target="_blank" aria-label="LinkedIn" title="LinkedIn">in</a>
+      <a id="youtubeLink" href="#" target="_blank" aria-label="YouTube" title="YouTube">▶</a>
+      <a id="snapchatLink" href="#" target="_blank" aria-label="Snapchat" title="Snapchat">👻</a>
+    </div>
+
+    <div id="footerDetails" class="footer-details"></div>
+
+    <a class="whatsapp" id="footerWhatsApp" href="#" target="_blank" data-i18n="whatsappUs">WhatsApp Us</a>
+  </footer>
+
+  <aside id="cartPanel" class="cart hidden">
+    <button type="button" class="close" onclick="closeCart()">×</button>
+    <h2 data-i18n="yourCart">Your Cart</h2>
+    <div id="cartItems"></div>
+    <h3 id="cartTotal"></h3>
+    <button type="button" class="btn primary" onclick="checkout()" data-i18n="checkout">Checkout</button>
+  </aside>
+
+  <script src="script.js?v=20260607premium"></script>
+  <script src="language-toggle-fix.js?v=20260611langstable"></script>
+  <script src="analytics-tracker.js"></script>
+  <script src="customer-journey-95.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+  <script src="room-tools-working.js?v=20260607tools2"></script>
+  <script src="public-cleanup.js?v=20260607clean4"></script>
+  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+</body>
+</html>

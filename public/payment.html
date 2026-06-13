@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment | Crafted Visual</title>
+  <link rel="stylesheet" href="styles.css?v=20260607premium">
+  <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2">
+  <script src="translate-ar.js"></script>
+  <script src="apiClient.js"></script>
+  <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
+  <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
+  <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
+</head>
+<body>
+<header class="nav">
+  <div class="brand">Crafted Visual</div>
+  <nav><a href="review.html">Back to Review</a><a href="index.html">Home</a></nav>
+</header>
+
+<main class="review-page">
+  <h1>Payment</h1>
+  <p>Select your payment method to complete the order.</p>
+
+  <section class="review-box" id="paymentSummary"></section>
+
+  <section class="review-box">
+    <h2>Accepted Payment Methods</h2>
+    <div class="payment-grid">
+      <button class="payment-card selected" onclick="selectPayment('Mada', this)"><span class="pay-logo mada">mada</span><strong>Mada</strong></button>
+      <button class="payment-card" onclick="selectPayment('Visa', this)"><span class="pay-logo visa">VISA</span><strong>Visa</strong></button>
+      <button class="payment-card" onclick="selectPayment('Mastercard', this)"><span class="pay-logo mastercard"><i></i><b></b></span><strong>Mastercard</strong></button>
+      <button class="payment-card" onclick="selectPayment('Apple Pay', this)"><span class="pay-logo apple"> Pay</span><strong>Apple Pay</strong></button>
+      <button class="payment-card" onclick="selectPayment('Samsung Pay', this)"><span class="pay-logo samsung">SAMSUNG Pay</span><strong>Samsung Pay</strong></button>
+    </div>
+  </section>
+
+  <section class="review-box">
+    <h2>Card Details</h2>
+    <input id="cardName" placeholder="Name on Card">
+    <input id="cardNumber" placeholder="Card Number">
+    <div class="admin-grid-3">
+      <input id="expiry" placeholder="MM/YY">
+      <input id="cvv" placeholder="CVV">
+    </div>
+    <p class="small-note">Demo payment page. Connect a real Saudi payment gateway such as Moyasar, HyperPay, Tap, or PayTabs for live payments.</p>
+  </section>
+
+  <button class="btn primary" onclick="payNow()">Pay Now</button>
+</main>
+
+<script>
+let selectedPayment = "Mada";
+const order = JSON.parse(localStorage.getItem("pendingOrder") || "null");
+if(!order){ location.href = "review.html"; }
+
+function render(){
+  document.getElementById("paymentSummary").innerHTML = `
+    <h2>Order Summary</h2>
+    <p><strong>Order:</strong> ${order.id}</p>
+    <p><strong>Customer:</strong> ${order.customer.name}</p>
+    <p><strong>Subtotal:</strong> SAR ${Number(order.subtotal).toLocaleString()}</p>
+    <p><strong>Delivery:</strong> SAR ${Number(order.delivery).toLocaleString()}</p>
+    <h2>Total: SAR ${Number(order.total).toLocaleString()}</h2>
+  `;
+}
+render();
+
+function selectPayment(method, el){
+  selectedPayment = method;
+  document.querySelectorAll(".payment-card").forEach(x=>x.classList.remove("selected"));
+  el.classList.add("selected");
+}
+
+async function payNow(){
+  if(!document.getElementById("cardName").value || !document.getElementById("cardNumber").value){
+    alert("Please add payment details.");
+    return;
+  }
+  order.paymentMethod = selectedPayment;
+  order.paymentStatus = "Paid";
+  order.orderStatus = "Paid";
+  order.paidAt = new Date().toISOString();
+
+  const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+  orders.push(order);
+  localStorage.setItem("orders", JSON.stringify(orders));
+  localStorage.removeItem("pendingOrder");
+  localStorage.removeItem("cart");
+
+  await crmSendEmail({
+    orderId: order.id,
+    to: order.customer?.email,
+    from: "do-not-reply@craftedvisual.com",
+    fromName: "Crafted Visual Customer Care",
+    subject: "Crafted Visual Payment Confirmation - " + order.id,
+    body: paymentMessage(order),
+    customer: order.customer
+  });
+
+  await crmSendWhatsApp({
+    orderId: order.id,
+    to: order.customer?.mobile,
+    body: paymentMessage(order),
+    customer: order.customer
+  });
+
+  location.href = "thankyou.html?order=" + encodeURIComponent(order.id);
+}
+
+function paymentMessage(order){
+  return `Dear ${order.customer.name},
+
+Thank you for your order with Crafted Visual.
+
+Order Number: ${order.id}
+Payment Status: Paid
+Order Status: ${order.orderStatus || "Paid"}
+Total Paid: SAR ${Number(order.total).toLocaleString()}
+
+We will now start processing your order and keep you updated at every stage.
+
+Best regards,
+Crafted Visual Customer Care`;
+}
+
+async function crmSendEmail(payload){
+  const settings = await getSettings();
+  const record = {...payload, id:"EMAIL-" + Date.now(), channel:"Email", status:"Queued", date:new Date().toISOString()};
+  if(settings.crm_email_api_url){
+    try{
+      const res = await fetch(settings.crm_email_api_url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(record)});
+      record.status = res.ok ? "Sent by CRM" : "CRM API Error";
+    }catch(e){ record.status = "CRM API Error"; record.error = String(e); }
+  }
+  const outbox = JSON.parse(localStorage.getItem("crmEmailOutbox") || "[]");
+  outbox.push(record);
+  localStorage.setItem("crmEmailOutbox", JSON.stringify(outbox));
+}
+
+async function crmSendWhatsApp(payload){
+  const settings = await getSettings();
+  const record = {...payload, id:"WA-" + Date.now(), channel:"WhatsApp", status:"Queued", date:new Date().toISOString()};
+  if(settings.whatsapp_business_api_url){
+    try{
+      const res = await fetch(settings.whatsapp_business_api_url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(record)});
+      record.status = res.ok ? "Sent by WhatsApp API" : "WhatsApp API Error";
+    }catch(e){ record.status = "WhatsApp API Error"; record.error = String(e); }
+  }
+  const outbox = JSON.parse(localStorage.getItem("crmWhatsAppOutbox") || "[]");
+  outbox.push(record);
+  localStorage.setItem("crmWhatsAppOutbox", JSON.stringify(outbox));
+}
+
+async function getSettings(){
+  const local = localStorage.getItem("cms_settings");
+  if(local) return JSON.parse(local);
+  try { return await fetch("settings.json").then(r=>r.json()); } catch(e){ return {}; }
+}
+</script>
+  <script src="analytics-tracker.js"></script>
+  <script src="customer-journey-95.js"></script>
+  <script src="responsive-all-devices.js?v=20260607v2"></script>
+  <script src="cv-premium-journey.js?v=20260607premium"></script>
+  <script src="ux95-final-visible.js?v=20260607final2"></script>
+  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+</body>
+</html>
