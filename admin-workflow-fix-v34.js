@@ -2365,13 +2365,14 @@
     const out = [];
     const add = (v) => {
       if(v === undefined || v === null) return;
-      if(typeof v === 'object') v = v.label || v.name || v.value || v.color || v.title || '';
-      String(v).split(',').forEach(x => { const txt = x.trim(); if(txt) out.push(txt); });
+      if(typeof v === 'object') v = v.label || v.name || v.value || v.color || v.title || v.code || '';
+      String(v).split(',').forEach(x => { const t = x.trim(); if(t) out.push(t); });
     };
     if(p && p.colors && typeof p.colors === 'object') Object.keys(p.colors).forEach(add);
     if(p && Array.isArray(p.colorOptions)) p.colorOptions.forEach(add);
     if(p && Array.isArray(p.colorsList)) p.colorsList.forEach(add);
     if(p && Array.isArray(p.colorNames)) p.colorNames.forEach(add);
+    if(p && Array.isArray(p.variants)) p.variants.forEach(v => add(v && (v.color || v.colorName || v.name)));
     return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
   }
 
