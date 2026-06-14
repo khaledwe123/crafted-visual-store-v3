@@ -145,17 +145,25 @@
     if(legacy){ legacy.classList.add('hidden'); legacy.style.display = 'none'; }
   }
 
-  function openStableModal(product, customize){
+  function openStableModal(product, customize, preferredVariant){
     var p = normalizeProductSafe(product);
     if(!p) return;
     try{ window.currentProduct = p; currentProduct = p; }catch(e){}
     var sizes = sizeOptions(p);
     var fabrics = fabricOptions(p);
     var colors = colorKeys(p);
-    var selectedColor = colors[0] || '';
-    var selectedSize = sizes[0];
-    var selectedFabric = fabrics[0];
-    try{ window.selectedColor = selectedColor; window.selectedSizeOption = selectedSize; window.selectedFabricOption = selectedFabric; selectedColor = selectedColor; selectedSizeOption = selectedSize; selectedFabricOption = selectedFabric; }catch(e){}
+    function sameLabel(a,b){
+      function lbl(x){ return String((x && (x.label || x.name || x.size || x.fabric || x.value)) || x || '').trim().toLowerCase(); }
+      return !!lbl(a) && lbl(a) === String(b || '').trim().toLowerCase();
+    }
+    preferredVariant = preferredVariant || {};
+    var selectedColor = preferredVariant.color ? (colors.find(function(c){return String(c).trim().toLowerCase() === String(preferredVariant.color).trim().toLowerCase();}) || preferredVariant.color) : (colors[0] || '');
+    var selectedSize = preferredVariant.size ? (sizes.find(function(x){return sameLabel(x, preferredVariant.size);}) || sizes[0]) : sizes[0];
+    var selectedFabric = preferredVariant.fabric ? (fabrics.find(function(x){return sameLabel(x, preferredVariant.fabric);}) || fabrics[0]) : fabrics[0];
+    function syncGlobals(){
+      try{ window.currentProduct = p; currentProduct = p; window.selectedColor = selectedColor; window.selectedSizeOption = selectedSize; selectedSizeOption = selectedSize; window.selectedFabricOption = selectedFabric; selectedFabricOption = selectedFabric; }catch(e){}
+    }
+    syncGlobals();
 
     var modal = ensureModal();
     var body = document.getElementById('cvStableQuickViewBody');
@@ -164,16 +172,13 @@
       '<div class="cv-stable-qv-media"><img class="cv-stable-qv-main-img" id="cvStableQvMainImg" src="'+esc(imgs[0])+'" alt="'+esc(getProductName(p))+'"><div class="cv-stable-qv-thumbs" id="cvStableQvThumbs">'+imgs.map(function(img,i){return '<img src="'+esc(img)+'" data-cv-qv-thumb="'+esc(img)+'" class="'+(i===0?'active':'')+'" alt="">';}).join('')+'</div></div>'+
       '<div class="cv-stable-qv-info"><h2>'+esc(getProductName(p))+'</h2><p class="cv-stable-qv-desc">'+esc(getProductDesc(p))+'</p><div id="cvStableQvPrice">'+priceHtml(p, selectedSize, selectedFabric)+'</div>'+(customize?'<div class="customize-mode-badge" style="padding:10px 12px;margin:10px 0;border-radius:12px;background:#fff8e5;border:1px solid #f0d991;font-weight:700;">Customization mode: choose size, fabric, and color before adding to cart.</div>':'')+
       '<div class="cv-stable-qv-rating"><strong>Customer Rating:</strong><div class="cv-stable-qv-stars">★★★★★</div><small>Rate this item</small></div>'+ 
-      '<label class="cv-stable-qv-label">Color</label><div class="cv-stable-qv-colors" id="cvStableQvColors">'+colors.map(function(c,i){var s=colorSet(p,c);return '<button type="button" class="cv-stable-qv-color '+(i===0?'active':'')+'" data-cv-qv-color="'+esc(c)+'"><span class="cv-stable-qv-dot" style="background:'+esc(s.hex || '#ccc')+'"></span><span>'+esc(c)+'</span>'+(s.code?'<small>'+esc(s.code)+'</small>':'')+'</button>';}).join('')+'</div>'+ 
-      '<label class="cv-stable-qv-label">Fabric</label><select class="cv-stable-qv-select" id="cvStableQvFabric">'+fabrics.map(function(f,i){return '<option value="'+i+'">'+esc(f.label || f)+'</option>';}).join('')+'</select><div class="cv-stable-qv-fabric-desc" id="cvStableQvFabricDesc">'+esc((selectedFabric && (selectedFabric.description || selectedFabric.description_ar)) || '')+'</div>'+ 
-      '<label class="cv-stable-qv-label">Size</label><select class="cv-stable-qv-select" id="cvStableQvSize">'+sizes.map(function(s,i){return '<option value="'+i+'">'+esc(s.label || s)+'</option>';}).join('')+'</select>'+ 
+      '<label class="cv-stable-qv-label">Color</label><div class="cv-stable-qv-colors" id="cvStableQvColors">'+colors.map(function(c,i){var s=colorSet(p,c);var isActive=String(c).trim().toLowerCase()===String(selectedColor).trim().toLowerCase();return '<button type="button" class="cv-stable-qv-color '+(isActive?'active':'')+'" data-cv-qv-color="'+esc(c)+'"><span class="cv-stable-qv-dot" style="background:'+esc(s.hex || '#ccc')+'"></span><span>'+esc(c)+'</span>'+(s.code?'<small>'+esc(s.code)+'</small>':'')+'</button>';}).join('')+'</div>'+ 
+      '<label class="cv-stable-qv-label">Fabric</label><select class="cv-stable-qv-select" id="cvStableQvFabric">'+fabrics.map(function(f,i){var lbl=String((f && (f.label || f.name || f.fabric || f.value)) || f || '');var sel=(f===selectedFabric || lbl.trim().toLowerCase()===String(preferredVariant.fabric||'').trim().toLowerCase())?' selected':'';return '<option value="'+i+'"'+sel+'>'+esc(lbl)+'</option>';}).join('')+'</select><div class="cv-stable-qv-fabric-desc" id="cvStableQvFabricDesc">'+esc((selectedFabric && (selectedFabric.description || selectedFabric.description_ar)) || '')+'</div>'+ 
+      '<label class="cv-stable-qv-label">Size</label><select class="cv-stable-qv-select" id="cvStableQvSize">'+sizes.map(function(s,i){var lbl=String((s && (s.label || s.name || s.size || s.value)) || s || '');var sel=(s===selectedSize || lbl.trim().toLowerCase()===String(preferredVariant.size||'').trim().toLowerCase())?' selected':'';return '<option value="'+i+'"'+sel+'>'+esc(lbl)+'</option>';}).join('')+'</select>'+ 
       '<div class="cv-stable-qv-tools"><button type="button" data-ux95-tool="360">360° View</button><button type="button" data-ux95-tool="room">Room Visualizer</button><button type="button" data-ux95-tool="measure">Measure-in-Room</button></div>'+ 
       '<div class="cv-stable-qv-actions"><button type="button" class="btn primary" id="cvStableQvAddCart">Add to Cart</button><button type="button" class="btn secondary" id="cvStableQvWhatsapp">WhatsApp Inquiry</button></div>'+ 
       '<div class="cv-stable-qv-trust"><div class="cv-stable-qv-stars">★★★★★</div><strong>Reviews & Trust</strong><p>Warranty included • Secure inquiry • Furniture specialist support</p></div></div></div>';
 
-    function syncGlobals(){
-      try{ window.currentProduct = p; currentProduct = p; window.selectedColor = selectedColor; selectedColor = selectedColor; window.selectedSizeOption = selectedSize; selectedSizeOption = selectedSize; window.selectedFabricOption = selectedFabric; selectedFabricOption = selectedFabric; }catch(e){}
-    }
     function refreshPrice(){
       var price = document.getElementById('cvStableQvPrice');
       if(price) price.innerHTML = priceHtml(p, selectedSize, selectedFabric);
@@ -235,15 +240,26 @@
     e.preventDefault();
     e.stopPropagation();
     if(e.stopImmediatePropagation) e.stopImmediatePropagation();
-    openStableModal(p, action.customize);
+    var variant = {
+      size: action.el.getAttribute('data-discount-size') || action.el.getAttribute('data-selected-size') || '',
+      fabric: action.el.getAttribute('data-discount-fabric') || action.el.getAttribute('data-selected-fabric') || '',
+      color: action.el.getAttribute('data-discount-color') || action.el.getAttribute('data-selected-color') || ''
+    };
+    var card = action.el.closest && action.el.closest('[data-discount-size], [data-discount-fabric], [data-discount-color]');
+    if(card){
+      variant.size = variant.size || card.getAttribute('data-discount-size') || '';
+      variant.fabric = variant.fabric || card.getAttribute('data-discount-fabric') || '';
+      variant.color = variant.color || card.getAttribute('data-discount-color') || '';
+    }
+    openStableModal(p, action.customize, variant);
   }
 
   // Use window capture so this handler runs before older document-level handlers.
   window.addEventListener('click', handleProductAction, true);
 
   // Override legacy functions too, so any older scripts that call openProduct/openCustomizeProduct use this stable modal.
-  window.openProduct = function(id){ var p = findProduct(id, null); if(p) openStableModal(p, false); };
-  window.openCustomizeProduct = function(id){ var p = findProduct(id, null); if(p) openStableModal(p, true); };
+  window.openProduct = function(id, variant){ var p = findProduct(id, null); if(p) openStableModal(p, false, variant || {}); };
+  window.openCustomizeProduct = function(id, variant){ var p = findProduct(id, null); if(p) openStableModal(p, true, variant || {}); };
 
   window.addEventListener('click', function(e){
     if(e.target && e.target.closest && e.target.closest('[data-cv-qv-close]')){
