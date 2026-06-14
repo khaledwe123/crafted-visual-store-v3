@@ -497,6 +497,98 @@ function seedDefaults(){
 
 seedDefaults();
 app.get('/api/health',(req,res)=>res.json({ok:true, platform:'Crafted Visual DB Ecommerce', time:new Date().toISOString()}));
+
+
+// Analytics resilience: keep Analytics Center operational even when a Railway
+// database was restored without journey tables or with an older partial schema.
+function ensureAnalyticsTablesSafe(){
+  try{
+    db.exec(`
+CREATE TABLE IF NOT EXISTS customer_journey_events(
+ id SERIAL PRIMARY KEY,
+ session_id TEXT NOT NULL,
+ customer_id INTEGER,
+ event_type TEXT NOT NULL,
+ page_url TEXT,
+ page_title TEXT,
+ product_id INTEGER,
+ product_name TEXT,
+ source TEXT,
+ medium TEXT,
+ campaign TEXT,
+ term TEXT,
+ content TEXT,
+ referrer TEXT,
+ device TEXT,
+ ip_hash TEXT,
+ user_agent TEXT,
+ metadata_json TEXT DEFAULT '{}',
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS session_id TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS customer_id INTEGER;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS event_type TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS page_url TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS page_title TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS product_id INTEGER;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS product_name TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS medium TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS campaign TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS term TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS content TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS referrer TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS device TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS ip_hash TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS metadata_json TEXT DEFAULT '{}';
+ALTER TABLE customer_journey_events ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT CURRENT_TIMESTAMP;
+UPDATE customer_journey_events SET session_id = COALESCE(NULLIF(session_id,''), 'unknown') WHERE session_id IS NULL OR session_id='';
+UPDATE customer_journey_events SET event_type = COALESCE(NULLIF(event_type,''), 'event') WHERE event_type IS NULL OR event_type='';
+CREATE INDEX IF NOT EXISTS idx_journey_session ON customer_journey_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_journey_event_type ON customer_journey_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_journey_created ON customer_journey_events(created_at);
+
+CREATE TABLE IF NOT EXISTS abandoned_carts(
+ id SERIAL PRIMARY KEY,
+ session_id TEXT NOT NULL,
+ customer_id INTEGER,
+ cart_json TEXT NOT NULL DEFAULT '[]',
+ source TEXT,
+ campaign TEXT,
+ status TEXT NOT NULL DEFAULT 'open',
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS session_id TEXT;
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS customer_id INTEGER;
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS cart_json TEXT DEFAULT '[]';
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS campaign TEXT;
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'open';
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE abandoned_carts ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT CURRENT_TIMESTAMP;
+UPDATE abandoned_carts SET session_id = COALESCE(NULLIF(session_id,''), 'unknown') WHERE session_id IS NULL OR session_id='';
+UPDATE abandoned_carts SET status = COALESCE(NULLIF(status,''), 'open') WHERE status IS NULL OR status='';
+CREATE INDEX IF NOT EXISTS idx_abandoned_carts_status ON abandoned_carts(status);
+CREATE INDEX IF NOT EXISTS idx_abandoned_carts_updated ON abandoned_carts(updated_at);
+`);
+    return true;
+  }catch(err){
+    console.error('Analytics table verification failed:', err.message || err);
+    return false;
+  }
+}
+function analyticsEmptySummary(days, reason='Analytics data unavailable'){
+  return { ok:false, empty:true, days, reason,
+    totals:{events:0, sessions:0}, funnel:[], sources:[], pages:[], products:[], abandoned:{open_carts:0}
+  };
+}
+function numberOrNull(v){
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 app.get('/api/version',(req,res)=>res.json({version:'CRAFTED-VISUAL-SUPERADMIN-MEDIA-FIX-20260609-18', superadminFix:true, mediaLibrary:true, publicTopRibbon:false, publicAnalyticsMenu:false, adminLogin:true, time:new Date().toISOString()}));
 
 app.get('/api/settings',(req,res)=>res.json(publicSettings(getSettingObject())));
@@ -520,58 +612,82 @@ app.get('/sitemap.xml',(req,res)=>{
 
 // 95/100 maturity: customer journey, source tracking, funnel, inventory and audit endpoints
 app.post('/api/journey', writeLimiter, (req,res)=>{
-  const b=req.body || {};
-  const meta = b.metadata && typeof b.metadata === 'object' ? b.metadata : {};
-  const sessionId = sanitizeText(b.session_id || b.sessionId || crypto.randomUUID(), 120);
-  const eventType = sanitizeText(b.event_type || b.eventType || 'event', 80);
-  db.prepare(`INSERT INTO customer_journey_events(session_id,customer_id,event_type,page_url,page_title,product_id,product_name,source,medium,campaign,term,content,referrer,device,ip_hash,user_agent,metadata_json)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      sessionId,
-      b.customer_id || null,
-      eventType,
-      sanitizeText(b.page_url || b.pageUrl || '', 1000),
-      sanitizeText(b.page_title || b.pageTitle || '', 300),
-      b.product_id || null,
-      sanitizeText(b.product_name || b.productName || '', 300),
-      sanitizeText(b.source || b.utm_source || '', 120),
-      sanitizeText(b.medium || b.utm_medium || '', 120),
-      sanitizeText(b.campaign || b.utm_campaign || '', 160),
-      sanitizeText(b.term || b.utm_term || '', 160),
-      sanitizeText(b.content || b.utm_content || '', 160),
-      sanitizeText(b.referrer || req.get('referer') || '', 1000),
-      detectDevice(req.get('user-agent') || ''),
-      hashValue(req.ip),
-      sanitizeText(req.get('user-agent') || '', 500),
-      JSON.stringify(meta)
-    );
-  res.json({ok:true, session_id:sessionId});
+  try{
+    ensureAnalyticsTablesSafe();
+    const b=req.body || {};
+    const meta = b.metadata && typeof b.metadata === 'object' ? b.metadata : (b.data && typeof b.data === 'object' ? b.data : {});
+    const sessionId = sanitizeText(b.session_id || b.sessionId || b.session || crypto.randomUUID(), 120) || crypto.randomUUID();
+    const eventType = sanitizeText(b.event_type || b.eventType || b.event || 'event', 80) || 'event';
+    db.prepare(`INSERT INTO customer_journey_events(session_id,customer_id,event_type,page_url,page_title,product_id,product_name,source,medium,campaign,term,content,referrer,device,ip_hash,user_agent,metadata_json)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        sessionId,
+        numberOrNull(b.customer_id || b.customerId),
+        eventType,
+        sanitizeText(b.page_url || b.pageUrl || b.page || '', 1000),
+        sanitizeText(b.page_title || b.pageTitle || (typeof document !== 'undefined' ? document.title : '') || '', 300),
+        numberOrNull(b.product_id || b.productId),
+        sanitizeText(b.product_name || b.productName || '', 300),
+        sanitizeText(b.source || b.utm_source || '', 120),
+        sanitizeText(b.medium || b.utm_medium || '', 120),
+        sanitizeText(b.campaign || b.utm_campaign || '', 160),
+        sanitizeText(b.term || b.utm_term || '', 160),
+        sanitizeText(b.content || b.utm_content || '', 160),
+        sanitizeText(b.referrer || req.get('referer') || '', 1000),
+        detectDevice(req.get('user-agent') || ''),
+        hashValue(req.ip),
+        sanitizeText(req.get('user-agent') || '', 500),
+        JSON.stringify(meta)
+      );
+    res.json({ok:true, session_id:sessionId});
+  }catch(err){
+    console.error('Journey tracking write failed:', err.message || err);
+    res.status(200).json({ok:false, stored:false, message:'Tracking temporarily unavailable.'});
+  }
 });
 app.post('/api/cart/abandoned', writeLimiter, (req,res)=>{
-  const b=req.body || {};
-  const sessionId = sanitizeText(b.session_id || b.sessionId || crypto.randomUUID(), 120);
-  const cartJson = JSON.stringify(Array.isArray(b.cart) ? b.cart : []);
-  const existing = db.prepare('SELECT id FROM abandoned_carts WHERE session_id=? AND status=? ORDER BY id DESC').get(sessionId,'open');
-  if(existing){
-    db.prepare('UPDATE abandoned_carts SET cart_json=?, source=?, campaign=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(cartJson, sanitizeText(b.source||'',120), sanitizeText(b.campaign||'',160), existing.id);
-    return res.json({ok:true, id:existing.id, updated:true});
+  try{
+    ensureAnalyticsTablesSafe();
+    const b=req.body || {};
+    const sessionId = sanitizeText(b.session_id || b.sessionId || crypto.randomUUID(), 120) || crypto.randomUUID();
+    const cartJson = JSON.stringify(Array.isArray(b.cart) ? b.cart : []);
+    const existing = db.prepare('SELECT id FROM abandoned_carts WHERE session_id=? AND status=? ORDER BY id DESC').get(sessionId,'open');
+    if(existing){
+      db.prepare('UPDATE abandoned_carts SET cart_json=?, source=?, campaign=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(cartJson, sanitizeText(b.source||'',120), sanitizeText(b.campaign||'',160), existing.id);
+      return res.json({ok:true, id:existing.id, updated:true});
+    }
+    const r=db.prepare('INSERT INTO abandoned_carts(session_id,customer_id,cart_json,source,campaign) VALUES(?,?,?,?,?)').run(sessionId,numberOrNull(b.customer_id || b.customerId),cartJson,sanitizeText(b.source||'',120),sanitizeText(b.campaign||'',160));
+    res.json({ok:true,id:r.lastInsertRowid});
+  }catch(err){
+    console.error('Abandoned cart tracking failed:', err.message || err);
+    res.status(200).json({ok:false, stored:false, message:'Cart tracking temporarily unavailable.'});
   }
-  const r=db.prepare('INSERT INTO abandoned_carts(session_id,customer_id,cart_json,source,campaign) VALUES(?,?,?,?,?)').run(sessionId,b.customer_id||null,cartJson,sanitizeText(b.source||'',120),sanitizeText(b.campaign||'',160));
-  res.json({ok:true,id:r.lastInsertRowid});
 });
 app.get('/api/journey/summary', adminAuth('analytics','read'), (req,res)=>{
   const days = Math.max(1, Math.min(365, Number(req.query.days || 30)));
-  const since = `-${days} days`;
-  const totals = db.prepare(`SELECT COUNT(*) events, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE created_at >= datetime('now', ?)`).get(since);
-  const funnel = db.prepare(`SELECT event_type, COUNT(*) count, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE created_at >= datetime('now', ?) GROUP BY event_type ORDER BY count DESC`).all(since);
-  const sources = db.prepare(`SELECT COALESCE(NULLIF(source,''),'direct') source, COALESCE(NULLIF(medium,''),'none') medium, COUNT(DISTINCT session_id) sessions, COUNT(*) events FROM customer_journey_events WHERE created_at >= datetime('now', ?) GROUP BY source, medium ORDER BY sessions DESC LIMIT 20`).all(since);
-  const pages = db.prepare(`SELECT page_url, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type='page_view' AND created_at >= datetime('now', ?) GROUP BY page_url ORDER BY views DESC LIMIT 20`).all(since);
-  const products = db.prepare(`SELECT product_name, product_id, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type IN ('product_view','view_details') AND created_at >= datetime('now', ?) GROUP BY product_name, product_id ORDER BY views DESC LIMIT 20`).all(since);
-  const abandoned = db.prepare(`SELECT COUNT(*) open_carts FROM abandoned_carts WHERE status='open' AND updated_at >= datetime('now', ?)`).get(since);
-  res.json({days, totals, funnel, sources, pages, products, abandoned});
+  try{
+    if(!ensureAnalyticsTablesSafe()) return res.status(200).json(analyticsEmptySummary(days, 'Analytics tables could not be verified'));
+    const since = `-${days} days`;
+    const totals = db.prepare(`SELECT COUNT(*) events, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE created_at >= datetime('now', ?)`).get(since) || {events:0, sessions:0};
+    const funnel = db.prepare(`SELECT event_type, COUNT(*) count, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE created_at >= datetime('now', ?) GROUP BY event_type ORDER BY count DESC`).all(since);
+    const sources = db.prepare(`SELECT COALESCE(NULLIF(source,''),'direct') source, COALESCE(NULLIF(medium,''),'none') medium, COUNT(DISTINCT session_id) sessions, COUNT(*) events FROM customer_journey_events WHERE created_at >= datetime('now', ?) GROUP BY source, medium ORDER BY sessions DESC LIMIT 20`).all(since);
+    const pages = db.prepare(`SELECT page_url, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type='page_view' AND created_at >= datetime('now', ?) GROUP BY page_url ORDER BY views DESC LIMIT 20`).all(since);
+    const products = db.prepare(`SELECT product_name, product_id, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type IN ('product_view','view_details') AND created_at >= datetime('now', ?) GROUP BY product_name, product_id ORDER BY views DESC LIMIT 20`).all(since);
+    const abandoned = db.prepare(`SELECT COUNT(*) open_carts FROM abandoned_carts WHERE status='open' AND updated_at >= datetime('now', ?)`).get(since) || {open_carts:0};
+    res.json({ok:true, empty:Number(totals.events||0)===0, days, totals, funnel, sources, pages, products, abandoned});
+  }catch(err){
+    console.error('Analytics summary failed:', err.message || err);
+    res.status(200).json(analyticsEmptySummary(days, 'Analytics query failed safely'));
+  }
 });
 app.get('/api/journey/events', adminAuth('analytics','read'), (req,res)=>{
-  const rows = db.prepare('SELECT * FROM customer_journey_events ORDER BY created_at DESC LIMIT 500').all().map(r=>({...r, metadata: json(r.metadata_json,{})}));
-  res.json(rows);
+  try{
+    if(!ensureAnalyticsTablesSafe()) return res.status(200).json([]);
+    const rows = db.prepare('SELECT * FROM customer_journey_events ORDER BY created_at DESC LIMIT 500').all().map(r=>({...r, metadata: json(r.metadata_json,{})}));
+    res.json(rows);
+  }catch(err){
+    console.error('Analytics events failed:', err.message || err);
+    res.status(200).json([]);
+  }
 });
 app.get('/api/audit-logs', adminAuth('security','read'), (req,res)=>{
   res.json(db.prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500').all().map(r=>({...r, metadata:json(r.metadata_json,{})})));

@@ -2131,9 +2131,9 @@ async function analyticsApi(path){
   const headers = { 'Content-Type':'application/json' };
   const t = analyticsToken();
   if(t) headers.Authorization = 'Bearer ' + t;
-  const res = await fetch(path, { headers });
+  const res = await fetch(path, { headers, credentials:'include' });
   const data = await res.json().catch(() => ({}));
-  if(!res.ok) throw new Error(data.error || 'Analytics API failed');
+  if(!res.ok) throw new Error(data.error || data.message || 'Analytics API failed');
   return data;
 }
 function analyticsRows(id, arr, labelFn, valueFn, subFn){
@@ -2174,7 +2174,18 @@ async function loadAnalyticsCenter(){
     }
     if(status) status.textContent = 'Analytics Center updated. Tracking is live from pages using analytics-tracker.js.';
   }catch(err){
-    if(status) status.textContent = 'Could not load analytics. Login as Super Admin and confirm analytics permission. ' + err.message;
+    const setText = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    setText('kpiSessions', 0);
+    setText('kpiEvents', 0);
+    setText('kpiAbandoned', 0);
+    setText('kpiConversions', 0);
+    analyticsRows('analyticsFunnel', [], x => '', x => 0);
+    analyticsRows('analyticsSources', [], x => '', x => 0);
+    analyticsRows('analyticsPages', [], x => '', x => 0);
+    analyticsRows('analyticsProducts', [], x => '', x => 0);
+    const tbody = document.getElementById('analyticsRecentEvents');
+    if(tbody) tbody.innerHTML = '<tr><td colspan="7">No analytics data available yet. Tracking will appear automatically after visitors browse the website.</td></tr>';
+    if(status) status.textContent = 'Analytics Center is available, but no analytics data could be loaded yet. Please refresh after browsing activity. Details: ' + (err.message || 'Unavailable');
   }
 }
 
