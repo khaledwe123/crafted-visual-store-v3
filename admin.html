@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Crafted Visual CMS</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="styles.css?v=20260607premium">
-  <script src="adminAuthGuard.js?v=superadmin-media-fix-20260609"></script>
+  <script src="adminAuthGuard.js?v=prod-auth-recovery-20260613"></script>
   <script src="translate-ar.js"></script>
-  <script src="apiClient.js"></script>
+  <script src="apiClient.js?v=prod-auth-recovery-20260613"></script>
   <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
   <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
   <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
 <header class="nav">
@@ -23,6 +25,7 @@
     <a href="#" data-tab-link="analyticsControl">Analytics Center</a>
     <a href="customer-journey-dashboard.html">Customer Journey</a>
     <a href="crm.html">CRM</a>
+    <a href="audit-logs.html">Audit Logs</a>
   </nav>
 </header>
 
@@ -57,6 +60,46 @@
       <div id="menuList" class="admin-list"></div>
       <button class="btn primary" type="button" onclick="saveMenu()">Save Menu</button>
       <button class="btn secondary" type="button" onclick="resetMenu()">Reset Default Menu</button>
+    </div>
+
+    <div class="admin-panel" id="pageManagerPanel">
+      <h2>Page Builder & Page Connections</h2>
+      <div class="admin-note">Add pages, control the menu connection, and edit the full page content. New pages open as <b>page.html?slug=your-page</b>.</div>
+      <input id="page_edit_id" type="hidden">
+      <div class="admin-grid-3">
+        <input id="page_title_en" placeholder="Page Title English">
+        <input id="page_title_ar" placeholder="Page Title Arabic">
+        <input id="page_slug" placeholder="Slug e.g. sale, about-us, project-page">
+        <input id="page_menu_en" placeholder="Menu Label English">
+        <input id="page_menu_ar" placeholder="Menu Label Arabic">
+        <input id="page_url" placeholder="Page URL auto: page.html?slug=...">
+      </div>
+      <textarea id="page_subtitle_en" placeholder="Page subtitle / intro English"></textarea>
+      <textarea id="page_subtitle_ar" placeholder="Page subtitle / intro Arabic"></textarea>
+      <textarea id="page_body_en" placeholder="Main page content English. You can write paragraphs, sections, services, terms, etc."></textarea>
+      <textarea id="page_body_ar" placeholder="Main page content Arabic"></textarea>
+      <div class="admin-grid-3">
+        <input id="page_hero_image" placeholder="Hero image URL">
+        <input id="page_button_label_en" placeholder="Button Label English optional">
+        <input id="page_button_label_ar" placeholder="Button Label Arabic optional">
+        <input id="page_button_url" placeholder="Button URL optional">
+        <select id="page_status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <label class="auto-translate-toggle"><input id="page_show_menu" type="checkbox" checked> Show in menu</label>
+      </div>
+      <h3>SEO for This Page</h3>
+      <div class="admin-grid-3">
+        <input id="page_seo_title_en" placeholder="SEO Title English">
+        <input id="page_seo_title_ar" placeholder="SEO Title Arabic">
+        <input id="page_seo_keywords" placeholder="SEO Keywords comma separated">
+      </div>
+      <textarea id="page_seo_description_en" placeholder="SEO Description English"></textarea>
+      <textarea id="page_seo_description_ar" placeholder="SEO Description Arabic"></textarea>
+      <button class="btn primary" type="button" onclick="saveCustomPage()">Save Page</button>
+      <button class="btn secondary" type="button" onclick="clearCustomPageForm()">Clear Page Form</button>
+      <div id="customPageList" class="admin-list"></div>
     </div>
 
     <div class="admin-panel">
@@ -155,6 +198,8 @@
         <input id="costPrice" placeholder="Cost of Goods / COGS SAR" type="number">
         <input id="vatRate" placeholder="VAT % default 15" type="number" value="15">
         <input id="discountPercent" placeholder="Discount % optional" type="number" min="0" max="90">
+        <div class="admin-note" style="grid-column:1/-1;">Choose where this product is published. Shop remains selected by default.</div>
+        <div id="productPublishPages" class="admin-check-list" style="grid-column:1/-1;"></div>
         <textarea id="description" placeholder="Short English Description"></textarea>
         <textarea id="description_ar" placeholder="Short Arabic Description"></textarea>
 
@@ -352,23 +397,42 @@
   <section id="discountControl" class="cms-section">
     <div class="admin-panel">
       <h2>Discount Page</h2>
+
       <div class="admin-grid-3">
-        <select id="discountScope" onchange="renderDiscountTargets()">
-          <option value="product">Specific Product</option>
-          <option value="category">Specific Category</option>
+        <select id="discountTargetType">
+          <option value="">Choose discount target</option>
           <option value="all">All Products</option>
+          <option value="category">Product Category</option>
+          <option value="product">Specific Product</option>
         </select>
-        <select id="discountTarget"></select>
+        <select id="discountCategoryTarget" style="display:none"></select>
+        <select id="discountProductTarget" style="display:none"></select>
+      </div>
+
+      <div class="admin-grid-3" style="margin-top:10px;">
+        <select id="discountApplyScope" style="display:none">
+          <option value="product">Product Only</option>
+          <option value="size">Size Only</option>
+          <option value="fabric">Fabric Only</option>
+          <option value="combo">Size + Fabric Combination</option>
+        </select>
+        <select id="discountSizeTarget" style="display:none"></select>
+        <select id="discountFabricTarget" style="display:none"></select>
+      </div>
+
+      <div class="admin-grid-3" style="margin-top:10px;">
         <input id="bulkDiscount" type="number" min="0" max="90" placeholder="Discount %">
+        <select id="discountStatus">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
-      <div id="discountVariantControls" class="admin-grid-3" style="display:none;margin-top:10px;">
-        <select id="discountSizeTarget"><option value="">Choose size</option></select>
-        <select id="discountFabricTarget"><option value="">Choose fabric</option></select>
-        <select id="discountColorTarget"><option value="">Choose color</option></select>
-      </div>
-      <button class="btn primary" type="button" onclick="applyDiscount()">Apply Discount</button>
-      <button class="btn primary" type="button" onclick="saveDiscountPage()">Save Discount Page</button>
-      <button class="btn secondary" type="button" onclick="clearDiscounts()">Clear All Discounts</button>
+      <div class="admin-note" style="margin-top:10px;">Choose which page or pages this discount appears on. Discounted Items page is selected by default.</div>
+      <div id="discountPublishPages" class="admin-check-list"></div>
+
+      <button id="applyDiscountBtn" class="btn primary" type="button">Apply Discount</button>
+      <button id="saveDiscountPageBtn" class="btn primary" type="button">Save Discount Page</button>
+      <button id="clearDiscountsBtn" class="btn secondary" type="button">Clear All Discounts</button>
       <hr>
       <h3>Checkout Discount Codes</h3>
       <div class="admin-grid-3">
@@ -376,7 +440,7 @@
         <input id="discountCodePercent" type="number" min="0" max="90" placeholder="Discount %">
         <input id="discountCodeExpiry" type="date">
       </div>
-      <button class="btn primary" type="button" onclick="addDiscountCode()">Create Discount Code</button>
+      <button id="createDiscountCodeBtn" class="btn primary" type="button">Create Discount Code</button>
       <div id="discountCodeList" class="admin-list"></div>
       <div id="discountList" class="admin-list"></div>
     </div>
@@ -473,8 +537,7 @@
   </div>
 </div>
 
-<script src="admin.js?v=superadmin-media-fix-20260609"></script>
-<script src="admin-workflow-fix-v34.js?v=20260609-discount-page-v34"></script>
+<script src="admin-core-consolidated.js?v=prod-auth-recovery-20260613"></script>
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>

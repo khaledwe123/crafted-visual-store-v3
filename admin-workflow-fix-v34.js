@@ -11,7 +11,7 @@
   function q(id){ return document.getElementById(id); }
   function val(id){ return (q(id)?.value || '').trim(); }
   function fullPermissions(){ const o={}; ALL_PERMISSIONS.forEach(k=>o[k]={read:true,write:true}); return o; }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   function session(){ try{return JSON.parse(sessionStorage.getItem('cvAdminSession') || localStorage.getItem('cvAdminSession') || 'null');}catch(e){return null;} }
   function isSuper(){ const u=session(); return !!u && (String(u.role||'').toLowerCase()==='superadmin' || String(u.email||'').toLowerCase()===OWNER_EMAIL); }
   function status(msg, err){ if(typeof window.showAdminStatus==='function') window.showAdminStatus(msg, !!err); else alert(msg); }
@@ -33,10 +33,10 @@
 
   async function api(path, options={}){
     const t = token();
-    if(!t) throw new Error('Missing admin token. Logout and login again.');
-    const headers = Object.assign({}, options.headers || {}, {Authorization:'Bearer '+t});
+    const headers = Object.assign({}, options.headers || {});
+    if(t) headers.Authorization = 'Bearer '+t;
     if(!(options.body instanceof FormData)) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-    const res = await fetch(path, Object.assign({}, options, {headers, body: options.body instanceof FormData ? options.body : (options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body)}));
+    const res = await fetch(path, Object.assign({}, options, {headers, credentials:'same-origin', body: options.body instanceof FormData ? options.body : (options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body)}));
     const ct = res.headers.get('content-type') || '';
     const data = ct.includes('json') ? await res.json().catch(()=>({})) : await res.text().catch(()=>'');
     if(!res.ok) throw new Error((data && data.error) || (typeof data === 'string' && data) || 'HTTP '+res.status);
@@ -67,7 +67,7 @@
       const m = raw.trim().match(/^([A-Za-z_$][\w$]*)\((.*)\);?$/s);
       if(!m || typeof window[m[1]] !== 'function') return;
       // The browser CSP may block inline handlers before they execute; run safe known admin handlers ourselves.
-      const safe = /^(addMenuItem|toggleMenu|removeMenu|resetMenu|addCategory|toggleCategory|removeCategory|addManualSize|addManualFabric|buildSizeFabricPriceTable|addColorSet|clearForm|saveMenu|saveSettings|saveCategories|saveSeoPage|loadAnalyticsCenter|uploadMedia|loadMedia|saveMediaAlt|deleteMedia|openAssignMedia|assignMedia|editProduct|duplicateProduct|deleteProduct|exportProducts|downloadPrototypeProductsJson|openRealShop|openPrototypeShopPreview|closeInlineShopPreview|openPrototypeDetailByIndex|cvFinalClosePreview|cvFinalOpenDetails|cvFinalSelectImage|cvFinalChooseOption|cvFinalAddToCart)$/.test(m[1]);
+      const safe = /^(addMenuItem|toggleMenu|removeMenu|resetMenu|addCategory|toggleCategory|removeCategory|addManualSize|addManualFabric|buildSizeFabricPriceTable|addColorSet|clearForm|saveMenu|saveSettings|saveCategories|saveSeoPage|loadAnalyticsCenter|uploadMedia|loadMedia|saveMediaAlt|deleteMedia|openAssignMedia|assignMedia|editProduct|duplicateProduct|deleteProduct|exportProducts|downloadPrototypeProductsJson|openRealShop|openPrototypeShopPreview|closeInlineShopPreview|openPrototypeDetailByIndex|cvFinalClosePreview|cvFinalOpenDetails|cvFinalSelectImage|cvFinalChooseOption|cvFinalAddToCart|saveCustomPage|clearCustomPageForm|editCustomPage|deleteCustomPage|toggleCustomPage|renderCustomPageList)$/.test(m[1]);
       if(!safe) return;
       e.preventDefault(); e.stopPropagation();
       const args = String(m[2] || '').trim() === '' ? [] : String(m[2]).split(',').map(x => {
@@ -830,7 +830,8 @@
       fabricOptions,
       fabrics: fabricOptions.map(f => f.label),
       colors,
-      gallery: cv27Value('gallery') ? cv27Value('gallery').split('\n').map(x=>x.trim()).filter(Boolean) : []
+      gallery: cv27Value('gallery') ? cv27Value('gallery').split('\n').map(x=>x.trim()).filter(Boolean) : [],
+      publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('productPublishPages') : ['shop.html'])
     };
     const payload = {
       sku: product.id,
@@ -1380,7 +1381,7 @@
     else if(typeof window.status==='function') window.status(msg, !!err);
     else console[err?'error':'log'](msg);
   }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   async function api(path, options={}){
     const headers = Object.assign({}, options.headers || {});
     if(!(options.body instanceof FormData)) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
@@ -1875,7 +1876,7 @@
 
   function q(id){ return document.getElementById(id); }
   function msg(m, err){ if(typeof window.showAdminStatus === 'function') window.showAdminStatus(m, !!err); else console[err?'error':'log'](m); }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   function cleanName(v){ return String(v || '').trim(); }
   function normalizeCategory(c){
     const label = cleanName(c?.label_en || c?.name_en || c?.name || c?.label || c?.category || '');
@@ -1973,7 +1974,7 @@
       }
 
       const t = token();
-      if(!t) throw new Error('Missing admin token. Login again.');
+      
       const settings = await fetchJson('/api/settings');
       await fetchJson('/api/settings', {
         method:'PUT',
@@ -2026,7 +2027,7 @@
   ];
 
   function msg(m, err){ if(typeof window.showAdminStatus === 'function') window.showAdminStatus(m, !!err); else console[err?'error':'log'](m); }
-  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
   function clean(v){ return String(v || '').trim(); }
   function key(v){ return clean(v).toLowerCase(); }
   function canWrite(){ return !window.hasAdminPermission || window.hasAdminPermission('categories','write'); }
@@ -2105,7 +2106,7 @@
   async function getSettings(){ try{ return await fetchJson('/api/settings'); }catch(e){ return {}; } }
   async function putSettings(patch){
     const t = token();
-    if(!t) throw new Error('Missing admin token. Login again.');
+    
     const current = await getSettings();
     return fetchJson('/api/settings', {
       method:'PUT',
@@ -2219,6 +2220,31 @@
     if(typeof window.showAdminStatus === 'function') window.showAdminStatus(message, !!err);
     else alert(message);
   }
+
+  let currentDiscountEdit = null;
+
+  function setDiscountEditMode(entry){
+    currentDiscountEdit = entry || null;
+    const btn = q('applyDiscountBtn');
+    if(btn) btn.textContent = currentDiscountEdit ? 'Update Discount' : 'Apply Discount';
+    let cancel = q('cancelDiscountEditBtn');
+    if(currentDiscountEdit && btn && !cancel){
+      cancel = document.createElement('button');
+      cancel.id = 'cancelDiscountEditBtn';
+      cancel.type = 'button';
+      cancel.className = 'btn secondary';
+      cancel.textContent = 'Cancel Edit';
+      btn.insertAdjacentElement('afterend', cancel);
+    }
+    if(cancel) cancel.style.display = currentDiscountEdit ? '' : 'none';
+  }
+
+  function resetDiscountForm(){
+    ['discountTargetType','discountCategoryTarget','discountProductTarget','discountApplyScope','discountSizeTarget','discountFabricTarget','bulkDiscount'].forEach(id => { if(q(id)) q(id).value = ''; });
+    if(q('discountStatus')) q('discountStatus').value = 'active';
+    setDiscountEditMode(null);
+    if(typeof window.renderDiscountTargets === 'function') window.renderDiscountTargets();
+  }
   function esc(v){
     return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -2297,47 +2323,226 @@
     return [...new Set(cats.map(x=>String(x).trim()).filter(Boolean))];
   }
 
+  function getProductSizesForDiscount(p){
+    const out = [];
+    const add = (v) => {
+      if(v === undefined || v === null) return;
+      if(typeof v === 'object') v = v.label || v.name || v.value || v.size || v.title || '';
+      String(v).split(',').forEach(x => { const t = x.trim(); if(t) out.push(t); });
+    };
+    if(p && Array.isArray(p.sizeOptions)) p.sizeOptions.forEach(add);
+    if(p && Array.isArray(p.sizes)) p.sizes.forEach(add);
+    if(p && Array.isArray(p.fabricOptions)){
+      p.fabricOptions.forEach(f => {
+        if(f && f.sizePrices && typeof f.sizePrices === 'object') Object.keys(f.sizePrices).forEach(add);
+        if(f && f.sizeCosts && typeof f.sizeCosts === 'object') Object.keys(f.sizeCosts).forEach(add);
+        if(f && f.costPrices && typeof f.costPrices === 'object') Object.keys(f.costPrices).forEach(add);
+      });
+    }
+    if(p && p.priceMatrix && typeof p.priceMatrix === 'object') Object.keys(p.priceMatrix).forEach(add);
+    return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
+  }
+
+  function getProductFabricsForDiscount(p){
+    const out = [];
+    const add = (v) => {
+      if(v === undefined || v === null) return;
+      if(typeof v === 'object') v = v.label || v.name || v.value || v.fabric || v.title || '';
+      String(v).split(',').forEach(x => { const t = x.trim(); if(t) out.push(t); });
+    };
+    if(p && Array.isArray(p.fabricOptions)) p.fabricOptions.forEach(add);
+    if(p && Array.isArray(p.fabrics)) p.fabrics.forEach(add);
+    if(p && p.priceMatrix && typeof p.priceMatrix === 'object'){
+      Object.values(p.priceMatrix).forEach(row => {
+        if(row && typeof row === 'object') Object.keys(row).forEach(add);
+      });
+    }
+    return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
+  }
+
+  function ensureDiscountApplyScopeOptions(){
+    const el = q('discountApplyScope');
+    if(!el) return;
+    const current = el.value || 'product';
+    el.innerHTML = [
+      '<option value="product">Product Only</option>',
+      '<option value="size">Size Only</option>',
+      '<option value="fabric">Fabric Only</option>',
+      '<option value="combo">Size + Fabric Combination</option>'
+    ].join('');
+    el.value = ['product','size','fabric','combo'].includes(current) ? current : 'product';
+  }
+  function hideDiscountSelect(id){
+    const el = q(id);
+    if(!el) return;
+    el.style.display = 'none';
+    if(id !== 'discountApplyScope') el.innerHTML = '';
+  }
+  function showDiscountSelect(id){
+    const el = q(id);
+    if(!el) return el;
+    if(id === 'discountApplyScope') ensureDiscountApplyScopeOptions();
+    el.style.display = '';
+    return el;
+  }
+
+  async function renderDiscountVariantTargets(){
+    const type = val('discountTargetType');
+    const productId = val('discountProductTarget');
+    const applyScope = val('discountApplyScope') || 'product';
+    const scopeEl = q('discountApplyScope');
+    const sizeEl = q('discountSizeTarget');
+    const fabricEl = q('discountFabricTarget');
+
+    if(!scopeEl || !sizeEl || !fabricEl) return;
+
+    if(type !== 'product'){
+      hideDiscountSelect('discountApplyScope');
+      hideDiscountSelect('discountSizeTarget');
+      hideDiscountSelect('discountFabricTarget');
+      return;
+    }
+
+    showDiscountSelect('discountApplyScope');
+    const products = await loadProductsForDiscount();
+    const p = products.find(x => String(x.id) === String(productId) || String(x._dbId) === String(productId));
+
+    const sizes = getProductSizesForDiscount(p);
+    const fabrics = getProductFabricsForDiscount(p);
+    const selectedSize = sizeEl.value;
+    const selectedFabric = fabricEl.value;
+
+    if(applyScope === 'size' || applyScope === 'combo'){
+      showDiscountSelect('discountSizeTarget');
+      sizeEl.innerHTML = sizes.length ? '<option value="">Choose Size</option>' + sizes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('') : '<option value="">No sizes found for this product</option>';
+      if(selectedSize) sizeEl.value = selectedSize;
+    }else{
+      hideDiscountSelect('discountSizeTarget');
+    }
+
+    if(applyScope === 'fabric' || applyScope === 'combo'){
+      showDiscountSelect('discountFabricTarget');
+      fabricEl.innerHTML = fabrics.length ? '<option value="">Choose Fabric</option>' + fabrics.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('') : '<option value="">No fabrics found for this product</option>';
+      if(selectedFabric) fabricEl.value = selectedFabric;
+    }else{
+      hideDiscountSelect('discountFabricTarget');
+    }
+  }
+
+  window.renderDiscountVariantTargets = renderDiscountVariantTargets;
+
   window.renderDiscountTargets = async function(){
-    const scope = val('discountScope') || 'product';
-    const target = q('discountTarget');
-    if(!target) return;
+    const type = val('discountTargetType');
+    const categoryEl = q('discountCategoryTarget');
+    const productEl = q('discountProductTarget');
+    const oldScopeEl = q('discountScope');
+    const oldTargetEl = q('discountTarget');
+
+    // Backward compatibility if an older cached admin.html is still open.
+    if(oldScopeEl && oldTargetEl && !q('discountTargetType')){
+      const scope = val('discountScope') || 'product';
+      const products = await loadProductsForDiscount();
+      if(scope === 'all') oldTargetEl.innerHTML = '<option value="all">All Products</option>';
+      else if(scope === 'category'){
+        const cats = await loadCategoriesForDiscount(products);
+        oldTargetEl.innerHTML = cats.length ? cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('') : '<option value="">No categories found</option>';
+      }else{
+        oldTargetEl.innerHTML = products.length ? products.map(p=>`<option value="${esc(p.id)}">${esc(p.name || p.id)}</option>`).join('') : '<option value="">No products found</option>';
+      }
+      return;
+    }
+
+    if(!categoryEl || !productEl) return;
+
+    hideDiscountSelect('discountCategoryTarget');
+    hideDiscountSelect('discountProductTarget');
+    hideDiscountSelect('discountApplyScope');
+    hideDiscountSelect('discountSizeTarget');
+    hideDiscountSelect('discountFabricTarget');
+
+    if(!type) return;
 
     try{
       const products = await loadProductsForDiscount();
-      if(scope === 'all'){
-        target.innerHTML = '<option value="all">All Products</option>';
-      }else if(scope === 'category'){
+
+      if(type === 'category'){
         const cats = await loadCategoriesForDiscount(products);
-        target.innerHTML = cats.length
-          ? cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')
-          : '<option value="">No categories found</option>';
-      }else{
-        target.innerHTML = products.length
-          ? products.map(p=>`<option value="${esc(p.id)}">${esc(p.name || p.id)}</option>`).join('')
-          : '<option value="">No products found</option>';
+        showDiscountSelect('discountCategoryTarget');
+        categoryEl.innerHTML = cats.length ? cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('') : '<option value="">No categories found</option>';
+      }
+
+      if(type === 'product'){
+        showDiscountSelect('discountProductTarget');
+        productEl.innerHTML = products.length ? products.map(p=>`<option value="${esc(p.id)}">${esc(p.name || p.id)}</option>`).join('') : '<option value="">No products found</option>';
+        await renderDiscountVariantTargets();
       }
     }catch(e){
       console.error('Discount target load failed', e);
-      target.innerHTML = '<option value="">Could not load targets</option>';
       show('Could not load discount targets: ' + e.message, true);
     }
   };
 
-  async function updateDiscountedProducts(percent, scope, target){
+  function getDiscountSelection(){
+    const newType = val('discountTargetType');
+    if(newType){
+      return {
+        type: newType,
+        target: newType === 'category' ? val('discountCategoryTarget') : (newType === 'product' ? val('discountProductTarget') : 'all'),
+        applyScope: newType === 'product' ? (val('discountApplyScope') || 'product') : 'product',
+        size: val('discountSizeTarget'),
+        fabric: val('discountFabricTarget'),
+        active: val('discountStatus') !== 'inactive',
+        publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('discountPublishPages') : ['discounted-items.html'])
+      };
+    }
+    return {
+      type: val('discountScope') || 'product',
+      target: val('discountTarget'),
+      applyScope: 'product',
+      size: '',
+      fabric: '',
+      active: true,
+      publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('discountPublishPages') : ['discounted-items.html'])
+    };
+  }
+
+  function discountRuleMatches(rule, selection){
+    return String(rule.scope || '') === String(selection.applyScope || '') &&
+      String(rule.size || '') === String(selection.size || '') &&
+      String(rule.fabric || '') === String(selection.fabric || '');
+  }
+
+  async function updateDiscountedProducts(percent, selection){
     const products = await loadProductsForDiscount();
     const changed = [];
-    const pct = Number(percent || 0);
+    const pct = selection.active ? Number(percent || 0) : 0;
 
     products.forEach(p=>{
-      const match =
-        scope === 'all' ||
-        (scope === 'category' && String(p.category) === String(target)) ||
-        (scope === 'product' && String(p.id) === String(target));
+      const match = selection.type === 'all' ||
+        (selection.type === 'category' && String(p.category) === String(selection.target)) ||
+        (selection.type === 'product' && String(p.id) === String(selection.target));
 
-      if(match){
+      if(!match) return;
+
+      if(selection.type === 'product' && selection.applyScope !== 'product'){
+        const rules = Array.isArray(p.discountRules) ? p.discountRules.filter(r => !discountRuleMatches(r, selection)) : [];
+        if(selection.active && pct > 0){
+          rules.push({
+            scope: selection.applyScope,
+            size: selection.applyScope === 'size' || selection.applyScope === 'combo' ? selection.size : '',
+            fabric: selection.applyScope === 'fabric' || selection.applyScope === 'combo' ? selection.fabric : '',
+            percent: pct,
+            active: true,
+            updatedAt: new Date().toISOString(),
+            publishPages: selection.publishPages || ['discounted-items.html']
+          });
+        }
+        p.discountRules = rules;
+      }else{
         p.discountPercent = pct;
-        changed.push(p);
+        p.discountPages = selection.publishPages || ['discounted-items.html'];
       }
+      changed.push(p);
     });
 
     for(const p of changed){
@@ -2366,16 +2571,20 @@
       return show('You do not have write access for discounts.', true);
     }
 
-    const scope = val('discountScope') || 'product';
-    const target = val('discountTarget');
+    const selection = getDiscountSelection();
     const percent = num('bulkDiscount', 0);
 
+    if(!selection.type) return show('Please choose a discount target.', true);
+    if(selection.type !== 'all' && !selection.target) return show('Please choose a discount target.', true);
     if(percent < 0 || percent > 90) return show('Discount must be between 0 and 90.', true);
-    if(scope !== 'all' && !target) return show('Please choose a discount target.', true);
+    if(selection.type === 'product' && (selection.applyScope === 'size' || selection.applyScope === 'combo') && !selection.size) return show('Please choose a size for this product.', true);
+    if(selection.type === 'product' && (selection.applyScope === 'fabric' || selection.applyScope === 'combo') && !selection.fabric) return show('Please choose a fabric for this product.', true);
 
     try{
-      const count = await updateDiscountedProducts(percent, scope, target);
-      show(`Discount applied and published to ${count} product(s).`);
+      const count = await updateDiscountedProducts(percent, selection);
+      const wasEditing = !!currentDiscountEdit;
+      setDiscountEditMode(null);
+      show(wasEditing ? `Discount updated and published to ${count} product(s).` : `Discount applied and published to ${count} product(s).`);
     }catch(e){
       console.error('Apply discount failed', e);
       show('Could not apply discount: ' + e.message, true);
@@ -2387,8 +2596,17 @@
       return show('You do not have write access for discounts.', true);
     }
     try{
-      const count = await updateDiscountedProducts(0, 'all', 'all');
-      show(`All product discounts cleared and published (${count} product(s)).`);
+      const products = await loadProductsForDiscount();
+      for(const p of products){
+        p.discountPercent = 0;
+        p.discountRules = [];
+        if(p._dbId){
+          await api('/products/' + encodeURIComponent(p._dbId), {method:'PUT', body: productPayload(p)});
+        }
+      }
+      try{ window.products = products; }catch(e){}
+      await window.renderDiscountList();
+      show(`All product discounts cleared and published (${products.length} product(s)).`);
     }catch(e){
       console.error('Clear discounts failed', e);
       show('Could not clear discounts: ' + e.message, true);
@@ -2400,6 +2618,7 @@
       return show('You do not have write access for discounts.', true);
     }
     try{
+      await window.renderDiscountTargets();
       await window.renderDiscountList();
       await window.renderDiscountCodeList();
       show('Discount page is synced with the live backend.');
@@ -2461,23 +2680,132 @@
     }
   };
 
+  function discountEntriesFromProducts(products){
+    const entries = [];
+    products.forEach(p => {
+      const productId = p.id || p._dbId || '';
+      if(Number(p.discountPercent || 0) > 0){
+        entries.push({
+          key: `product:${productId}`,
+          product:p,
+          kind:'product',
+          ruleIndex:-1,
+          scope:'product',
+          percent:Number(p.discountPercent || 0),
+          active:true,
+          label:`Product discount: ${Number(p.discountPercent || 0)}%`
+        });
+      }
+      (Array.isArray(p.discountRules) ? p.discountRules : []).forEach((r, idx) => {
+        if(!r || Number(r.percent || 0) <= 0) return;
+        const details = [];
+        if(r.size) details.push('Size: ' + r.size);
+        if(r.fabric) details.push('Fabric: ' + r.fabric);
+        const scope = String(r.scope || 'product');
+        entries.push({
+          key: `rule:${productId}:${idx}`,
+          product:p,
+          kind:'rule',
+          ruleIndex:idx,
+          scope,
+          size:r.size || '',
+          fabric:r.fabric || '',
+          percent:Number(r.percent || 0),
+          active:r.active !== false,
+          label:`${scope.toUpperCase()} discount: ${Number(r.percent || 0)}%${details.length ? ' | ' + details.join(' | ') : ''}${r.active === false ? ' | Inactive' : ''}`
+        });
+      });
+    });
+    return entries;
+  }
+
   window.renderDiscountList = async function(){
     const box = q('discountList');
     if(!box) return;
     try{
       const products = await loadProductsForDiscount();
-      const active = products.filter(p => Number(p.discountPercent || 0) > 0);
+      const active = discountEntriesFromProducts(products);
       box.innerHTML = active.length
-        ? active.map(p=>`
+        ? active.map(item=>`
           <div class="admin-item">
-            <div><strong>${esc(p.name || p.id)}</strong><br>${Number(p.discountPercent || 0)}% discount</div>
-            <button type="button" data-discount-edit-product="${esc(p.id)}">Edit</button>
+            <div><strong>${esc(item.product.name || item.product.id)}</strong><br>${esc(item.label)}</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button type="button" data-discount-edit="${esc(item.key)}">Edit</button>
+              <button type="button" data-discount-delete="${esc(item.key)}">Delete</button>
+            </div>
           </div>
         `).join('')
         : '<p>No active product discounts.</p>';
     }catch(e){
       console.error('Render discounts failed', e);
       box.innerHTML = '<p>Could not load product discounts.</p>';
+    }
+  };
+
+  async function findDiscountEntry(key){
+    const products = await loadProductsForDiscount();
+    return discountEntriesFromProducts(products).find(x => String(x.key) === String(key));
+  }
+
+  window.editDiscountOnPage = async function(key){
+    try{
+      const entry = await findDiscountEntry(key);
+      if(!entry) return show('This discount could not be found. Refresh and try again.', true);
+      if(q('discountTargetType')) q('discountTargetType').value = 'product';
+      await window.renderDiscountTargets();
+      if(q('discountProductTarget')) q('discountProductTarget').value = entry.product.id || entry.product._dbId || '';
+      await window.renderDiscountVariantTargets();
+      if(q('discountApplyScope')) q('discountApplyScope').value = entry.scope || 'product';
+      await window.renderDiscountVariantTargets();
+      if(q('discountSizeTarget')) q('discountSizeTarget').value = entry.size || '';
+      if(q('discountFabricTarget')) q('discountFabricTarget').value = entry.fabric || '';
+      if(q('bulkDiscount')) q('bulkDiscount').value = entry.percent || '';
+      if(q('discountStatus')) q('discountStatus').value = entry.active === false ? 'inactive' : 'active';
+      setDiscountEditMode({key});
+      const panel = q('discountControl');
+      if(panel && panel.scrollIntoView) panel.scrollIntoView({behavior:'smooth', block:'start'});
+      show('Discount loaded for editing on this page.');
+    }catch(e){
+      console.error('Edit discount failed', e);
+      show('Could not load discount for editing: ' + e.message, true);
+    }
+  };
+
+  window.deleteDiscountOnPage = async function(key){
+    if(typeof window.hasAdminPermission === 'function' && !window.hasAdminPermission('discounts','write')){
+      return show('You do not have write access for discounts.', true);
+    }
+    if(!confirm('Delete this discount?')) return;
+    try{
+      const products = await loadProductsForDiscount();
+      let changedProduct = null;
+      for(const p of products){
+        const productId = p.id || p._dbId || '';
+        if(String(key) === `product:${productId}`){
+          p.discountPercent = 0;
+          changedProduct = p;
+          break;
+        }
+        const m = String(key).match(/^rule:(.*):(\d+)$/);
+        if(m && String(m[1]) === String(productId)){
+          const idx = Number(m[2]);
+          if(Array.isArray(p.discountRules) && p.discountRules[idx]){
+            p.discountRules.splice(idx, 1);
+            changedProduct = p;
+            break;
+          }
+        }
+      }
+      if(!changedProduct) return show('This discount could not be found. Refresh and try again.', true);
+      if(changedProduct._dbId){
+        await api('/products/' + encodeURIComponent(changedProduct._dbId), {method:'PUT', body: productPayload(changedProduct)});
+      }
+      if(currentDiscountEdit && currentDiscountEdit.key === key) resetDiscountForm();
+      await window.renderDiscountList();
+      show('Discount deleted.');
+    }catch(e){
+      console.error('Delete discount failed', e);
+      show('Could not delete discount: ' + e.message, true);
     }
   };
 
@@ -2494,18 +2822,55 @@
       }
     }
 
-    const editProductBtn = e.target.closest('[data-discount-edit-product]');
-    if(editProductBtn){
+    const editDiscountBtn = e.target.closest('[data-discount-edit]');
+    if(editDiscountBtn){
       e.preventDefault();
       e.stopPropagation();
-      const id = editProductBtn.getAttribute('data-discount-edit-product');
-      if(typeof window.editProduct === 'function') window.editProduct(id);
+      window.editDiscountOnPage(editDiscountBtn.getAttribute('data-discount-edit'));
+      return;
+    }
+
+    const deleteDiscountBtn = e.target.closest('[data-discount-delete]');
+    if(deleteDiscountBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      window.deleteDiscountOnPage(deleteDiscountBtn.getAttribute('data-discount-delete'));
+      return;
+    }
+
+    const cancelDiscountBtn = e.target.closest('#cancelDiscountEditBtn');
+    if(cancelDiscountBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      resetDiscountForm();
+      return;
     }
   }, true);
 
   document.addEventListener('change', function(e){
-    if(e.target && e.target.id === 'discountScope'){
+    if(!e.target) return;
+    if(e.target.id === 'discountScope' || e.target.id === 'discountTargetType'){
       window.renderDiscountTargets();
+    }
+    if(e.target.id === 'discountProductTarget' || e.target.id === 'discountApplyScope'){
+      window.renderDiscountVariantTargets();
+    }
+  }, true);
+
+  document.addEventListener('click', function(e){
+    const btn = e.target && e.target.closest('button');
+    if(!btn) return;
+    const map = {
+      applyDiscountBtn:'applyDiscount',
+      saveDiscountPageBtn:'saveDiscountPage',
+      clearDiscountsBtn:'clearDiscounts',
+      createDiscountCodeBtn:'addDiscountCode'
+    };
+    const fn = map[btn.id];
+    if(fn && typeof window[fn] === 'function'){
+      e.preventDefault();
+      e.stopPropagation();
+      window[fn]();
     }
   }, true);
 
@@ -2520,295 +2885,887 @@
 
 })();
 
-/* CRAFTED VISUAL - DISCOUNT SPECIFIC PRODUCT SIZE + FABRIC + COLOR PATCH
-   Scope: Discount Page only. Adds exact variant targeting for Specific Product discounts.
+
+/* CRAFTED-VISUAL-PRODUCT-EDIT-STANDARD-SIZE-FABRIC-FIX-20260609-37
+   Front/admin product form only: keep photos/sizes/fabrics when editing,
+   and add standard dropdown choices while still allowing custom additions.
 */
 (function(){
   'use strict';
-  if(window.__cvDiscountSizeFabricColorPatch) return;
-  window.__cvDiscountSizeFabricColorPatch = true;
+  if(window.__cv37ProductEditStandardPatch) return;
+  window.__cv37ProductEditStandardPatch = true;
+
+  const STD_SIZES = [
+    {label:'Single 90×190', width:'90', depth:'190', height:''},
+    {label:'Single 100×200', width:'100', depth:'200', height:''},
+    {label:'Queen 160×200', width:'160', depth:'200', height:''},
+    {label:'King 180×200', width:'180', depth:'200', height:''},
+    {label:'Super King 200×200', width:'200', depth:'200', height:''},
+    {label:'2 Seater Sofa', width:'160', depth:'90', height:'85'},
+    {label:'3 Seater Sofa', width:'220', depth:'95', height:'85'},
+    {label:'L Shape Sofa Medium', width:'280', depth:'180', height:'85'},
+    {label:'L Shape Sofa Large', width:'320', depth:'220', height:'85'}
+  ];
+  const STD_FABRICS = [
+    {label:'Velvet', description:'Soft premium velvet fabric.'},
+    {label:'Linen', description:'Natural linen-look upholstery fabric.'},
+    {label:'Bouclé', description:'Textured luxury bouclé fabric.'},
+    {label:'Leather', description:'Premium leather upholstery.'},
+    {label:'Suede', description:'Soft suede-touch upholstery.'},
+    {label:'Chenille', description:'Durable woven chenille fabric.'},
+    {label:'Microfiber', description:'Easy-care microfiber fabric.'}
+  ];
 
   function q(id){ return document.getElementById(id); }
-  function val(id){ return (q(id)?.value || '').trim(); }
   function esc(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function show(message, err=false){
-    if(typeof window.showAdminStatus === 'function') window.showAdminStatus(message, !!err);
-    else alert(message);
-  }
-  function adminToken(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || ''; }
-  function safeJson(v){
-    if(!v) return {};
-    if(typeof v === 'object') return v;
-    try{ return JSON.parse(v); }catch(e){ return {}; }
-  }
-  async function api(path, options={}){
-    const token = adminToken();
-    if(!token) throw new Error('Missing admin token. Please logout and login again.');
-    const headers = Object.assign({}, options.headers || {}, {Authorization:'Bearer ' + token});
-    if(!(options.body instanceof FormData)) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-    const res = await fetch('/api' + path, Object.assign({}, options, {
-      headers,
-      body: options.body instanceof FormData ? options.body : (
-        options.body !== undefined && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body
-      )
-    }));
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-    return data;
-  }
-  async function publicApi(path){
-    const res = await fetch('/api' + path, {cache:'no-store'});
-    const data = await res.json().catch(()=>[]);
-    if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-    return data;
-  }
-  function normalizeProduct(row){
-    row = row || {};
-    const data = Object.assign({}, safeJson(row.data_json), safeJson(row.data));
-    const p = Object.assign({}, data);
-    p._dbId = row.id || p._dbId;
-    p.id = p.id || row.sku || String(row.id || '');
-    p.name = p.name || row.name_en || row.name || '';
-    p.name_ar = p.name_ar || row.name_ar || '';
-    p.category = p.category || row.category_name || row.category || '';
-    p.category_ar = p.category_ar || row.category_ar || '';
-    p.description = p.description || row.description_en || '';
-    p.description_ar = p.description_ar || row.description_ar || '';
-    p.price = Number(p.price || row.base_price || 0);
-    p.vatRate = Number(p.vatRate || row.vat_rate || 15);
-    p.discountPercent = Number(p.discountPercent || 0);
-    p.discountRules = Array.isArray(p.discountRules) ? p.discountRules : [];
-    return p;
-  }
-  function productPayload(p){
-    return {
-      sku: p.id,
-      name_en: p.name,
-      name_ar: p.name_ar || '',
-      category_name: p.category || '',
-      category_ar: p.category_ar || '',
-      description_en: p.description || '',
-      description_ar: p.description_ar || '',
-      base_price: Number(p.price || 0),
-      vat_rate: Number(p.vatRate || 15),
-      active: true,
-      data: p
-    };
-  }
-  async function loadProducts(){
-    const rows = await publicApi('/products');
-    const list = Array.isArray(rows) ? rows.map(normalizeProduct) : [];
-    try{ window.products = list; }catch(e){}
-    return list;
-  }
-  async function loadCategories(products){
-    let cats = [];
-    try{
-      const rows = await publicApi('/categories');
-      cats = (Array.isArray(rows) ? rows : []).map(c => c.name_en || c.label_en || c.name || '').filter(Boolean);
-    }catch(e){}
-    (products || []).forEach(p => { if(p.category) cats.push(p.category); });
-    return [...new Set(cats.map(x=>String(x).trim()).filter(Boolean))];
-  }
-  function sizeLabels(p){
-    const out = [];
-    (p.sizeOptions || []).forEach(s => out.push(s.label || s.name || s));
-    (p.sizes || []).forEach(s => out.push(typeof s === 'object' ? (s.label || s.name) : s));
-    (p.fabricOptions || []).forEach(f => Object.keys(f.sizePrices || {}).forEach(k => out.push(k)));
-    if(p.sizeFabricPrices && typeof p.sizeFabricPrices === 'object') Object.keys(p.sizeFabricPrices).forEach(k => out.push(k));
-    return [...new Set(out.map(x=>String(x||'').trim()).filter(Boolean))];
-  }
-  function fabricLabels(p){
-    const out = [];
-    (p.fabricOptions || []).forEach(f => out.push(f.label || f.name || f));
-    (p.fabrics || []).forEach(f => out.push(typeof f === 'object' ? (f.label || f.name) : f));
-    if(p.sizeFabricPrices && typeof p.sizeFabricPrices === 'object'){
-      Object.values(p.sizeFabricPrices).forEach(row => {
-        if(row && typeof row === 'object') Object.keys(row).forEach(k => out.push(k));
-      });
-    }
-    return [...new Set(out.map(x=>String(x||'').trim()).filter(Boolean))];
-  }
-  function colorLabels(p){
-    const out = [];
-    Object.keys(p.colors || {}).forEach(k => out.push(k));
-    (p.colorOptions || []).forEach(c => out.push(c.label || c.name || c));
-    (p.colorsList || []).forEach(c => out.push(c.label || c.name || c));
-    return [...new Set(out.map(x=>String(x||'').trim()).filter(Boolean))];
-  }
-  function renderOptions(select, values, placeholder){
-    if(!select) return;
-    select.innerHTML = `<option value="">${esc(placeholder)}</option>` + (values || []).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
-  }
-  async function renderVariantControls(productsList){
-    const wrap = q('discountVariantControls');
-    const scope = val('discountScope') || 'product';
-    const productId = val('discountTarget');
-    if(!wrap) return;
-    if(scope !== 'product' || !productId){
-      wrap.style.display = 'none';
-      renderOptions(q('discountSizeTarget'), [], 'Choose size');
-      renderOptions(q('discountFabricTarget'), [], 'Choose fabric');
-      renderOptions(q('discountColorTarget'), [], 'Choose color');
-      return;
-    }
-    const products = productsList || await loadProducts();
-    const product = products.find(p => String(p.id) === String(productId) || String(p._dbId) === String(productId));
-    if(!product){
-      wrap.style.display = 'none';
-      return;
-    }
-    wrap.style.display = 'grid';
-    renderOptions(q('discountSizeTarget'), sizeLabels(product), 'Choose size');
-    renderOptions(q('discountFabricTarget'), fabricLabels(product), 'Choose fabric');
-    renderOptions(q('discountColorTarget'), colorLabels(product), 'Choose color');
-  }
-  window.renderDiscountVariantControls = renderVariantControls;
+  function msg(m,err){ if(typeof window.showAdminStatus==='function') window.showAdminStatus(m,!!err); else console[err?'error':'log'](m); }
+  function getGlobal(name, fallback){ try{ return (0,eval)(name); }catch(e){ return fallback; } }
+  function setGlobal(name, value){ try{ (0,eval)(name + ' = arguments[1]')(name, value); }catch(e){ try{ window[name]=value; }catch(_){} } }
+  function arr(name){ const v=getGlobal(name, window[name]); return Array.isArray(v)?v:[]; }
+  function obj(name){ const v=getGlobal(name, window[name]); return v && typeof v==='object' ? v : {}; }
+  function deep(v){ try{return JSON.parse(JSON.stringify(v||{}));}catch(e){return v||{};} }
 
-  window.renderDiscountTargets = async function(){
-    const scope = val('discountScope') || 'product';
-    const target = q('discountTarget');
-    if(!target) return;
-    try{
-      const products = await loadProducts();
-      if(scope === 'all'){
-        target.innerHTML = '<option value="all">All Products</option>';
-      }else if(scope === 'category'){
-        const cats = await loadCategories(products);
-        target.innerHTML = cats.length ? cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('') : '<option value="">No categories found</option>';
-      }else{
-        target.innerHTML = products.length ? products.map(p=>`<option value="${esc(p.id)}">${esc(p.name || p.id)}</option>`).join('') : '<option value="">No products found</option>';
-      }
-      await renderVariantControls(products);
-    }catch(e){
-      console.error('Discount target load failed', e);
-      target.innerHTML = '<option value="">Could not load targets</option>';
-      show('Could not load discount targets: ' + e.message, true);
+  function installStandardDropdowns(){
+    if(q('standardSizeSelect') || !q('sizeNameInput')) return;
+    const sizeWrap=document.createElement('div');
+    sizeWrap.className='admin-grid-3 cv-standard-choice-row';
+    sizeWrap.innerHTML=`<select id="standardSizeSelect"><option value="">Choose standard size</option>${STD_SIZES.map((s,i)=>`<option value="${i}">${esc(s.label)}${s.width||s.depth?` — ${esc([s.width,s.depth,s.height].filter(Boolean).join(' × '))} cm`:''}</option>`).join('')}<option value="custom">Custom size / type manually below</option></select><button class="btn secondary" type="button" id="addStandardSizeBtn">Add Selected Size</button>`;
+    q('sizeNameInput').closest('.admin-grid-3')?.before(sizeWrap);
+
+    const fabricInput=q('fabricNameInput');
+    if(fabricInput && !q('standardFabricSelect')){
+      const fabricWrap=document.createElement('div');
+      fabricWrap.className='admin-grid-3 cv-standard-choice-row';
+      fabricWrap.innerHTML=`<select id="standardFabricSelect"><option value="">Choose standard fabric</option>${STD_FABRICS.map((f,i)=>`<option value="${i}">${esc(f.label)}</option>`).join('')}<option value="custom">Custom fabric / type manually below</option></select><button class="btn secondary" type="button" id="addStandardFabricBtn">Add Selected Fabric</button>`;
+      fabricInput.closest('.admin-grid-3')?.before(fabricWrap);
     }
+  }
+
+  function addStandardSize(){
+    const sel=q('standardSizeSelect'); if(!sel || sel.value==='' || sel.value==='custom') return msg('Choose a standard size or type a custom size below.', true);
+    const s=STD_SIZES[Number(sel.value)]; if(!s) return;
+    const sizes=arr('manualSizes');
+    if(!sizes.some(x=>String(x.label).toLowerCase()===String(s.label).toLowerCase())) sizes.push({...s});
+    setGlobal('manualSizes', sizes);
+    if(typeof window.renderManualSizeTable==='function') window.renderManualSizeTable();
+    if(typeof window.buildSizeFabricPriceTable==='function') window.buildSizeFabricPriceTable();
+    if(typeof window.refreshFabricDropdowns==='function') window.refreshFabricDropdowns();
+    msg('Standard size added: '+s.label);
+  }
+  function addStandardFabric(){
+    const sel=q('standardFabricSelect'); if(!sel || sel.value==='' || sel.value==='custom') return msg('Choose a standard fabric or type a custom fabric below.', true);
+    const f=STD_FABRICS[Number(sel.value)]; if(!f) return;
+    const fabrics=arr('manualFabrics');
+    if(!fabrics.some(x=>String(x.label).toLowerCase()===String(f.label).toLowerCase())) fabrics.push({...f});
+    setGlobal('manualFabrics', fabrics);
+    if(typeof window.renderManualFabricTable==='function') window.renderManualFabricTable();
+    if(typeof window.buildSizeFabricPriceTable==='function') window.buildSizeFabricPriceTable();
+    if(typeof window.refreshFabricDropdowns==='function') window.refreshFabricDropdowns();
+    msg('Standard fabric added: '+f.label);
+  }
+
+  function productById(pid){
+    const list=arr('products');
+    return list.find(p=>String(p.id)===String(pid) || String(p._dbId)===String(pid)) || null;
+  }
+  function rebuildMapsFromProduct(p){
+    const priceMap=deep(p.sizeFabricPrices || {});
+    const costMap=deep(p.sizeFabricCosts || {});
+    (p.fabricOptions||[]).forEach(f=>{
+      const fl=f.label || String(f);
+      Object.entries(f.sizePrices||{}).forEach(([s,v])=>{ priceMap[s]=priceMap[s]||{}; priceMap[s][fl]=Number(v||0); });
+      Object.entries(f.sizeCosts||f.costPrices||{}).forEach(([s,v])=>{ costMap[s]=costMap[s]||{}; costMap[s][fl]=Number(v||0); });
+    });
+    return {priceMap,costMap};
+  }
+  function repopulateProductForm(p){
+    if(!p) return;
+    ['id','name','name_ar','category','price','costPrice','vatRate','discountPercent','description','description_ar'].forEach(k=>{ if(q(k)) q(k).value = p[k] ?? ''; });
+    if(q('sizes')) q('sizes').value=(p.sizes||[]).join('\n');
+    if(q('fabrics')) q('fabrics').value=(p.fabrics||[]).join('\n');
+    if(q('gallery')) q('gallery').value=(p.gallery||[]).join('\n');
+    const sizes=(p.sizeOptions&&p.sizeOptions.length?p.sizeOptions:(p.sizes||[]).map(x=>({label:String(x)}))).map(s=>({label:s.label||String(s),width:s.width||'',depth:s.depth||'',height:s.height||'',price:Number(s.price||0)}));
+    const fabrics=(p.fabricOptions&&p.fabricOptions.length?p.fabricOptions:(p.fabrics||[]).map(x=>({label:String(x),description:''}))).map(f=>({label:f.label||String(f),description:f.description||''}));
+    setGlobal('manualSizes', sizes);
+    setGlobal('manualFabrics', fabrics);
+    const maps=rebuildMapsFromProduct(p);
+    setGlobal('sizeFabricPrices', maps.priceMap);
+    setGlobal('sizeFabricCosts', maps.costMap);
+    setGlobal('colorSets', deep(p.colors || {}));
+    try{ if(typeof window.syncCategoryArabic==='function') window.syncCategoryArabic(); }catch(e){}
+    try{ if(typeof window.renderManualSizeTable==='function') window.renderManualSizeTable(); }catch(e){}
+    try{ if(typeof window.renderManualFabricTable==='function') window.renderManualFabricTable(); }catch(e){}
+    try{ if(typeof window.buildSizeFabricPriceTable==='function') window.buildSizeFabricPriceTable(); }catch(e){}
+    try{ if(typeof window.refreshFabricDropdowns==='function') window.refreshFabricDropdowns(); }catch(e){}
+    try{ if(typeof window.renderColorSets==='function') window.renderColorSets(); }catch(e){}
+  }
+
+  const previousEdit = window.editProduct;
+  window.editProduct = function(pid){
+    const p=productById(pid);
+    let result;
+    if(typeof previousEdit==='function'){
+      try{ result=previousEdit.apply(window, arguments); }catch(e){ console.warn('Original editProduct failed; using safe edit.', e); }
+    }
+    setTimeout(()=>{ repopulateProductForm(p || productById(pid)); }, 80);
+    return result;
   };
 
-  function upsertVariantRule(product, percent, size, fabric, color){
-    product.discountRules = Array.isArray(product.discountRules) ? product.discountRules : [];
-    const key = [size, fabric, color].map(x => String(x || '').trim().toLowerCase()).join('||');
-    const existing = product.discountRules.find(r =>
-      r && r.scope === 'size_fabric_color' &&
-      [r.size, r.fabric, r.color].map(x => String(x || '').trim().toLowerCase()).join('||') === key
-    );
-    const rule = {
-      id: existing?.id || ('DISC-' + Date.now()),
-      scope: 'size_fabric_color',
-      size,
-      fabric,
-      color,
-      percent: Number(percent || 0),
-      active: Number(percent || 0) > 0,
-      updatedAt: new Date().toISOString()
-    };
-    if(existing) Object.assign(existing, rule);
-    else product.discountRules.push(rule);
-    product.discountRules = product.discountRules.filter(r => Number(r.percent || 0) > 0 && r.active !== false);
-  }
-
-  async function updateDiscountedProducts(percent, scope, target){
-    const products = await loadProducts();
-    const changed = [];
-    const pct = Number(percent || 0);
-
-    if(scope === 'product'){
-      const p = products.find(x => String(x.id) === String(target) || String(x._dbId) === String(target));
-      if(!p) return 0;
-      const size = val('discountSizeTarget');
-      const fabric = val('discountFabricTarget');
-      const color = val('discountColorTarget');
-      if(!size || !fabric || !color){
-        throw new Error('Please choose Size, Fabric, and Color for the specific product discount.');
-      }
-      upsertVariantRule(p, pct, size, fabric, color);
-      changed.push(p);
-    }else{
-      products.forEach(p=>{
-        const match = scope === 'all' || (scope === 'category' && String(p.category) === String(target));
-        if(match){
-          p.discountPercent = pct;
-          changed.push(p);
-        }
-      });
-    }
-
-    for(const p of changed){
-      if(!p._dbId) continue;
-      await api('/products/' + encodeURIComponent(p._dbId), {method:'PUT', body: productPayload(p)});
-    }
-    try{
-      localStorage.setItem('cvPrototypeProducts', JSON.stringify(products));
-      localStorage.setItem('adminProducts', JSON.stringify(products));
-      sessionStorage.setItem('cvPrototypeProducts', JSON.stringify(products));
-      sessionStorage.setItem('adminProducts', JSON.stringify(products));
-    }catch(e){}
-    if(typeof window.renderProductsAdmin === 'function') window.renderProductsAdmin();
-    await window.renderDiscountList();
-    return changed.length;
-  }
-
-  window.applyDiscount = async function(){
-    if(typeof window.hasAdminPermission === 'function' && !window.hasAdminPermission('discounts','write')){
-      return show('You do not have write access for discounts.', true);
-    }
-    const scope = val('discountScope') || 'product';
-    const target = val('discountTarget');
-    const percent = Number(val('bulkDiscount') || 0);
-    if(percent < 0 || percent > 90) return show('Discount must be between 0 and 90.', true);
-    if(scope !== 'all' && !target) return show('Please choose a discount target.', true);
-    try{
-      const count = await updateDiscountedProducts(percent, scope, target);
-      show(scope === 'product'
-        ? `Size + Fabric + Color discount applied and published to ${count} product.`
-        : `Discount applied and published to ${count} product(s).`);
-    }catch(e){
-      console.error('Apply discount failed', e);
-      show('Could not apply discount: ' + e.message, true);
-    }
-  };
-
-  window.renderDiscountList = async function(){
-    const box = q('discountList');
-    if(!box) return;
-    try{
-      const products = await loadProducts();
-      const rows = [];
-      products.forEach(p => {
-        if(Number(p.discountPercent || 0) > 0){
-          rows.push(`<div class="admin-item"><div><strong>${esc(p.name || p.id)}</strong><br>${Number(p.discountPercent || 0)}% product discount</div><button type="button" data-discount-edit-product="${esc(p.id)}">Edit</button></div>`);
-        }
-        (p.discountRules || []).filter(r => r && r.active !== false && Number(r.percent || 0) > 0).forEach(r => {
-          rows.push(`<div class="admin-item"><div><strong>${esc(p.name || p.id)}</strong><br>${Number(r.percent || 0)}% on Size: ${esc(r.size)} | Fabric: ${esc(r.fabric)} | Color: ${esc(r.color)}</div><button type="button" data-discount-edit-variant="${esc(p.id)}" data-size="${esc(r.size)}" data-fabric="${esc(r.fabric)}" data-color="${esc(r.color)}" data-percent="${esc(r.percent)}">Edit</button></div>`);
-        });
-      });
-      box.innerHTML = rows.length ? rows.join('') : '<p>No active product discounts.</p>';
-    }catch(e){
-      console.error('Render discounts failed', e);
-      box.innerHTML = '<p>Could not load product discounts.</p>';
-    }
-  };
-
+  document.addEventListener('click', function(e){
+    if(e.target && e.target.id==='addStandardSizeBtn'){ e.preventDefault(); e.stopPropagation(); addStandardSize(); }
+    if(e.target && e.target.id==='addStandardFabricBtn'){ e.preventDefault(); e.stopPropagation(); addStandardFabric(); }
+  }, true);
   document.addEventListener('change', function(e){
-    if(e.target && (e.target.id === 'discountScope' || e.target.id === 'discountTarget')){
-      setTimeout(function(){ window.renderDiscountTargets(); }, 0);
+    if(e.target && e.target.id==='standardSizeSelect'){
+      const s=STD_SIZES[Number(e.target.value)]; if(s){ if(q('sizeNameInput')) q('sizeNameInput').value=s.label; if(q('sizeWidthInput')) q('sizeWidthInput').value=s.width; if(q('sizeDepthInput')) q('sizeDepthInput').value=s.depth; if(q('sizeHeightInput')) q('sizeHeightInput').value=s.height; }
+    }
+    if(e.target && e.target.id==='standardFabricSelect'){
+      const f=STD_FABRICS[Number(e.target.value)]; if(f){ if(q('fabricNameInput')) q('fabricNameInput').value=f.label; if(q('fabricDescInput')) q('fabricDescInput').value=f.description; }
     }
   }, true);
 
-  document.addEventListener('click', async function(e){
-    const btn = e.target.closest('[data-discount-edit-variant]');
-    if(!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if(q('discountScope')) q('discountScope').value = 'product';
-    await window.renderDiscountTargets();
-    if(q('discountTarget')) q('discountTarget').value = btn.getAttribute('data-discount-edit-variant') || '';
-    await renderVariantControls();
-    if(q('discountSizeTarget')) q('discountSizeTarget').value = btn.getAttribute('data-size') || '';
-    if(q('discountFabricTarget')) q('discountFabricTarget').value = btn.getAttribute('data-fabric') || '';
-    if(q('discountColorTarget')) q('discountColorTarget').value = btn.getAttribute('data-color') || '';
-    if(q('bulkDiscount')) q('bulkDiscount').value = btn.getAttribute('data-percent') || '';
+  function boot(){ installStandardDropdowns(); }
+  document.addEventListener('DOMContentLoaded', boot);
+  setTimeout(boot, 500);
+})();
+
+
+/* === CV PAGE BUILDER + PAGE CONNECTION CONTROL ONLY ===
+   Adds admin control for custom pages, menu/page connections, and publish page choices.
+   Does not change shop rendering.
+*/
+(function(){
+  'use strict';
+  if(window.__cvPageBuilderControlOnly) return;
+  window.__cvPageBuilderControlOnly = true;
+
+  function q(id){ return document.getElementById(id); }
+  function v(id){ return (q(id)?.value || '').trim(); }
+  function checked(id){ return !!q(id)?.checked; }
+  function esc(x){ return String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function msg(text, err){ if(typeof window.showAdminStatus === 'function') window.showAdminStatus(text, !!err); else alert(text); }
+  function slugify(x){ return String(x || '').toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06FF]+/g,'-').replace(/^-|-$/g,''); }
+  function token(){ return localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || ''; }
+
+  async function apiSettings(next){
+    if(typeof publishSettings === 'function') return publishSettings(next);
+    const t = token();
+    const res = await fetch('/api/settings', {method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+t}, body:JSON.stringify(next)});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+    return data;
+  }
+
+  function getSettings(){
+    try{ if(typeof settings !== 'undefined') return settings || {}; }catch(e){}
+    window.settings = window.settings || {};
+    return window.settings;
+  }
+
+  function getPages(){
+    const st = getSettings();
+    if(!Array.isArray(st.custom_pages)) st.custom_pages = [];
+    return st.custom_pages;
+  }
+
+  function builtinPages(){
+    return [
+      {id:'home', label:'Home', url:'index.html'},
+      {id:'shop', label:'Shop', url:'shop.html'},
+      {id:'discounted', label:'Discounted Items', url:'discounted-items.html'},
+      {id:'custom', label:'Custom Order', url:'index.html#custom'},
+      {id:'track', label:'Track Order', url:'track-order.html'},
+      {id:'contact', label:'Contact Us', url:'contact.html'},
+      {id:'account', label:'My Account', url:'account.html'}
+    ];
+  }
+
+  function seoForBuiltin(id){
+    const st = getSettings();
+    const keyMap = {home:'home', shop:'shop', discounted:'discounted', custom:'home', track:'track', contact:'contact', account:'account'};
+    return (st.seo_pages && st.seo_pages[keyMap[id] || id]) || {};
+  }
+
+  function menuInfoForUrl(url){
+    const found = currentMenu().find(m => String(m.url || '') === String(url || ''));
+    return found || {};
+  }
+
+  function builtinStoredContent(id){
+    const st = getSettings();
+    st.page_content = st.page_content || {};
+    return st.page_content[id] || {};
+  }
+
+  function defaultHomeShopByRoom(){
+    return {
+      title_en:'Shop by Room', title_ar:'تسوق حسب الغرفة',
+      shop_all_en:'Shop All', shop_all_ar:'تسوق الكل', shop_all_url:'shop.html',
+      cards:[
+        {key:'living', title_en:'Living Room', title_ar:'غرفة المعيشة', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html?category=L%20Shape%20Sofas'},
+        {key:'bedroom', title_en:'Bedroom', title_ar:'غرفة النوم', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html?category=Beds'},
+        {key:'majlis', title_en:'Majlis', title_ar:'المجلس', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html?category=Single%20Chairs'},
+        {key:'custom', title_en:'Custom Made', title_ar:'تفصيل حسب الطلب', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html'}
+      ]
+    };
+  }
+
+  function mergeHomeShopByRoom(saved){
+    const d = defaultHomeShopByRoom();
+    const s = saved && typeof saved === 'object' ? saved : {};
+    const cards = Array.isArray(s.cards) ? s.cards : [];
+    return Object.assign({}, d, s, {
+      cards: d.cards.map((card, i) => Object.assign({}, card, cards[i] || {}))
+    });
+  }
+
+  function ensureHomeShopByRoomFields(){
+    if(q('homeShopByRoomEditor')) return;
+    const anchor = q('page_body_ar') || q('page_body_en');
+    if(!anchor || !anchor.parentNode) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'homeShopByRoomEditor';
+    wrap.style.display = 'none';
+    wrap.style.gridColumn = '1 / -1';
+    wrap.innerHTML = `
+      <h3>Home Page - Shop by Room Boxes</h3>
+      <div class="admin-grid-3">
+        <input id="home_room_title_en" placeholder="Shop by Room title English">
+        <input id="home_room_title_ar" placeholder="Shop by Room title Arabic">
+        <input id="home_room_shop_all_url" placeholder="Shop All URL">
+        <input id="home_room_shop_all_en" placeholder="Shop All text English">
+        <input id="home_room_shop_all_ar" placeholder="Shop All text Arabic">
+      </div>
+      <div class="admin-grid-3">
+        ${['living','bedroom','majlis','custom'].map(key => `
+          <div style="grid-column:1/-1;border:1px solid #eadfce;border-radius:14px;padding:12px;margin-top:8px;">
+            <strong>${key.charAt(0).toUpperCase() + key.slice(1)} box</strong>
+            <div class="admin-grid-3">
+              <input id="home_room_${key}_title_en" placeholder="${key} title English">
+              <input id="home_room_${key}_title_ar" placeholder="${key} title Arabic">
+              <input id="home_room_${key}_url" placeholder="${key} link URL">
+              <input id="home_room_${key}_subtitle_en" placeholder="${key} subtitle English">
+              <input id="home_room_${key}_subtitle_ar" placeholder="${key} subtitle Arabic">
+            </div>
+          </div>`).join('')}
+      </div>`;
+    anchor.insertAdjacentElement('afterend', wrap);
+  }
+
+  function fillHomeShopByRoomFields(data){
+    ensureHomeShopByRoomFields();
+    const wrap = q('homeShopByRoomEditor');
+    if(!wrap) return;
+    const home = mergeHomeShopByRoom(data);
+    const set = (id, val) => { if(q(id)) q(id).value = val || ''; };
+    set('home_room_title_en', home.title_en); set('home_room_title_ar', home.title_ar);
+    set('home_room_shop_all_en', home.shop_all_en); set('home_room_shop_all_ar', home.shop_all_ar); set('home_room_shop_all_url', home.shop_all_url);
+    (home.cards || []).forEach(card => {
+      const key = card.key;
+      set(`home_room_${key}_title_en`, card.title_en); set(`home_room_${key}_title_ar`, card.title_ar);
+      set(`home_room_${key}_subtitle_en`, card.subtitle_en); set(`home_room_${key}_subtitle_ar`, card.subtitle_ar);
+      set(`home_room_${key}_url`, card.url);
+    });
+  }
+
+  function collectHomeShopByRoomFields(){
+    const keys = ['living','bedroom','majlis','custom'];
+    return {
+      title_en:v('home_room_title_en') || 'Shop by Room', title_ar:v('home_room_title_ar') || 'تسوق حسب الغرفة',
+      shop_all_en:v('home_room_shop_all_en') || 'Shop All', shop_all_ar:v('home_room_shop_all_ar') || 'تسوق الكل', shop_all_url:v('home_room_shop_all_url') || 'shop.html',
+      cards: keys.map(key => ({
+        key,
+        title_en:v(`home_room_${key}_title_en`), title_ar:v(`home_room_${key}_title_ar`),
+        subtitle_en:v(`home_room_${key}_subtitle_en`), subtitle_ar:v(`home_room_${key}_subtitle_ar`),
+        url:v(`home_room_${key}_url`)
+      }))
+    };
+  }
+
+  function toggleHomeShopByRoomEditor(show, data){
+    ensureHomeShopByRoomFields();
+    const wrap = q('homeShopByRoomEditor');
+    if(!wrap) return;
+    wrap.style.display = show ? 'block' : 'none';
+    if(show) fillHomeShopByRoomFields(data);
+  }
+
+  function builtinEditablePage(id){
+    const st = getSettings();
+    const base = builtinPages().find(p => p.id === id);
+    if(!base) return null;
+    const stored = builtinStoredContent(id);
+    const seo = seoForBuiltin(id);
+    const menuItem = menuInfoForUrl(base.url);
+    const defaults = {
+      home:{
+        title_en: st.hero_title_en || 'Home', title_ar: st.hero_title_ar || '',
+        subtitle_en: st.hero_text_en || '', subtitle_ar: st.hero_text_ar || '',
+        body_en: [st.intro_title_en, st.intro_text_en, st.about_title_en, st.about_text_en, st.footer_text_en].filter(Boolean).join('\n\n'),
+        body_ar: [st.intro_title_ar, st.intro_text_ar, st.about_title_ar, st.about_text_ar, st.footer_text_ar].filter(Boolean).join('\n\n'),
+        hero_image: st.hero_image || (Array.isArray(st.hero_banners) && st.hero_banners[0]) || '',
+        home_shop_by_room: mergeHomeShopByRoom((st.page_content && st.page_content.home && st.page_content.home.home_shop_by_room) || {})
+      },
+      shop:{title_en:'Shop Collection', title_ar:'مجموعة المتجر', subtitle_en:'Browse products by category, fabric, color, size, and price.', subtitle_ar:'تصفح المنتجات حسب الفئة والقماش واللون والمقاس والسعر.', body_en:'Product grid, categories, filters, product details, cart buttons, and shop tools are controlled by the shop page.', body_ar:'شبكة المنتجات والفئات والفلاتر وتفاصيل المنتجات وأزرار السلة وأدوات المتجر يتم التحكم بها من صفحة المتجر.'},
+      discounted:{title_en:'Discounted Items', title_ar:'المنتجات المخفضة', subtitle_en:'All active discounted products appear here automatically.', subtitle_ar:'تظهر هنا جميع المنتجات المخفضة النشطة تلقائياً.', body_en:'This page is connected to shop products and filters only discounted items.', body_ar:'هذه الصفحة مرتبطة بمنتجات المتجر وتعرض المنتجات المخفضة فقط.'},
+      custom:{title_en:'Custom Order', title_ar:'طلب تفصيل', subtitle_en:'Custom furniture request form.', subtitle_ar:'نموذج طلب أثاث مخصص.', body_en:'Customer name, mobile, category, size, fabric, color, city, notes, and WhatsApp submission form.', body_ar:'نموذج الاسم والجوال والفئة والمقاس والقماش واللون والمدينة والملاحظات والإرسال عبر واتساب.'},
+      track:{title_en:'Track Your Order', title_ar:'تتبع طلبك', subtitle_en:'Enter the full order number exactly as received.', subtitle_ar:'أدخل رقم الطلب كاملاً كما وصل إليك.', body_en:'Order tracking form and order status result area.', body_ar:'نموذج تتبع الطلب ومنطقة عرض حالة الطلب.'},
+      contact:{title_en:'Contact Us', title_ar:'تواصل معنا', subtitle_en:'For furniture inquiries, custom orders, delivery, after-sales support, and project requests.', subtitle_ar:'لاستفسارات الأثاث والطلبات الخاصة والتوصيل وخدمة ما بعد البيع وطلبات المشاريع.', body_en:'Contact information, inquiry form, WhatsApp, social links, phone, email, and address.', body_ar:'معلومات التواصل ونموذج الاستفسار وواتساب وروابط التواصل والهاتف والبريد والعنوان.'},
+      account:{title_en:'My Account', title_ar:'حسابي', subtitle_en:'Manage your saved delivery details.', subtitle_ar:'إدارة بيانات التوصيل المحفوظة.', body_en:'Customer profile, saved delivery details, account fields, and logout action.', body_ar:'ملف العميل وبيانات التوصيل المحفوظة وحقول الحساب وتسجيل الخروج.'}
+    };
+    const d = defaults[id] || {};
+    return Object.assign({}, d, stored, {
+      id:'builtin:' + id, builtin_id:id, slug:id, url:base.url,
+      menu_label_en: stored.menu_label_en || menuItem.label_en || base.label,
+      menu_label_ar: stored.menu_label_ar || menuItem.label_ar || stored.title_ar || d.title_ar || base.label,
+      seo_title_en: stored.seo_title_en || seo.title_en || seo.title || '',
+      seo_title_ar: stored.seo_title_ar || seo.title_ar || '',
+      seo_description_en: stored.seo_description_en || seo.description_en || seo.description || '',
+      seo_description_ar: stored.seo_description_ar || seo.description_ar || '',
+      seo_keywords: stored.seo_keywords || (Array.isArray(seo.keywords) ? seo.keywords.join(', ') : (seo.keywords || '')),
+      active: stored.active !== false,
+      show_in_menu: stored.show_in_menu !== false && menuItem.visible !== false
+    });
+  }
+
+  function fillPageForm(page){
+    if(!page) return;
+    const map = {
+      page_edit_id:page.id, page_title_en:page.title_en, page_title_ar:page.title_ar, page_slug:page.slug,
+      page_menu_en:page.menu_label_en, page_menu_ar:page.menu_label_ar, page_url:page.url,
+      page_subtitle_en:page.subtitle_en, page_subtitle_ar:page.subtitle_ar, page_body_en:page.body_en, page_body_ar:page.body_ar,
+      page_hero_image:page.hero_image, page_button_label_en:page.button_label_en, page_button_label_ar:page.button_label_ar, page_button_url:page.button_url,
+      page_seo_title_en:page.seo_title_en, page_seo_title_ar:page.seo_title_ar, page_seo_description_en:page.seo_description_en, page_seo_description_ar:page.seo_description_ar,
+      page_seo_keywords:page.seo_keywords
+    };
+    Object.entries(map).forEach(([id,val])=>{ if(q(id)) q(id).value = val || ''; });
+    if(q('page_status')) q('page_status').value = page.active === false ? 'inactive' : 'active';
+    if(q('page_show_menu')) q('page_show_menu').checked = page.show_in_menu !== false;
+    toggleHomeShopByRoomEditor(page.builtin_id === 'home' || page.id === 'builtin:home', page.home_shop_by_room);
+    q('pageManagerPanel')?.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  async function saveBuiltinPageContent(page){
+    const st = getSettings();
+    const builtinId = String(page.id || '').replace('builtin:', '');
+    const base = builtinPages().find(p => p.id === builtinId);
+    if(!base) throw new Error('Existing page not found.');
+    st.page_content = st.page_content || {};
+    st.page_content[builtinId] = Object.assign({}, page, {id:'builtin:' + builtinId, builtin_id:builtinId, url:base.url, updatedAt:new Date().toISOString()});
+
+    st.seo_pages = st.seo_pages || {};
+    const seoKey = {home:'home', shop:'shop', discounted:'discounted', custom:'home', track:'track', contact:'contact', account:'account'}[builtinId] || builtinId;
+    st.seo_pages[seoKey] = Object.assign({}, st.seo_pages[seoKey] || {}, {
+      title_en:page.seo_title_en || page.title_en || '', title_ar:page.seo_title_ar || page.title_ar || '',
+      description_en:page.seo_description_en || page.subtitle_en || '', description_ar:page.seo_description_ar || page.subtitle_ar || '',
+      keywords:String(page.seo_keywords || '').split(',').map(x=>x.trim()).filter(Boolean)
+    });
+
+    let items = currentMenu();
+    const idx = items.findIndex(m => String(m.url || '') === String(base.url));
+    const menuItem = {label_en:page.menu_label_en || page.title_en || base.label, label_ar:page.menu_label_ar || page.title_ar || page.menu_label_en || base.label, url:base.url, visible:page.show_in_menu !== false};
+    if(idx >= 0) items[idx] = Object.assign({}, items[idx], menuItem);
+    else items.push(menuItem);
+    try{ menu = items; }catch(e){ window.menu = items; }
+    st.menu = items;
+    await apiSettings(st);
+    localStorage.setItem('cms_settings', JSON.stringify(st));
+    localStorage.setItem('cms_menu', JSON.stringify(items));
+    if(typeof window.renderMenu === 'function') window.renderMenu();
+  }
+
+  function allPageOptions(){
+    return builtinPages().concat(getPages().filter(p => p && p.active !== false).map(p => ({
+      id:p.id || p.slug,
+      label:p.menu_label_en || p.title_en || p.slug,
+      url:p.url || ('page.html?slug=' + encodeURIComponent(p.slug || p.id || ''))
+    })));
+  }
+
+  window.getSelectedPublishPages = function(containerId){
+    const box = q(containerId);
+    if(!box) return [];
+    return Array.from(box.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value).filter(Boolean);
+  };
+
+  function renderPublishBoxes(){
+    const options = allPageOptions();
+    [['productPublishPages',['shop.html']], ['discountPublishPages',['discounted-items.html','shop.html']]].forEach(([id, defaults]) => {
+      const box = q(id);
+      if(!box) return;
+      const selected = window.getSelectedPublishPages(id);
+      const active = selected.length ? selected : defaults;
+      box.innerHTML = options.map(p => `<label style="display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;"><input type="checkbox" value="${esc(p.url)}" ${active.includes(p.url)?'checked':''}> ${esc(p.label)}</label>`).join('');
+    });
+  }
+
+  function currentMenu(){
+    try{ if(Array.isArray(menu)) return menu; }catch(e){}
+    return [];
+  }
+
+  async function publishPagesAndMenu(){
+    const st = getSettings();
+    const pages = getPages();
+    let items = currentMenu().filter(m => !m.__customPage);
+    pages.forEach(p => {
+      if(p.show_in_menu && p.active !== false){
+        items.push({label_en:p.menu_label_en || p.title_en, label_ar:p.menu_label_ar || p.title_ar || p.menu_label_en || p.title_en, url:p.url, visible:true, __customPage:true, page_id:p.id});
+      }
+    });
+    try{ menu = items; }catch(e){ window.menu = items; }
+    st.menu = items;
+    await apiSettings(st);
+    localStorage.setItem('cms_settings', JSON.stringify(st));
+    localStorage.setItem('cms_menu', JSON.stringify(items));
+    if(typeof window.renderMenu === 'function') window.renderMenu();
+  }
+
+  function collectPage(){
+    const title = v('page_title_en');
+    const slug = slugify(v('page_slug') || title);
+    if(!title) throw new Error('Add page title.');
+    if(!slug) throw new Error('Add page slug.');
+    return {
+      id: v('page_edit_id') || slug,
+      slug,
+      url: v('page_url') || ('page.html?slug=' + encodeURIComponent(slug)),
+      title_en:title,
+      title_ar:v('page_title_ar'),
+      menu_label_en:v('page_menu_en') || title,
+      menu_label_ar:v('page_menu_ar') || v('page_title_ar') || title,
+      subtitle_en:v('page_subtitle_en'),
+      subtitle_ar:v('page_subtitle_ar'),
+      body_en:v('page_body_en'),
+      body_ar:v('page_body_ar'),
+      hero_image:v('page_hero_image'),
+      button_label_en:v('page_button_label_en'),
+      button_label_ar:v('page_button_label_ar'),
+      button_url:v('page_button_url'),
+      seo_title_en:v('page_seo_title_en'),
+      seo_title_ar:v('page_seo_title_ar'),
+      seo_description_en:v('page_seo_description_en'),
+      seo_description_ar:v('page_seo_description_ar'),
+      seo_keywords:v('page_seo_keywords'),
+      home_shop_by_room: (v('page_edit_id') === 'builtin:home') ? collectHomeShopByRoomFields() : undefined,
+      active:v('page_status') !== 'inactive',
+      show_in_menu:checked('page_show_menu'),
+      updatedAt:new Date().toISOString()
+    };
+  }
+
+  window.clearCustomPageForm = function(){
+    ['page_edit_id','page_title_en','page_title_ar','page_slug','page_menu_en','page_menu_ar','page_url','page_subtitle_en','page_subtitle_ar','page_body_en','page_body_ar','page_hero_image','page_button_label_en','page_button_label_ar','page_button_url','page_seo_title_en','page_seo_title_ar','page_seo_description_en','page_seo_description_ar','page_seo_keywords'].forEach(id=>{ if(q(id)) q(id).value=''; });
+    ['home_room_title_en','home_room_title_ar','home_room_shop_all_en','home_room_shop_all_ar','home_room_shop_all_url','home_room_living_title_en','home_room_living_title_ar','home_room_living_subtitle_en','home_room_living_subtitle_ar','home_room_living_url','home_room_bedroom_title_en','home_room_bedroom_title_ar','home_room_bedroom_subtitle_en','home_room_bedroom_subtitle_ar','home_room_bedroom_url','home_room_majlis_title_en','home_room_majlis_title_ar','home_room_majlis_subtitle_en','home_room_majlis_subtitle_ar','home_room_majlis_url','home_room_custom_title_en','home_room_custom_title_ar','home_room_custom_subtitle_en','home_room_custom_subtitle_ar','home_room_custom_url'].forEach(id=>{ if(q(id)) q(id).value=''; });
+    toggleHomeShopByRoomEditor(false);
+    if(q('page_status')) q('page_status').value='active';
+    if(q('page_show_menu')) q('page_show_menu').checked=true;
+  };
+
+  window.saveCustomPage = async function(){
+    try{
+      if(typeof window.hasAdminPermission === 'function' && !window.hasAdminPermission('menu','write')) return msg('You have read-only access for page connections.', true);
+      const page = collectPage();
+      if(String(page.id || '').startsWith('builtin:')){
+        await saveBuiltinPageContent(page);
+        renderCustomPageList();
+        renderPublishBoxes();
+        window.clearCustomPageForm();
+        msg('Existing page content saved.');
+        return;
+      }
+      const st = getSettings();
+      const pages = getPages();
+      const idx = pages.findIndex(p => String(p.id) === String(page.id) || String(p.slug) === String(page.slug));
+      if(idx >= 0) pages[idx] = Object.assign({}, pages[idx], page); else pages.push(page);
+      st.custom_pages = pages;
+      await publishPagesAndMenu();
+      renderCustomPageList();
+      renderPublishBoxes();
+      window.clearCustomPageForm();
+      msg('Page and menu connection saved.');
+    }catch(e){ msg('Could not save page: ' + e.message, true); }
+  };
+
+  window.editCustomPage = function(id){
+    const page = getPages().find(p => String(p.id) === String(id));
+    if(!page) return;
+    fillPageForm(page);
+  };
+
+  window.editExistingPageContent = function(id){
+    const page = builtinEditablePage(id);
+    if(!page) return msg('Existing page not found.', true);
+    fillPageForm(page);
+  };
+
+  window.deleteCustomPage = async function(id){
+    if(!confirm('Delete this page connection and content?')) return;
+    const st = getSettings();
+    st.custom_pages = getPages().filter(p => String(p.id) !== String(id));
+    await publishPagesAndMenu();
+    renderCustomPageList();
+    renderPublishBoxes();
+    msg('Page deleted.');
+  };
+
+  window.toggleCustomPage = async function(id){
+    const st = getSettings();
+    const page = getPages().find(p => String(p.id) === String(id));
+    if(!page) return;
+    page.active = page.active === false ? true : false;
+    await publishPagesAndMenu();
+    renderCustomPageList();
+    renderPublishBoxes();
+    msg('Page status updated.');
+  };
+
+  function renderCustomPageList(){
+    const box = q('customPageList');
+    if(!box) return;
+    const existing = builtinPages().map(p => {
+      const content = builtinEditablePage(p.id) || {};
+      return `<div class="admin-item"><div><strong>${esc(content.title_en || p.label)}</strong><br>${esc(p.url)}<br>Existing page | Status: ${content.active === false ? 'Inactive' : 'Active'} | Menu: ${content.show_in_menu === false ? 'Hidden' : 'Shown'}</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" data-existing-page-edit="${esc(p.id)}">Edit Existing Content</button></div></div>`;
+    }).join('');
+    const pages = getPages();
+    const custom = pages.length ? pages.map(p => `<div class="admin-item"><div><strong>${esc(p.title_en || p.slug)}</strong><br>${esc(p.url)}<br>Custom page | Status: ${p.active === false ? 'Inactive' : 'Active'} | Menu: ${p.show_in_menu === false ? 'Hidden' : 'Shown'}</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" onclick="editCustomPage('${esc(p.id)}')">Edit Content</button><button type="button" onclick="toggleCustomPage('${esc(p.id)}')">${p.active === false ? 'Enable' : 'Disable'}</button><button type="button" onclick="deleteCustomPage('${esc(p.id)}')">Delete</button></div></div>`).join('') : '<p>No custom pages yet.</p>';
+    box.innerHTML = '<h3>Existing Pages</h3>' + existing + '<h3>Custom Pages</h3>' + custom;
+    box.querySelectorAll('[data-existing-page-edit]').forEach(btn => {
+      btn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); window.editExistingPageContent(this.getAttribute('data-existing-page-edit')); });
+    });
+  }
+
+  window.renderCustomPageList = renderCustomPageList;
+
+
+  function bindPageBuilderButtons(){
+    const saveBtn = Array.from(document.querySelectorAll('button')).find(btn => (btn.getAttribute('onclick') || '').includes('saveCustomPage'));
+    if(saveBtn && !saveBtn.dataset.cvPageSaveBound){
+      saveBtn.dataset.cvPageSaveBound = '1';
+      saveBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); window.saveCustomPage(); }, true);
+    }
+    const clearBtn = Array.from(document.querySelectorAll('button')).find(btn => (btn.getAttribute('onclick') || '').includes('clearCustomPageForm'));
+    if(clearBtn && !clearBtn.dataset.cvPageClearBound){
+      clearBtn.dataset.cvPageClearBound = '1';
+      clearBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); window.clearCustomPageForm(); }, true);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    ensureHomeShopByRoomFields();
+    bindPageBuilderButtons();
+    setTimeout(function(){ renderCustomPageList(); renderPublishBoxes(); }, 500);
+  });
+  setTimeout(function(){ bindPageBuilderButtons(); renderCustomPageList(); renderPublishBoxes(); }, 1000);
+
+
+  /* === CV MENU EDIT BUTTON SAFE PATCH ===
+     Adds Edit capability without replacing the existing menu renderer.
+     Keeps Show/Hide and Delete buttons exactly as they were.
+  */
+  let cvMenuEditIndex = -1;
+
+  function cvMenuAddButton(){
+    return Array.from(document.querySelectorAll('button')).find(btn => (btn.getAttribute('onclick') || '').includes('addMenuItem'));
+  }
+
+  function cvMenuClearForm(){
+    ['menu_label_en','menu_label_ar','menu_url'].forEach(id => { if(q(id)) q(id).value = ''; });
+  }
+
+  function cvMenuSetEditMode(index){
+    cvMenuEditIndex = Number.isInteger(index) ? index : -1;
+    const btn = cvMenuAddButton();
+    if(btn) btn.textContent = cvMenuEditIndex >= 0 ? 'Update Menu Item' : 'Add Menu Item';
+    let cancel = q('cvCancelMenuEditBtn');
+    if(cvMenuEditIndex >= 0){
+      if(btn && !cancel){
+        cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.id = 'cvCancelMenuEditBtn';
+        cancel.textContent = 'Cancel Edit';
+        cancel.style.marginLeft = '8px';
+        cancel.addEventListener('click', function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          window.cancelMenuEdit();
+        });
+        btn.insertAdjacentElement('afterend', cancel);
+      }
+    }else if(cancel){
+      cancel.remove();
+    }
+  }
+
+  function cvMenuEnhanceButtons(){
+    const list = q('menuList');
+    if(!list) return;
+    const items = getMenuItems();
+    Array.from(list.children).forEach((row, index) => {
+      if(!items[index]) return;
+      if(row.querySelector('[data-cv-menu-edit]')) return;
+      const buttons = row.querySelectorAll('button');
+      if(!buttons.length) return;
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = 'Edit';
+      edit.setAttribute('data-cv-menu-edit', String(index));
+      edit.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        window.editMenuItem(index);
+      });
+      const deleteBtn = Array.from(buttons).find(btn => (btn.textContent || '').trim().toLowerCase() === 'delete');
+      if(deleteBtn) deleteBtn.insertAdjacentElement('beforebegin', edit);
+      else buttons[buttons.length - 1].insertAdjacentElement('afterend', edit);
+    });
+  }
+
+  window.editMenuItem = function(index){
+    if(!window.hasAdminPermission('menu','write')) return status('You have read-only access for Menu.', true);
+    const items = getMenuItems();
+    const item = items[Number(index)];
+    if(!item) return status('Menu item not found.', true);
+    if(q('menu_label_en')) q('menu_label_en').value = item.label_en || '';
+    if(q('menu_label_ar')) q('menu_label_ar').value = item.label_ar || '';
+    if(q('menu_url')) q('menu_url').value = item.url || '';
+    cvMenuSetEditMode(Number(index));
+    status('Editing menu item. Change the fields, then click Update Menu Item.');
+  };
+
+  window.cancelMenuEdit = function(){
+    cvMenuClearForm();
+    cvMenuSetEditMode(-1);
+    status('Menu edit cancelled.');
+  };
+
+  const cvMenuOriginalAddMenuItem = window.addMenuItem;
+  window.addMenuItem = async function(){
+    if(cvMenuEditIndex < 0){
+      const result = cvMenuOriginalAddMenuItem ? await cvMenuOriginalAddMenuItem() : undefined;
+      setTimeout(cvMenuEnhanceButtons, 50);
+      return result;
+    }
+    if(!window.hasAdminPermission('menu','write')) return status('You have read-only access for Menu.', true);
+    const en = val('menu_label_en');
+    const ar = val('menu_label_ar');
+    const url = val('menu_url');
+    if(!en || !url) return status('Add menu label and URL.', true);
+    const items = getMenuItems();
+    const current = items[cvMenuEditIndex];
+    if(!current){
+      cvMenuSetEditMode(-1);
+      return status('Menu item not found. Please try again.', true);
+    }
+    items[cvMenuEditIndex] = Object.assign({}, current, {label_en:en, label_ar:ar, url:url});
+    setMenuItems(items);
+    cvMenuClearForm();
+    cvMenuSetEditMode(-1);
+    if(typeof window.renderMenu === 'function') window.renderMenu();
+    setTimeout(cvMenuEnhanceButtons, 50);
+    try{
+      await publishSettings({menu:items});
+      status('Menu item updated and published.');
+    }catch(e){
+      status('Menu item updated locally, but publish failed: '+e.message, true);
+    }
+  };
+
+  const cvMenuOriginalRenderMenu = window.renderMenu;
+  if(typeof cvMenuOriginalRenderMenu === 'function'){
+    window.renderMenu = function(){
+      const result = cvMenuOriginalRenderMenu.apply(this, arguments);
+      cvMenuEnhanceButtons();
+      return result;
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      if(typeof window.renderMenu === 'function') window.renderMenu();
+      cvMenuEnhanceButtons();
+      cvMenuSetEditMode(-1);
+    }, 400);
+  });
+  setTimeout(cvMenuEnhanceButtons, 1000);
+
+})();
+
+/* === CV MENU EDIT BUTTON ONLY FINAL PATCH ===
+   Adds Edit button to Menu Control without changing other sections.
+*/
+(function(){
+  'use strict';
+  if(window.__cvMenuEditOnlyFinalPatch) return;
+  window.__cvMenuEditOnlyFinalPatch = true;
+
+  var editIndex = -1;
+
+  function byId(id){ return document.getElementById(id); }
+  function value(id){ var el = byId(id); return el ? String(el.value || '').trim() : ''; }
+  function setValue(id, v){ var el = byId(id); if(el) el.value = v || ''; }
+  function statusMsg(msg, isError){
+    if(typeof window.status === 'function') return window.status(msg, isError);
+    if(typeof window.showAdminStatus === 'function') return window.showAdminStatus(msg, isError);
+    var box = byId('adminSaveStatus');
+    if(box){ box.textContent = msg || ''; box.className = 'admin-save-status' + (isError ? ' error' : ''); }
+  }
+  function canWriteMenu(){
+    return !(typeof window.hasAdminPermission === 'function') || window.hasAdminPermission('menu','write');
+  }
+  function currentMenu(){
+    if(!Array.isArray(window.menu)){
+      try{ window.menu = JSON.parse(localStorage.getItem('cms_menu') || '[]'); }catch(e){ window.menu = []; }
+    }
+    return window.menu;
+  }
+  function saveLocal(items){
+    window.menu = items;
+    try{ localStorage.setItem('cms_menu', JSON.stringify(items)); }catch(e){}
+    try{ sessionStorage.setItem('cms_menu', JSON.stringify(items)); }catch(e){}
+  }
+  async function publishMenu(items){
+    if(typeof window.publishSettings === 'function'){
+      await window.publishSettings({menu: items});
+    }
+  }
+  function escapeHtml(v){
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+  function addButton(){
+    return Array.from(document.querySelectorAll('#menuControl button')).find(function(btn){
+      return (btn.getAttribute('onclick') || '').indexOf('addMenuItem') !== -1 || btn.id === 'cvMenuAddUpdateBtn';
+    });
+  }
+  function setMode(index){
+    editIndex = Number.isInteger(index) ? index : -1;
+    var btn = addButton();
+    if(btn){
+      btn.id = 'cvMenuAddUpdateBtn';
+      btn.textContent = editIndex >= 0 ? 'Update Menu Item' : 'Add Menu Item';
+    }
+    var cancel = byId('cvCancelMenuEditBtn');
+    if(editIndex >= 0){
+      if(btn && !cancel){
+        cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.id = 'cvCancelMenuEditBtn';
+        cancel.className = 'btn secondary';
+        cancel.textContent = 'Cancel Edit';
+        cancel.style.marginLeft = '8px';
+        btn.insertAdjacentElement('afterend', cancel);
+      }
+    }else if(cancel){
+      cancel.remove();
+    }
+  }
+  function clearForm(){
+    setValue('menu_label_en','');
+    setValue('menu_label_ar','');
+    setValue('menu_url','');
+  }
+
+  window.renderMenu = function(){
+    var list = byId('menuList');
+    if(!list) return;
+    var items = currentMenu();
+    list.innerHTML = items.map(function(m, i){
+      return '<div class="admin-item" data-menu-index="' + i + '">' +
+        '<div><strong>' + escapeHtml(m.label_en) + '</strong> / ' + escapeHtml(m.label_ar || '') + '<br>' +
+        escapeHtml(m.url || '') + '<br>Visible: ' + (m.visible !== false) + '</div>' +
+        '<div>' +
+          '<button type="button" data-menu-action="toggle" data-menu-index="' + i + '">Show/Hide</button>' +
+          '<button type="button" data-menu-action="edit" data-menu-index="' + i + '">Edit</button>' +
+          '<button type="button" data-menu-action="delete" data-menu-index="' + i + '">Delete</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    setMode(editIndex >= 0 && items[editIndex] ? editIndex : -1);
+  };
+
+  var previousAddMenuItem = window.addMenuItem;
+  window.addMenuItem = async function(){
+    if(!canWriteMenu()) return statusMsg('You have read-only access for Menu.', true);
+    var en = value('menu_label_en');
+    var ar = value('menu_label_ar');
+    var url = value('menu_url');
+    if(!en || !url) return statusMsg('Add menu label and URL.', true);
+    var items = currentMenu();
+
+    if(editIndex >= 0){
+      if(!items[editIndex]){ setMode(-1); return statusMsg('Menu item not found. Please try again.', true); }
+      items[editIndex] = Object.assign({}, items[editIndex], {label_en: en, label_ar: ar, url: url});
+      saveLocal(items);
+      clearForm();
+      setMode(-1);
+      window.renderMenu();
+      try{ await publishMenu(items); statusMsg('Menu item updated and published.'); }
+      catch(e){ statusMsg('Menu item updated locally, but publish failed: ' + e.message, true); }
+      return;
+    }
+
+    if(typeof previousAddMenuItem === 'function'){
+      var result = await previousAddMenuItem.apply(this, arguments);
+      window.renderMenu();
+      return result;
+    }
+    items.push({label_en: en, label_ar: ar, url: url, visible: true});
+    saveLocal(items);
+    clearForm();
+    window.renderMenu();
+    try{ await publishMenu(items); statusMsg('Menu item added and published.'); }
+    catch(e){ statusMsg('Menu item added locally, but publish failed: ' + e.message, true); }
+  };
+
+  window.editMenuItem = function(index){
+    if(!canWriteMenu()) return statusMsg('You have read-only access for Menu.', true);
+    var items = currentMenu();
+    var item = items[Number(index)];
+    if(!item) return statusMsg('Menu item not found.', true);
+    setValue('menu_label_en', item.label_en || '');
+    setValue('menu_label_ar', item.label_ar || '');
+    setValue('menu_url', item.url || '');
+    setMode(Number(index));
+    statusMsg('Editing menu item. Click Update Menu Item to save.');
+  };
+
+  window.cancelMenuEdit = function(){
+    clearForm();
+    setMode(-1);
+    statusMsg('Menu edit cancelled.');
+  };
+
+  document.addEventListener('click', function(e){
+    var actionBtn = e.target.closest('#menuList [data-menu-action], #cvCancelMenuEditBtn, #cvMenuAddUpdateBtn');
+    if(!actionBtn) return;
+
+    if(actionBtn.id === 'cvCancelMenuEditBtn'){
+      e.preventDefault(); e.stopPropagation();
+      window.cancelMenuEdit();
+      return;
+    }
+    if(actionBtn.id === 'cvMenuAddUpdateBtn'){
+      e.preventDefault(); e.stopPropagation();
+      window.addMenuItem();
+      return;
+    }
+
+    var action = actionBtn.getAttribute('data-menu-action');
+    var index = Number(actionBtn.getAttribute('data-menu-index'));
+    if(action === 'edit'){
+      e.preventDefault(); e.stopPropagation();
+      window.editMenuItem(index);
+    }else if(action === 'toggle'){
+      e.preventDefault(); e.stopPropagation();
+      if(typeof window.toggleMenu === 'function') window.toggleMenu(index);
+      setTimeout(window.renderMenu, 50);
+    }else if(action === 'delete'){
+      e.preventDefault(); e.stopPropagation();
+      if(typeof window.removeMenu === 'function') window.removeMenu(index);
+      setTimeout(window.renderMenu, 50);
+    }
   }, true);
+
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(window.renderMenu, 300); });
+  setTimeout(window.renderMenu, 800);
 })();
