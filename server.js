@@ -15,6 +15,62 @@ const { sendEmailNow, sendWhatsAppNow } = require('./automation');
 
 migrate();
 
+function ensureProductReviewsTable(){
+  try{
+    db.exec(`
+CREATE TABLE IF NOT EXISTS product_reviews(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  rating INTEGER NOT NULL,
+  review_text TEXT NOT NULL,
+  approved INTEGER DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_product_id ON product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_approved_created ON product_reviews(approved, created_at);
+`);
+    try{ db.exec(`ALTER TABLE product_reviews ADD COLUMN approved INTEGER DEFAULT 1;`); }catch(_e){}
+    try{ db.exec(`ALTER TABLE product_reviews ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`); }catch(_e){}
+  }catch(e){
+    console.error('Product reviews table check failed:', e.message);
+  }
+}
+ensureProductReviewsTable();
+
+function safeReviewText(value, max){
+  return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+function publicReview(row){
+  return {
+    id: row.id,
+    product_id: String(row.product_id || ''),
+    customer_name: row.customer_name || 'Customer',
+    rating: Number(row.rating || 0),
+    review_text: row.review_text || '',
+    created_at: row.created_at || new Date().toISOString()
+  };
+}
+function groupedReviewPayload(rows){
+  const reviews = {};
+  const summaries = {};
+  (rows || []).forEach(row => {
+    const r = publicReview(row);
+    const id = String(r.product_id || '');
+    if(!id) return;
+    reviews[id] = reviews[id] || [];
+    reviews[id].push(r);
+  });
+  Object.keys(reviews).forEach(productId => {
+    const list = reviews[productId];
+    const avg = list.length ? list.reduce((sum, r) => sum + Number(r.rating || 0), 0) / list.length : 0;
+    summaries[productId] = { avg, count: list.length };
+  });
+  return { reviews, summaries };
+}
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -789,6 +845,41 @@ app.get('/api/admin/me', auth, (req,res)=>{
 });
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
+
+
+app.get('/api/product-reviews', (req, res) => {
+  try{
+    ensureProductReviewsTable();
+    const requested = safeReviewText(req.query.product_id || req.query.productId || '', 160);
+    const rows = requested
+      ? db.prepare(`SELECT id, product_id, customer_name, rating, review_text, created_at FROM product_reviews WHERE approved=1 AND product_id=? ORDER BY created_at DESC, id DESC LIMIT 500`).all(requested)
+      : db.prepare(`SELECT id, product_id, customer_name, rating, review_text, created_at FROM product_reviews WHERE approved=1 ORDER BY created_at DESC, id DESC LIMIT 2000`).all();
+    res.json(groupedReviewPayload(rows));
+  }catch(e){
+    console.error('Product reviews load failed:', e.message);
+    res.status(200).json({reviews:{}, summaries:{}, empty:true, message:'Reviews are not available yet.'});
+  }
+});
+
+app.post('/api/product-reviews', writeLimiter, (req, res) => {
+  try{
+    ensureProductReviewsTable();
+    const productId = safeReviewText(req.body.product_id || req.body.productId || '', 160);
+    const customerName = safeReviewText(req.body.customer_name || req.body.customerName || 'Customer', 80) || 'Customer';
+    const reviewText = safeReviewText(req.body.review_text || req.body.reviewText || '', 1000);
+    const rating = Math.max(1, Math.min(5, Number.parseInt(req.body.rating, 10) || 0));
+    if(!productId) return res.status(400).json({error:'Product is required.'});
+    if(!rating) return res.status(400).json({error:'Rating is required.'});
+    if(reviewText.length < 3) return res.status(400).json({error:'Please write a short review.'});
+    const result = db.prepare(`INSERT INTO product_reviews(product_id, customer_name, rating, review_text, approved, created_at, updated_at) VALUES(?,?,?,?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run(productId, customerName, rating, reviewText);
+    const saved = db.prepare(`SELECT id, product_id, customer_name, rating, review_text, created_at FROM product_reviews WHERE id=?`).get(result.lastInsertRowid);
+    res.json({ok:true, review: publicReview(saved || {id: result.lastInsertRowid, product_id: productId, customer_name: customerName, rating, review_text: reviewText, created_at: new Date().toISOString()})});
+  }catch(e){
+    console.error('Product review save failed:', e.message);
+    res.status(500).json({error:'Could not save review. Please try again.'});
+  }
+});
+
 app.get('/api/products',(req,res)=>res.json(db.prepare(`SELECT p.*, c.name_en category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.active=1 ORDER BY p.created_at DESC`).all().map(p=>({...p,data:json(p.data_json,{})}))));
 app.get('/api/products/:id',(req,res)=>{ const p=db.prepare('SELECT * FROM products WHERE id=?').get(req.params.id); if(!p) return res.status(404).json({error:'Not found'}); const variants=db.prepare('SELECT * FROM product_variants WHERE product_id=?').all(p.id); res.json({...p,data:json(p.data_json,{}),variants}); });
 app.post('/api/products',adminAuth('products','write'),(req,res)=>{ const b=req.body; const categoryId=categoryIdFromBody(b); const existing=b.sku?db.prepare('SELECT id FROM products WHERE sku=?').get(b.sku):null; if(existing){ db.prepare('UPDATE products SET name_en=?,name_ar=?,category_id=?,description_en=?,description_ar=?,base_price=?,vat_rate=?,active=?,data_json=? WHERE id=?').run(b.name_en,b.name_ar,categoryId,b.description_en,b.description_ar,b.base_price||0,b.vat_rate||15,b.active!==false?1:0,JSON.stringify(b.data||{}),existing.id); return res.json({id:existing.id, updated:true}); } const r=db.prepare('INSERT INTO products(sku,name_en,name_ar,category_id,description_en,description_ar,base_price,vat_rate,active,data_json) VALUES(?,?,?,?,?,?,?,?,?,?)').run(b.sku,b.name_en,b.name_ar,categoryId,b.description_en,b.description_ar,b.base_price||0,b.vat_rate||15,b.active!==false?1:0,JSON.stringify(b.data||{})); res.json({id:r.lastInsertRowid}); });
