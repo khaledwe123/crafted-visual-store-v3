@@ -103,11 +103,38 @@
     </section>`;
   }
 
+  function activeProductId(){
+    try{
+      const p = window.currentProduct || (typeof currentProduct !== 'undefined' ? currentProduct : null);
+      return cleanId(state.currentProductId || (p && (p.id || p._dbId || p.sku || p.code)) || document.getElementById('productModal')?.getAttribute('data-review-product-id') || '');
+    }catch(_e){ return cleanId(state.currentProductId); }
+  }
+
   function mountModalReviews(productId){
-    productId = cleanId(productId || state.currentProductId);
-    const target = document.getElementById('modalRating');
-    if(!target || !productId) return;
-    target.innerHTML = reviewPanelHtml(productId);
+    productId = cleanId(productId || activeProductId());
+    if(!productId) return;
+    state.currentProductId = productId;
+
+    // Legacy modal target
+    const legacyTarget = document.getElementById('modalRating');
+    if(legacyTarget){
+      legacyTarget.innerHTML = reviewPanelHtml(productId);
+    }
+
+    // Stable Quick View modal target used by quickview-final-fix.js
+    const stableBody = document.getElementById('cvStableQuickViewBody');
+    if(stableBody){
+      let stableTarget = stableBody.querySelector('#cvStableProductReviews');
+      if(!stableTarget){
+        const info = stableBody.querySelector('.cv-stable-qv-info') || stableBody;
+        stableTarget = document.createElement('div');
+        stableTarget.id = 'cvStableProductReviews';
+        const insertAfter = stableBody.querySelector('.cv-stable-qv-rating') || stableBody.querySelector('.cv-stable-qv-trust') || null;
+        if(insertAfter && insertAfter.parentNode) insertAfter.insertAdjacentElement('afterend', stableTarget);
+        else info.appendChild(stableTarget);
+      }
+      stableTarget.innerHTML = reviewPanelHtml(productId);
+    }
   }
 
   function injectCardReviewLinks(){
@@ -231,7 +258,14 @@
     loadReviews();
     const grid = document.getElementById('productGrid');
     if(grid) observer.observe(grid, {childList:true, subtree:true});
-    setInterval(wrapOpeners, 1000);
+    const body = document.body;
+    if(body) observer.observe(body, {childList:true, subtree:true});
+    setInterval(function(){
+      wrapOpeners();
+      injectCardReviewLinks();
+      const stable = document.getElementById('cvStableQuickViewModal');
+      if(stable && !stable.classList.contains('hidden')) mountModalReviews(activeProductId());
+    }, 800);
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

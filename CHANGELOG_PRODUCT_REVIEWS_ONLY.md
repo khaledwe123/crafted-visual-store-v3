@@ -1,31 +1,42 @@
-# Product Reviews Targeted Change Log
+# Product Reviews Fix - Corrected Files Only
 
-## Scope
-Enabled customer product ratings and written reviews in the shop/customer product view only.
+## Files changed
+- `server.js`
+- `product-reviews.js`
+- `public/product-reviews.js`
+- `shop.html`
+- `public/shop.html`
 
-## Files Changed
+## What was fixed
+1. Product reviews now mount inside the active Quick View modal used by `quickview-final-fix.js`.
+2. The previous implementation only mounted reviews into the legacy `#modalRating` area, so nothing appeared when the stable Quick View modal was used.
+3. The review script now supports both modal systems:
+   - legacy `#productModal`
+   - stable `#cvStableQuickViewModal`
+4. Customer can submit star rating and written review.
+5. Customer can view reviews already submitted.
+6. Reviews persist through `/api/product-reviews` when backend API is available.
+7. If backend API is temporarily unavailable, reviews save safely in browser localStorage as fallback.
+8. `shop.html` and `public/shop.html` include the review script with a new cache-busting version.
 
-| File | Change | Effect |
-|---|---|---|
-| `server.js` | Added `product_reviews` table auto-check/creation and public review API endpoints: `GET /api/product-reviews` and `POST /api/product-reviews`. | Customer reviews are stored persistently in the database and loaded for all customers. The endpoint fails safely with an empty review set instead of crashing. |
-| `product-reviews.js` | Rebuilt customer review frontend module. | Customers can rate products, write reviews, and view all reviews from other customers inside the product modal. Review summaries update the visible star rating. |
-| `public/product-reviews.js` | Same frontend review module for Railway/public build alignment. | Ensures deployed/public builds load the same review behavior. |
-| `shop.html` | Added script reference to `product-reviews.js`. | Activates review functionality on the shop page. |
-| `public/shop.html` | Added script reference to `product-reviews.js`. | Ensures deployed/public shop page activates review functionality. |
+## What was not changed
+- Product display logic
+- Quick View opening logic
+- Customize opening logic
+- Cart
+- Checkout
+- Discounts
+- Admin
+- Styling outside product review component
 
-## What Was Not Changed
-- Shop product rendering logic
-- Quick View / Customize handlers
-- Cart logic
-- Discount logic
-- Checkout logic
-- Product publishing logic
-- Admin dashboard logic
-- Styling files
-- Database schema unrelated to reviews
-
-## Testing Notes
-- `node -c server.js` passed.
-- `node -c product-reviews.js` passed.
-- Review API is designed to auto-create the review table if missing.
-- If the API is unavailable, the review is temporarily saved in browser localStorage so the customer is not blocked.
+## Testing steps
+1. Upload only these corrected files.
+2. Hard refresh shop page: Cmd + Shift + R.
+3. Open any product with Quick View.
+4. Confirm Customer Reviews section appears inside the modal.
+5. Select stars.
+6. Write a review.
+7. Submit.
+8. Close and reopen the product.
+9. Confirm the review appears.
+10. Open another product and confirm reviews are product-specific.
