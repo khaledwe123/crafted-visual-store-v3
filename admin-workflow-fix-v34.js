@@ -2240,7 +2240,7 @@
   }
 
   function resetDiscountForm(){
-    ['discountTargetType','discountCategoryTarget','discountProductTarget','discountApplyScope','discountSizeTarget','discountFabricTarget','bulkDiscount'].forEach(id => { if(q(id)) q(id).value = ''; });
+    ['discountTargetType','discountCategoryTarget','discountProductTarget','discountApplyScope','discountSizeTarget','discountFabricTarget','discountColorTarget','bulkDiscount'].forEach(id => { if(q(id)) q(id).value = ''; });
     if(q('discountStatus')) q('discountStatus').value = 'active';
     setDiscountEditMode(null);
     if(typeof window.renderDiscountTargets === 'function') window.renderDiscountTargets();
@@ -2360,6 +2360,21 @@
     return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
   }
 
+
+  function getProductColorsForDiscount(p){
+    const out = [];
+    const add = (v) => {
+      if(v === undefined || v === null) return;
+      if(typeof v === 'object') v = v.label || v.name || v.value || v.color || v.title || '';
+      String(v).split(',').forEach(x => { const txt = x.trim(); if(txt) out.push(txt); });
+    };
+    if(p && p.colors && typeof p.colors === 'object') Object.keys(p.colors).forEach(add);
+    if(p && Array.isArray(p.colorOptions)) p.colorOptions.forEach(add);
+    if(p && Array.isArray(p.colorsList)) p.colorsList.forEach(add);
+    if(p && Array.isArray(p.colorNames)) p.colorNames.forEach(add);
+    return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
+  }
+
   function ensureDiscountApplyScopeOptions(){
     const el = q('discountApplyScope');
     if(!el) return;
@@ -2368,7 +2383,7 @@
       '<option value="product">Product Only</option>',
       '<option value="size">Size Only</option>',
       '<option value="fabric">Fabric Only</option>',
-      '<option value="combo">Size + Fabric Combination</option>'
+      '<option value="combo">Size + Fabric + Color Combination</option>'
     ].join('');
     el.value = ['product','size','fabric','combo'].includes(current) ? current : 'product';
   }
@@ -2393,13 +2408,15 @@
     const scopeEl = q('discountApplyScope');
     const sizeEl = q('discountSizeTarget');
     const fabricEl = q('discountFabricTarget');
+    const colorEl = q('discountColorTarget');
 
-    if(!scopeEl || !sizeEl || !fabricEl) return;
+    if(!scopeEl || !sizeEl || !fabricEl || !colorEl) return;
 
     if(type !== 'product'){
       hideDiscountSelect('discountApplyScope');
       hideDiscountSelect('discountSizeTarget');
       hideDiscountSelect('discountFabricTarget');
+      hideDiscountSelect('discountColorTarget');
       return;
     }
 
@@ -2409,8 +2426,10 @@
 
     const sizes = getProductSizesForDiscount(p);
     const fabrics = getProductFabricsForDiscount(p);
+    const colors = getProductColorsForDiscount(p);
     const selectedSize = sizeEl.value;
     const selectedFabric = fabricEl.value;
+    const selectedColor = colorEl.value;
 
     if(applyScope === 'size' || applyScope === 'combo'){
       showDiscountSelect('discountSizeTarget');
@@ -2426,6 +2445,14 @@
       if(selectedFabric) fabricEl.value = selectedFabric;
     }else{
       hideDiscountSelect('discountFabricTarget');
+    }
+
+    if(applyScope === 'combo'){
+      showDiscountSelect('discountColorTarget');
+      colorEl.innerHTML = colors.length ? '<option value="">Choose Color</option>' + colors.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('') : '<option value="">No colors found for this product</option>';
+      if(selectedColor) colorEl.value = selectedColor;
+    }else{
+      hideDiscountSelect('discountColorTarget');
     }
   }
 
@@ -2459,6 +2486,7 @@
     hideDiscountSelect('discountApplyScope');
     hideDiscountSelect('discountSizeTarget');
     hideDiscountSelect('discountFabricTarget');
+    hideDiscountSelect('discountColorTarget');
 
     if(!type) return;
 
@@ -2491,6 +2519,7 @@
         applyScope: newType === 'product' ? (val('discountApplyScope') || 'product') : 'product',
         size: val('discountSizeTarget'),
         fabric: val('discountFabricTarget'),
+        color: val('discountColorTarget'),
         active: val('discountStatus') !== 'inactive',
         publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('discountPublishPages') : ['discounted-items.html'])
       };
@@ -2501,6 +2530,7 @@
       applyScope: 'product',
       size: '',
       fabric: '',
+      color: '',
       active: true,
       publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('discountPublishPages') : ['discounted-items.html'])
     };
@@ -2509,7 +2539,8 @@
   function discountRuleMatches(rule, selection){
     return String(rule.scope || '') === String(selection.applyScope || '') &&
       String(rule.size || '') === String(selection.size || '') &&
-      String(rule.fabric || '') === String(selection.fabric || '');
+      String(rule.fabric || '') === String(selection.fabric || '') &&
+      String(rule.color || '') === String(selection.color || '');
   }
 
   async function updateDiscountedProducts(percent, selection){
@@ -2531,6 +2562,7 @@
             scope: selection.applyScope,
             size: selection.applyScope === 'size' || selection.applyScope === 'combo' ? selection.size : '',
             fabric: selection.applyScope === 'fabric' || selection.applyScope === 'combo' ? selection.fabric : '',
+            color: selection.applyScope === 'combo' ? selection.color : '',
             percent: pct,
             active: true,
             updatedAt: new Date().toISOString(),
@@ -2579,6 +2611,7 @@
     if(percent < 0 || percent > 90) return show('Discount must be between 0 and 90.', true);
     if(selection.type === 'product' && (selection.applyScope === 'size' || selection.applyScope === 'combo') && !selection.size) return show('Please choose a size for this product.', true);
     if(selection.type === 'product' && (selection.applyScope === 'fabric' || selection.applyScope === 'combo') && !selection.fabric) return show('Please choose a fabric for this product.', true);
+    if(selection.type === 'product' && selection.applyScope === 'combo' && !selection.color) return show('Please choose a color for this product.', true);
 
     try{
       const count = await updateDiscountedProducts(percent, selection);
@@ -2701,6 +2734,7 @@
         const details = [];
         if(r.size) details.push('Size: ' + r.size);
         if(r.fabric) details.push('Fabric: ' + r.fabric);
+        if(r.color) details.push('Color: ' + r.color);
         const scope = String(r.scope || 'product');
         entries.push({
           key: `rule:${productId}:${idx}`,
@@ -2710,6 +2744,7 @@
           scope,
           size:r.size || '',
           fabric:r.fabric || '',
+          color:r.color || '',
           percent:Number(r.percent || 0),
           active:r.active !== false,
           label:`${scope.toUpperCase()} discount: ${Number(r.percent || 0)}%${details.length ? ' | ' + details.join(' | ') : ''}${r.active === false ? ' | Inactive' : ''}`
@@ -2759,6 +2794,7 @@
       await window.renderDiscountVariantTargets();
       if(q('discountSizeTarget')) q('discountSizeTarget').value = entry.size || '';
       if(q('discountFabricTarget')) q('discountFabricTarget').value = entry.fabric || '';
+      if(q('discountColorTarget')) q('discountColorTarget').value = entry.color || '';
       if(q('bulkDiscount')) q('bulkDiscount').value = entry.percent || '';
       if(q('discountStatus')) q('discountStatus').value = entry.active === false ? 'inactive' : 'active';
       setDiscountEditMode({key});
