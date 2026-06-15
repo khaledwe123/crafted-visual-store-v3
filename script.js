@@ -2148,3 +2148,187 @@ openProduct = function(id){
   else setTimeout(syncAfterLoad, 350);
 })();
 
+
+/* CV FRONTEND DISCOUNT RULES PATCH
+   Purpose: make backend/admin discount combinations apply on the shop frontend.
+   Scope: frontend price calculation only. Does not touch admin, auth, Arabic toggle, or backend.
+*/
+(function(){
+  'use strict';
+  if(window.__cvFrontendDiscountRulesPatch) return;
+  window.__cvFrontendDiscountRulesPatch = true;
+
+  function cvNum(v, fallback){
+    var n = Number(v);
+    return Number.isFinite(n) ? n : (fallback || 0);
+  }
+  function cvClean(v){ return String(v == null ? '' : v).trim(); }
+  function cvMoney(v){
+    try{ return typeof money === 'function' ? money(v) : ('SAR ' + Math.round(cvNum(v)).toLocaleString()); }
+    catch(e){ return 'SAR ' + Math.round(cvNum(v)).toLocaleString(); }
+  }
+  function cvVatRate(p){
+    try{ return typeof vatRate === 'function' ? vatRate(p) : (cvNum(p && p.vatRate, 15) || 15); }
+    catch(e){ return cvNum(p && p.vatRate, 15) || 15; }
+  }
+  function cvPriceBeforeVat(p, sizeOpt, fabricOpt){
+    try{ return typeof priceBeforeVat === 'function' ? priceBeforeVat(p, sizeOpt, fabricOpt) : cvNum(p && p.price); }
+    catch(e){ return cvNum(p && p.price); }
+  }
+  function cvPriceInclVat(p, sizeOpt, fabricOpt){
+    try{ return typeof priceIncludingVat === 'function' ? priceIncludingVat(p, sizeOpt, fabricOpt) : cvPriceBeforeVat(p, sizeOpt, fabricOpt) * (1 + cvVatRate(p) / 100); }
+    catch(e){ return cvPriceBeforeVat(p, sizeOpt, fabricOpt) * (1 + cvVatRate(p) / 100); }
+  }
+  function cvRuleMatches(rule, sizeOpt, fabricOpt, color){
+    if(!rule || rule.active === false || cvNum(rule.percent) <= 0) return false;
+    var scope = cvClean(rule.scope || rule.applyScope || '');
+    var size = cvClean(sizeOpt && (sizeOpt.label || sizeOpt.name || sizeOpt));
+    var fabric = cvClean(fabricOpt && (fabricOpt.label || fabricOpt.name || fabricOpt));
+    var selected = cvClean(color || (typeof selectedColor !== 'undefined' ? selectedColor : ''));
+    var ruleSize = cvClean(rule.size);
+    var ruleFabric = cvClean(rule.fabric);
+    var ruleColor = cvClean(rule.color);
+
+    if(scope === 'size') return !!ruleSize && ruleSize === size;
+    if(scope === 'fabric') return !!ruleFabric && ruleFabric === fabric;
+    if(scope === 'color') return !!ruleColor && ruleColor === selected;
+    if(scope === 'combo') return !!ruleSize && !!ruleFabric && ruleSize === size && ruleFabric === fabric;
+    if(scope === 'comboColor') return !!ruleSize && !!ruleFabric && !!ruleColor && ruleSize === size && ruleFabric === fabric && ruleColor === selected;
+    return false;
+  }
+  function cvActiveDiscountPercent(p, sizeOpt, fabricOpt, color){
+    p = p || {};
+    var best = cvNum(p.discountPercent || p.discount || 0);
+    var rules = Array.isArray(p.discountRules) ? p.discountRules : [];
+    rules.forEach(function(rule){
+      if(cvRuleMatches(rule, sizeOpt, fabricOpt, color)) best = Math.max(best, cvNum(rule.percent));
+    });
+    return best;
+  }
+  window.cvActiveDiscountPercent = cvActiveDiscountPercent;
+
+  window.finalPrice = finalPrice = function(p, sizeOpt, fabricOpt, color){
+    var discount = cvActiveDiscountPercent(p, sizeOpt, fabricOpt, color);
+    return Math.round(cvPriceInclVat(p, sizeOpt, fabricOpt) * (1 - discount / 100));
+  };
+
+  function cvAllVariantPrices(p){
+    p = (typeof normalizeProduct === 'function') ? normalizeProduct(p || {}) : (p || {});
+    var values = [];
+    var sizes = Array.isArray(p.sizeOptions) && p.sizeOptions.length ? p.sizeOptions : [{label:'', price:cvNum(p.price)}];
+    var fabrics = Array.isArray(p.fabricOptions) && p.fabricOptions.length ? p.fabricOptions : [{label:'', sizePrices:{}}];
+    var colors = Object.keys(p.colors || {});
+    if(!colors.length) colors = [''];
+    sizes.forEach(function(s){
+      fabrics.forEach(function(f){
+        colors.forEach(function(c){
+          var before = cvPriceBeforeVat(p, s, f);
+          if(before > 0){
+            values.push({
+              before: before,
+              final: finalPrice(p, s, f, c),
+              discountPercent: cvActiveDiscountPercent(p, s, f, c),
+              size: s,
+              fabric: f,
+              color: c
+            });
+          }
+        });
+      });
+    });
+    if(!values.length){
+      values.push({before:cvNum(p.price), final:finalPrice(p), discountPercent:cvActiveDiscountPercent(p), size:null, fabric:null, color:''});
+    }
+    return values;
+  }
+  function cvLowestVariant(p){
+    return cvAllVariantPrices(p).sort(function(a,b){ return a.final - b.final; })[0] || {before:cvNum(p && p.price), final:finalPrice(p), discountPercent:cvActiveDiscountPercent(p)};
+  }
+
+  window.priceHTML = priceHTML = function(p, sizeOpt, fabricOpt){
+    p = (typeof normalizeProduct === 'function') ? normalizeProduct(p || {}) : (p || {});
+    var color = typeof selectedColor !== 'undefined' ? selectedColor : '';
+    var before = cvPriceBeforeVat(p, sizeOpt, fabricOpt);
+    var vat = before * cvVatRate(p) / 100;
+    var incl = before + vat;
+    var fp = finalPrice(p, sizeOpt, fabricOpt, color);
+    var discount = cvActiveDiscountPercent(p, sizeOpt, fabricOpt, color);
+    var html = '<div class="price-detail">' +
+      '<div>Selected price before VAT: <strong>' + cvMoney(before) + '</strong></div>' +
+      '<div>VAT (' + cvVatRate(p) + '%): <strong>' + cvMoney(vat) + '</strong></div>';
+    if(discount > 0){
+      html += '<div>Total before discount: <strong class="old-price" style="text-decoration:line-through;opacity:.65;">' + cvMoney(incl) + '</strong></div>' +
+        '<div>After discount: <strong class="discount-price">' + cvMoney(fp) + '</strong> <span class="discount-badge">-' + discount + '% OFF</span></div>';
+    }else{
+      html += '<div>Total incl. VAT: <strong>' + cvMoney(incl) + '</strong></div>';
+    }
+    return html + '</div>';
+  };
+
+  function cvShopCardPriceHTML(p){
+    var low = cvLowestVariant(p);
+    var oldIncl = Math.round(low.before * (1 + cvVatRate(p) / 100));
+    if(cvNum(low.discountPercent) > 0){
+      return '<div class="shop-price-summary"><small>From</small><br>' +
+        '<span class="old-price" style="text-decoration:line-through;opacity:.65;">' + cvMoney(oldIncl) + '</span><br>' +
+        '<strong class="discount-price">' + cvMoney(low.final) + '</strong> ' +
+        '<span class="discount-badge">-' + low.discountPercent + '%</span></div>';
+    }
+    return '<div class="shop-price-summary"><small>From</small><br><strong>' + cvMoney(low.final) + '</strong></div>';
+  }
+
+  var originalRenderProducts = typeof renderProducts === 'function' ? renderProducts : null;
+  if(originalRenderProducts){
+    window.renderProducts = renderProducts = function(list){
+      originalRenderProducts.call(this, list);
+      try{
+        var normalized = (list || []).map(function(p){ return (typeof normalizeProduct === 'function') ? normalizeProduct(p) : p; });
+        document.querySelectorAll('.product-card[data-product-id]').forEach(function(card){
+          var id = card.getAttribute('data-product-id');
+          var product = normalized.find(function(p){ return String(p.id || p._dbId || '') === String(id); });
+          if(!product) return;
+          var priceBox = card.querySelector('.shop-price-summary');
+          if(priceBox) priceBox.outerHTML = cvShopCardPriceHTML(product);
+        });
+      }catch(e){ console.warn('Discount card price patch skipped:', e); }
+    };
+  }
+
+  var originalApplySortAndFilter = typeof applySortAndFilter === 'function' ? applySortAndFilter : null;
+  if(originalApplySortAndFilter){
+    window.applySortAndFilter = applySortAndFilter = function(){
+      if(Array.isArray(products)){
+        products = products.map(function(p){ return (typeof normalizeProduct === 'function') ? normalizeProduct(p) : p; });
+        var sortSelect = document.getElementById('sortSelect');
+        if(sortSelect && sortSelect.value === 'discount'){
+          var oldRender = renderProducts;
+          try{
+            var list = products.slice();
+            var catFilter = document.getElementById('categoryFilter');
+            var selectedCategory = catFilter && catFilter.value ? catFilter.value : (window.CV_CATEGORY_FILTER || activeCategory);
+            activeCategory = selectedCategory || 'All';
+            if(activeCategory !== 'All') list = list.filter(function(p){ return p.category === activeCategory; });
+            list.sort(function(a,b){ return cvNum(cvLowestVariant(b).discountPercent) - cvNum(cvLowestVariant(a).discountPercent); });
+            renderProducts(list);
+            return;
+          }catch(e){ renderProducts = oldRender; }
+        }
+      }
+      return originalApplySortAndFilter.apply(this, arguments);
+    };
+  }
+
+  var originalAddCurrentToCart = typeof addCurrentToCart === 'function' ? addCurrentToCart : null;
+  if(originalAddCurrentToCart){
+    window.addCurrentToCart = addCurrentToCart = function(){
+      if(currentProduct){
+        currentProduct.discountPercent = cvActiveDiscountPercent(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
+      }
+      return originalAddCurrentToCart.apply(this, arguments);
+    };
+  }
+
+  setTimeout(function(){
+    try{ if(document.getElementById('productGrid') && typeof applySortAndFilter === 'function') applySortAndFilter(); }catch(e){}
+  }, 500);
+})();
