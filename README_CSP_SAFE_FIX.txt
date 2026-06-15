@@ -1,0 +1,1 @@
+Safe CSP/CDN analytics fix based on the original uploaded Final for checking server.js. Replace only server.js. This preserves the original auth routes, nonce setup, script-src-attr policy, middleware order, and all admin/login logic.
