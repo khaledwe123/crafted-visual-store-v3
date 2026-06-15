@@ -1,19 +1,22 @@
-# Duplicate /api/admin/me cleanup
+ADMIN /api/admin/me DUPLICATE ROUTE FIX
 
-Changed file: `server.js` only.
+Changed file:
+- server.js
 
 What changed:
-- Removed the second duplicate `GET /api/admin/me` route.
-- Kept the existing authoritative route that returns `id`, `name`, `email`, `role`, `isSuperAdmin`, and `permissions` at the top level.
+- Removed only the duplicate second app.get('/api/admin/me', auth, ...) route.
+- Kept the authoritative /api/admin/me route that appears earlier and is used for live role/permission checks.
+
+Validation:
+- node --check server.js passed.
+- Remaining /api/admin/me route count: 1.
 
 Not touched:
 - Admin login route
-- Cookies/JWT/auth middleware
-- Arabic language files
-- Discount files
-- Payment files
-- Product/shop frontend files
-
-Expected impact:
-- Admin login should continue working the same.
-- Reduces route conflict risk in `server.js`.
+- Admin cookies/auth middleware
+- Arabic translation
+- Discounts
+- Products
+- Payment
+- SEO rendering logic
+- CSS/JS/HTML files
