@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
   <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
   <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
-  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
 <header class="nav">
@@ -44,7 +43,7 @@
       <input id="expiry" placeholder="MM/YY">
       <input id="cvv" placeholder="CVV">
     </div>
-    <p class="small-note">Demo payment page. Connect a real Saudi payment gateway such as Moyasar, HyperPay, Tap, or PayTabs for live payments.</p>
+    <p class="small-note">Payment details are submitted for order confirmation only. The order remains awaiting payment verification until a live gateway such as Geidea is connected.</p>
   </section>
 
   <button class="btn primary" onclick="payNow()">Pay Now</button>
@@ -78,35 +77,65 @@ async function payNow(){
     alert("Please add payment details.");
     return;
   }
-  order.paymentMethod = selectedPayment;
-  order.paymentStatus = "Paid";
-  order.orderStatus = "Paid";
-  order.paidAt = new Date().toISOString();
 
-  const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-  orders.push(order);
-  localStorage.setItem("orders", JSON.stringify(orders));
-  localStorage.removeItem("pendingOrder");
-  localStorage.removeItem("cart");
+  const btn = document.querySelector("button.btn.primary");
+  const originalText = btn ? btn.textContent : "Pay Now";
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = "Saving order...";
+  }
 
-  await crmSendEmail({
-    orderId: order.id,
-    to: order.customer?.email,
-    from: "do-not-reply@craftedvisual.com",
-    fromName: "Crafted Visual Customer Care",
-    subject: "Crafted Visual Payment Confirmation - " + order.id,
-    body: paymentMessage(order),
-    customer: order.customer
-  });
+  try{
+    order.paymentMethod = selectedPayment;
+    order.paymentStatus = "Awaiting Payment Verification";
+    order.orderStatus = "Pending Payment";
+    order.paymentSubmittedAt = new Date().toISOString();
 
-  await crmSendWhatsApp({
-    orderId: order.id,
-    to: order.customer?.mobile,
-    body: paymentMessage(order),
-    customer: order.customer
-  });
+    // Important: do not mark the order as Paid in the browser.
+    // If the backend did not already save the order from review.html, create it now.
+    if(window.CV_API && await CV_API.available() && !order.apiId){
+      const saved = await CV_API.createOrderFromPrototype(order);
+      order.id = saved.order_no || order.id;
+      order.apiId = saved.id;
+      order.total = saved.total_amount || order.total;
+    }
 
-  location.href = "thankyou.html?order=" + encodeURIComponent(order.id);
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const existingIndex = orders.findIndex(o => o.id === order.id || (order.apiId && o.apiId === order.apiId));
+    if(existingIndex >= 0){
+      orders[existingIndex] = Object.assign({}, orders[existingIndex], order);
+    } else {
+      orders.push(order);
+    }
+    localStorage.setItem("orders", JSON.stringify(orders));
+    localStorage.removeItem("pendingOrder");
+    localStorage.removeItem("cart");
+
+    await crmSendEmail({
+      orderId: order.id,
+      to: order.customer?.email,
+      from: "do-not-reply@craftedvisual.com",
+      fromName: "Crafted Visual Customer Care",
+      subject: "Crafted Visual Order Received - " + order.id,
+      body: paymentMessage(order),
+      customer: order.customer
+    });
+
+    await crmSendWhatsApp({
+      orderId: order.id,
+      to: order.customer?.mobile,
+      body: paymentMessage(order),
+      customer: order.customer
+    });
+
+    location.href = "thankyou.html?order=" + encodeURIComponent(order.id);
+  } catch(err){
+    alert("Order could not be saved. Please try again. " + (err.message || err));
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
 }
 
 function paymentMessage(order){
@@ -115,11 +144,12 @@ function paymentMessage(order){
 Thank you for your order with Crafted Visual.
 
 Order Number: ${order.id}
-Payment Status: Paid
-Order Status: ${order.orderStatus || "Paid"}
-Total Paid: SAR ${Number(order.total).toLocaleString()}
+Payment Method Selected: ${order.paymentMethod || selectedPayment}
+Payment Status: Awaiting Payment Verification
+Order Status: ${order.orderStatus || "Pending Payment"}
+Order Total: SAR ${Number(order.total).toLocaleString()}
 
-We will now start processing your order and keep you updated at every stage.
+Your order has been received. Payment will be verified before production or delivery starts.
 
 Best regards,
 Crafted Visual Customer Care`;
@@ -164,6 +194,5 @@ async function getSettings(){
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
-  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
 </body>
 </html>
