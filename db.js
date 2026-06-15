@@ -8,8 +8,23 @@ require('dotenv').config();
 const uploadsDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is required. Add Railway Postgres DATABASE_URL variable before starting the app.');
+const isProd = process.env.NODE_ENV === 'production';
+
+// Production must still use Railway/Postgres DATABASE_URL.
+// Local development can run without DATABASE_URL by using LOCAL_DATABASE_URL
+// or this safe default local PostgreSQL connection string.
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  process.env.LOCAL_DATABASE_URL ||
+  'postgres://postgres:postgres@localhost:5432/crafted_visual_local';
+
+if (isProd && !process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required in production. Add Railway Postgres DATABASE_URL variable before starting the app.');
+}
+
+if (!process.env.DATABASE_URL && !process.env.LOCAL_DATABASE_URL) {
+  console.warn('[db] DATABASE_URL is not set. Using local PostgreSQL fallback: postgres://postgres:postgres@localhost:5432/crafted_visual_local');
+  console.warn('[db] To customize it, create .env and set LOCAL_DATABASE_URL=postgres://user:password@localhost:5432/database_name');
 }
 
 let seq = 0;
@@ -18,8 +33,8 @@ fs.mkdirSync(responseDir, { recursive: true });
 
 const worker = new Worker(path.join(__dirname, 'pg-sync-worker.js'), {
   workerData: {
-    databaseUrl: process.env.DATABASE_URL,
-    isProd: process.env.NODE_ENV === 'production',
+    databaseUrl,
+    isProd,
     responseDir
   }
 });
