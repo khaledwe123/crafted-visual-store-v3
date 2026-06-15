@@ -2149,276 +2149,557 @@ openProduct = function(id){
 })();
 
 
-/* CV FRONTEND DISCOUNT COMBINATION PATCH - 20260615
-   Scope: frontend shop price rendering only.
-   Supports backend/admin discountRules for Product Size/Fabric/Color combinations.
-   Does not touch admin, auth, Arabic toggle, payment, or server logic. */
+/* === CV ARABIC BUTTON CLICK FIX ONLY ===
+   Purpose: make the top-right Arabic/English language button work when CSP blocks inline onclick.
+   No layout, shop, admin, product, discount, or content logic is changed.
+*/
 (function(){
-  if(window.__cvFrontendDiscountRulesPatch20260615) return;
-  window.__cvFrontendDiscountRulesPatch20260615 = true;
-
-  function cvText(v){ return String(v == null ? '' : v).trim().toLowerCase(); }
-  function cvNum(v){ const x = Number(v || 0); return Number.isFinite(x) ? x : 0; }
-  function cvEsc(v){
-    return String(v == null ? '' : v).replace(/[&<>'"]/g, function(c){
-      return ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[c];
-    });
-  }
-  function cvMoney(v){
-    if(typeof money === 'function') return money(v);
-    return 'SAR ' + Math.round(Number(v || 0)).toLocaleString();
-  }
-  function cvVatRate(p){ return typeof vatRate === 'function' ? vatRate(p) : (Number(p?.vatRate || 15) || 15); }
-  function cvBeforeVat(p, sizeOpt, fabricOpt){
-    if(typeof priceBeforeVat === 'function') return priceBeforeVat(p, sizeOpt, fabricOpt);
-    return Number(p?.price || 0);
-  }
-  function cvInclVat(p, sizeOpt, fabricOpt){
-    if(typeof priceIncludingVat === 'function') return priceIncludingVat(p, sizeOpt, fabricOpt);
-    return cvBeforeVat(p, sizeOpt, fabricOpt) * (1 + cvVatRate(p) / 100);
-  }
-  function cvRuleScope(rule){ return cvText(rule?.scope || rule?.applyScope || rule?.type); }
-  function cvRuleActive(rule){ return rule && rule.active !== false && cvNum(rule.percent || rule.discountPercent) > 0; }
-  function cvRuleMatches(rule, sizeOpt, fabricOpt, colorName){
-    if(!cvRuleActive(rule)) return false;
-    const scope = cvRuleScope(rule);
-    const size = cvText(sizeOpt?.label || sizeOpt || '');
-    const fabric = cvText(fabricOpt?.label || fabricOpt || '');
-    const color = cvText(colorName || '');
-    const ruleSize = cvText(rule.size || rule.sizeLabel || '');
-    const ruleFabric = cvText(rule.fabric || rule.fabricLabel || '');
-    const ruleColor = cvText(rule.color || rule.colorName || '');
-
-    if(scope === 'product') return true;
-    if(scope === 'size') return !!ruleSize && ruleSize === size;
-    if(scope === 'fabric') return !!ruleFabric && ruleFabric === fabric;
-    if(scope === 'color') return !!ruleColor && ruleColor === color;
-    if(scope === 'combo') return !!ruleSize && !!ruleFabric && ruleSize === size && ruleFabric === fabric;
-    if(scope === 'combocolor' || scope === 'combo_color' || scope === 'sizefabriccolor'){
-      return !!ruleSize && !!ruleFabric && !!ruleColor && ruleSize === size && ruleFabric === fabric && ruleColor === color;
-    }
-    return false;
-  }
-  function cvVariantDiscountPercent(p, sizeOpt, fabricOpt, colorName){
-    p = typeof normalizeProduct === 'function' ? normalizeProduct(p || {}) : (p || {});
-    const productDiscount = cvNum(p.discountPercent || p.discount || 0);
-    const rules = Array.isArray(p.discountRules) ? p.discountRules : [];
-    const matchingRules = rules.filter(function(rule){ return cvRuleMatches(rule, sizeOpt, fabricOpt, colorName); });
-    const ruleDiscount = matchingRules.reduce(function(max, rule){ return Math.max(max, cvNum(rule.percent || rule.discountPercent)); }, 0);
-    return Math.max(productDiscount, ruleDiscount);
-  }
-  function cvFinalForVariant(p, sizeOpt, fabricOpt, colorName){
-    const incl = cvInclVat(p, sizeOpt, fabricOpt);
-    const discount = cvVariantDiscountPercent(p, sizeOpt, fabricOpt, colorName);
-    return Math.round(incl * (1 - discount / 100));
-  }
-  function cvAllVariantPrices(p){
-    p = typeof normalizeProduct === 'function' ? normalizeProduct(p || {}) : (p || {});
-    const values = [];
-    const colors = Object.keys(p.colors || {});
-    const colorList = colors.length ? colors : [''];
-    (p.sizeOptions || [{label:''}]).forEach(function(sizeOpt){
-      (p.fabricOptions || [{label:''}]).forEach(function(fabricOpt){
-        colorList.forEach(function(colorName){
-          const before = cvBeforeVat(p, sizeOpt, fabricOpt);
-          if(before > 0){
-            values.push({
-              before: before,
-              final: cvFinalForVariant(p, sizeOpt, fabricOpt, colorName),
-              discount: cvVariantDiscountPercent(p, sizeOpt, fabricOpt, colorName),
-              size: sizeOpt,
-              fabric: fabricOpt,
-              color: colorName
-            });
-          }
-        });
-      });
-    });
-    if(!values.length){
-      values.push({before:cvNum(p.price), final:cvFinalForVariant(p,null,null,''), discount:cvVariantDiscountPercent(p,null,null,''), size:null, fabric:null, color:''});
-    }
-    return values;
-  }
-  function cvLowestVariant(p){
-    return cvAllVariantPrices(p).sort(function(a,b){ return a.final - b.final; })[0];
-  }
-  function cvHasAnyDiscountRule(p){
-    return cvAllVariantPrices(p).some(function(v){ return cvNum(v.discount) > 0; });
-  }
-  function cvShopCardPriceHTML(p){
-    const low = cvLowestVariant(p);
-    const oldIncl = Math.round(low.before * (1 + cvVatRate(p) / 100));
-    if(cvNum(low.discount) > 0){
-      return '<div class="shop-price-summary">' +
-        '<small>From discounted combination</small><br>' +
-        '<span class="old-price" style="text-decoration:line-through;opacity:.65;">' + cvMoney(oldIncl) + '</span><br>' +
-        '<strong class="discount-price">' + cvMoney(low.final) + '</strong> ' +
-        '<span class="discount-badge">-' + cvNum(low.discount) + '%</span>' +
-        '</div>';
-    }
-    return '<div class="shop-price-summary"><small>From</small><br><strong>' + cvMoney(low.final) + '</strong></div>';
-  }
-
-  window.cvVariantDiscountPercent = cvVariantDiscountPercent;
-  window.cvHasAnyDiscountRule = cvHasAnyDiscountRule;
-
-  window.finalPrice = finalPrice = function(p, sizeOpt, fabricOpt, colorName){
-    const selected = colorName !== undefined ? colorName : (typeof selectedColor !== 'undefined' ? selectedColor : '');
-    return cvFinalForVariant(p, sizeOpt, fabricOpt, selected);
-  };
-
-  window.priceHTML = priceHTML = function(p, sizeOpt, fabricOpt, colorName){
-    p = typeof normalizeProduct === 'function' ? normalizeProduct(p || {}) : (p || {});
-    const selected = colorName !== undefined ? colorName : (typeof selectedColor !== 'undefined' ? selectedColor : '');
-    const before = cvBeforeVat(p, sizeOpt, fabricOpt);
-    const vat = before * cvVatRate(p) / 100;
-    const incl = before + vat;
-    const discount = cvVariantDiscountPercent(p, sizeOpt, fabricOpt, selected);
-    const fp = Math.round(incl * (1 - discount / 100));
-    let html = '<div class="price-detail">' +
-      '<div>Selected price before VAT: <strong>' + cvMoney(before) + '</strong></div>' +
-      '<div>VAT (' + cvVatRate(p) + '%): <strong>' + cvMoney(vat) + '</strong></div>';
-    if(discount > 0){
-      html += '<div>Total before discount: <strong class="old-price" style="text-decoration:line-through;opacity:.65;">' + cvMoney(incl) + '</strong></div>' +
-        '<div>After discount: <strong class="discount-price">' + cvMoney(fp) + '</strong> <span class="discount-badge">-' + discount + '% OFF</span></div>';
-    }else{
-      html += '<div>Total incl. VAT: <strong>' + cvMoney(incl) + '</strong></div>';
-    }
-    html += '</div>';
-    return html;
-  };
-
-  const cvOldSelectColor = typeof selectColor === 'function' ? selectColor : null;
-  window.selectColor = selectColor = function(color){
-    if(cvOldSelectColor) cvOldSelectColor(color);
+  function bindArabicButton(){
     try{
-      if(typeof currentProduct !== 'undefined' && currentProduct){
-        const el = document.getElementById('modalPrice');
-        if(el) el.innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, color);
-      }
+      if(typeof toggleLang === 'function') window.toggleLang = toggleLang;
+      var buttons = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));
+      var langButton = buttons.find(function(btn){
+        if(btn.id === 'authBtn') return false;
+        var txt = (btn.textContent || '').trim().toLowerCase();
+        return txt === 'عربي' || txt === 'english' || btn.getAttribute('onclick') === 'toggleLang()';
+      }) || buttons.find(function(btn){ return btn.id !== 'authBtn'; });
+      if(!langButton || langButton.__cvArabicButtonBound) return;
+      langButton.__cvArabicButtonBound = true;
+      langButton.setAttribute('type','button');
+      langButton.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(typeof window.toggleLang === 'function') window.toggleLang();
+      }, true);
+    }catch(e){ console.warn('Arabic button bind failed', e); }
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindArabicButton);
+  else bindArabicButton();
+  setTimeout(bindArabicButton, 500);
+})();
+
+/* === CV EXISTING PAGE BODY DISPLAY FIX ONLY ===
+   Purpose: display content saved in Admin > Page Builder for existing pages.
+   Scope: frontend page content text only. Does not change shop cards, products, discounts,
+   modal, page builder saving, or Shop by Room box rendering.
+*/
+(function(){
+  function cvCurrentPageKey(){
+    var file = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    if(file === '' || file === 'index.html') return 'home';
+    if(file === 'shop.html') return 'shop';
+    if(file === 'discounted.html' || file === 'discounted-items.html') return 'discounted';
+    if(file === 'contact.html') return 'contact';
+    if(file === 'track-order.html') return 'track';
+    if(file === 'account.html' || file === 'auth.html') return 'account';
+    return file.replace(/\.html$/,'');
+  }
+
+  function cvReadStoredSettings(){
+    try{
+      if(window.settings && typeof window.settings === 'object') return window.settings;
     }catch(e){}
-  };
-
-  const cvOldUpdateFabric = typeof updateSelectedFabric === 'function' ? updateSelectedFabric : null;
-  window.updateSelectedFabric = updateSelectedFabric = function(){
-    if(cvOldUpdateFabric) cvOldUpdateFabric();
     try{
-      if(typeof currentProduct !== 'undefined' && currentProduct){
-        const el = document.getElementById('modalPrice');
-        if(el) el.innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
-      }
-    }catch(e){}
-  };
+      var raw = localStorage.getItem('cms_settings') || sessionStorage.getItem('cms_settings');
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
 
-  const cvOldUpdateSize = typeof updateSelectedSize === 'function' ? updateSelectedSize : null;
-  window.updateSelectedSize = updateSelectedSize = function(){
-    if(cvOldUpdateSize) cvOldUpdateSize();
+  function cvPickByLang(obj, base){
+    if(!obj) return '';
+    var isAr = (window.lang || localStorage.getItem('lang') || 'en') === 'ar';
+    return isAr ? (obj[base + '_ar'] || obj[base] || obj[base + '_en'] || '') : (obj[base + '_en'] || obj[base] || obj[base + '_ar'] || '');
+  }
+
+  function cvSetText(id, value){
+    var el = document.getElementById(id);
+    if(el && value) el.textContent = value;
+  }
+
+  function cvEnsureManagedBlock(){
+    var existing = document.getElementById('cvManagedPageContent');
+    if(existing) return existing;
+    var body = document.createElement('section');
+    body.id = 'cvManagedPageContent';
+    body.className = 'intro cv-managed-page-content';
+    body.style.whiteSpace = 'pre-line';
+    var target = document.querySelector('#custom') || document.querySelector('footer') || document.body.firstElementChild;
+    if(target && target.parentNode) target.parentNode.insertBefore(body, target);
+    else document.body.appendChild(body);
+    return body;
+  }
+
+  function cvApplyExistingPageContent(){
     try{
-      if(typeof currentProduct !== 'undefined' && currentProduct){
-        const el = document.getElementById('modalPrice');
-        if(el) el.innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
-      }
-    }catch(e){}
-  };
+      var st = cvReadStoredSettings();
+      var key = cvCurrentPageKey();
+      var content = st && st.page_content ? st.page_content[key] : null;
+      if(!content) return;
 
-  window.renderProducts = renderProducts = function(list){
-    const grid = document.getElementById('productGrid');
-    if(!grid) return;
-    list = (list || []).map(function(p){ return typeof normalizeProduct === 'function' ? normalizeProduct(p) : p; });
-    if(!list.length){
-      grid.innerHTML = '<div class="empty-products"><h3>No products showing yet</h3><p>No products are currently published.</p></div>';
-      return;
-    }
-    grid.innerHTML = list.map(function(p){
-      const pid = String(p.id || p._dbId || '');
-      const img = (typeof firstImage === 'function' ? firstImage(p) : '') || 'assets/products/product_01.png';
-      const name = typeof displayName === 'function' ? displayName(p) : p.name;
-      const category = typeof displayCategory === 'function' ? displayCategory(p) : p.category;
-      const wished = typeof isWished === 'function' ? isWished(pid) : false;
-      const stars = typeof starDisplay === 'function' ? starDisplay(pid) : '';
-      const swatches = Object.entries(p.colors || {}).map(function(entry){
-        const c = entry[0], v = entry[1] || {};
-        return '<span title="' + cvEsc(c) + '" style="background:' + cvEsc(v.hex || '#ccc') + '"></span>';
-      }).join('');
-      return '<div class="card product-card" data-product-id="' + cvEsc(pid) + '">' +
-        '<div class="product-card-image-wrap" style="position:relative;">' +
-          '<img src="' + cvEsc(img) + '" alt="' + cvEsc(name) + '">' +
-          '<button type="button" class="wishlist-heart ' + (wished ? 'active' : '') + '" data-shop-action="wishlist" data-wishlist-id="' + cvEsc(pid) + '" aria-label="' + (wished ? 'Remove from wishlist' : 'Add to wishlist') + '" style="position:absolute;top:10px;right:10px;border:0;border-radius:50%;width:38px;height:38px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.12);font-size:22px;cursor:pointer;">' + (wished ? '♥' : '♡') + '</button>' +
-        '</div>' +
-        '<div class="card-body">' +
-          '<h3>' + cvEsc(name) + '</h3>' +
-          '<p>' + cvEsc(category || '') + '</p>' +
-          stars +
-          cvShopCardPriceHTML(p) +
-          '<div class="mini-swatches">' + swatches + '</div>' +
-          '<div class="cj-card-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">' +
-            '<button class="btn secondary" type="button" data-shop-action="quick" data-product-id="' + cvEsc(pid) + '">Quick View</button>' +
-            '<button class="btn primary" type="button" data-shop-action="customize" data-product-id="' + cvEsc(pid) + '">Customize</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  };
+      var title = cvPickByLang(content, 'title');
+      var subtitle = cvPickByLang(content, 'subtitle');
+      var body = cvPickByLang(content, 'body');
+      var heroImage = content.hero_image || '';
+      var mainText = body || '';
 
-  window.applySortAndFilter = applySortAndFilter = function(){
-    products = (products || []).map(function(p){ return typeof normalizeProduct === 'function' ? normalizeProduct(p) : p; });
-    let list = products.slice();
-    const catFilter = document.getElementById('categoryFilter');
-    const sortSelect = document.getElementById('sortSelect');
-    const selectedCategory = catFilter && catFilter.value ? catFilter.value : (window.CV_CATEGORY_FILTER || activeCategory);
-    activeCategory = selectedCategory || 'All';
-    if(activeCategory !== 'All') list = list.filter(function(p){ return p.category === activeCategory; });
-    const sort = sortSelect ? sortSelect.value : 'featured';
-    if(sort === 'priceHigh') list.sort(function(a,b){ return cvLowestVariant(b).final - cvLowestVariant(a).final; });
-    else if(sort === 'priceLow') list.sort(function(a,b){ return cvLowestVariant(a).final - cvLowestVariant(b).final; });
-    else if(sort === 'discount') list.sort(function(a,b){ return cvLowestVariant(b).discount - cvLowestVariant(a).discount; });
-    else if(sort === 'rating' && typeof productRating === 'function') list.sort(function(a,b){ return productRating(b.id).avg - productRating(a.id).avg; });
-    else if(sort === 'nameAZ' && typeof displayName === 'function') list.sort(function(a,b){ return displayName(a).localeCompare(displayName(b)); });
-    const title = document.getElementById('shopPageTitle');
-    if(title && activeCategory && activeCategory !== 'All') title.textContent = activeCategory;
-    renderProducts(list);
-  };
-
-  const cvOldAddCurrentToCart = typeof addCurrentToCart === 'function' ? addCurrentToCart : null;
-  window.addCurrentToCart = addCurrentToCart = function(){
-    try{
-      if(typeof currentProduct !== 'undefined' && currentProduct){
-        const colorObj = currentProduct.colors?.[selectedColor] || {};
-        const discount = cvVariantDiscountPercent(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
-        const item = lightweightCartItem({
-          id: currentProduct.id,
-          name: typeof displayName === 'function' ? displayName(currentProduct) : currentProduct.name,
-          price: cvFinalForVariant(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor),
-          originalPrice: cvInclVat(currentProduct, selectedSizeOption, selectedFabricOption),
-          priceBeforeVat: cvBeforeVat(currentProduct, selectedSizeOption, selectedFabricOption),
-          costPrice: typeof variantCost === 'function' ? variantCost(currentProduct, selectedSizeOption, selectedFabricOption) : cvNum(currentProduct.costPrice),
-          discountPercent: discount,
-          vatRate: cvVatRate(currentProduct),
-          color: selectedColor,
-          colorCode: colorObj.code || '',
-          fabric: selectedFabricOption?.label || '',
-          size: selectedSizeOption?.label || '',
-          qty: 1
-        });
-        cart.push(item);
-        if(typeof saveCartSafe === 'function' && !saveCartSafe()){ cart.pop(); return; }
-        if(typeof updateCartCount === 'function') updateCartCount();
-        try{ if(typeof trackEvent === 'function') trackEvent('add_to_cart', {item_id:item.id, item_name:item.name, value:item.price, size:item.size, fabric:item.fabric, color:item.color, discount:discount}); }catch(e){}
-        try{ if(typeof saveCRMActivity === 'function') saveCRMActivity('Add to Cart', item); }catch(e){}
-        if(typeof showToast === 'function') showToast((item.name || 'Product') + ' added to cart');
-        else alert('Added to cart');
+      if(key === 'home'){
+        // Keep Home page title/subtitle dedicated to the hero/banner only.
+        // The editable body content is rendered separately below Shop by Room,
+        // so the banner title does not repeat as a second body heading.
+        cvSetText('heroTitle', title);
+        cvSetText('heroText', subtitle);
+        if(heroImage){
+          var hero = document.querySelector('.hero');
+          if(hero) hero.style.background = "linear-gradient(90deg,rgba(24,61,50,.88),rgba(24,61,50,.25)), url('" + heroImage + "') center/cover";
+        }
+        var managed = cvEnsureManagedBlock();
+        if(mainText){
+          managed.innerHTML = '<p>' + String(mainText).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</p>';
+          managed.style.display = '';
+        } else {
+          managed.innerHTML = '';
+          managed.style.display = 'none';
+        }
         return;
       }
-    }catch(e){ console.warn('Discount-aware cart failed, using original cart flow', e); }
-    if(cvOldAddCurrentToCart) return cvOldAddCurrentToCart();
+
+      var pageTitle = document.querySelector('.page-hero h1, h1');
+      var pageText = document.querySelector('.page-hero p');
+      if(pageTitle && title) pageTitle.textContent = title;
+      if(pageText && (subtitle || body)) pageText.textContent = subtitle || body;
+      if(body){
+        var block = cvEnsureManagedBlock();
+        block.innerHTML = (title ? '<h2>' + String(title).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</h2>' : '') + '<p>' + String(body).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}) + '</p>';
+      }
+    }catch(e){ console.warn('Existing page content display skipped', e); }
+  }
+
+  var oldRenderCMS = typeof window.renderCMS === 'function' ? window.renderCMS : (typeof renderCMS === 'function' ? renderCMS : null);
+  if(oldRenderCMS){
+    window.renderCMS = renderCMS = function(){
+      oldRenderCMS.apply(this, arguments);
+      cvApplyExistingPageContent();
+    };
+  }
+
+  var oldApplyLang = typeof window.applyLang === 'function' ? window.applyLang : (typeof applyLang === 'function' ? applyLang : null);
+  if(oldApplyLang){
+    window.applyLang = applyLang = function(){
+      oldApplyLang.apply(this, arguments);
+      setTimeout(cvApplyExistingPageContent, 0);
+    };
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(cvApplyExistingPageContent, 300); setTimeout(cvApplyExistingPageContent, 1200); });
+  else { setTimeout(cvApplyExistingPageContent, 300); setTimeout(cvApplyExistingPageContent, 1200); }
+})();
+
+/* === CV CART ACTIVATION + CART DISCOUNT CODE ONLY FIX ===
+   Scope: cart panel behavior only.
+   - Activates cart/open/close/add-to-cart without relying on inline onclick.
+   - Adds discount-code box inside the cart before checkout.
+   - Discount codes apply before VAT only to non-discounted products.
+   - Items already under product discount do not receive extra code discount.
+*/
+(function(){
+  'use strict';
+  if(window.__cvCartActivationDiscountCodeFix) return;
+  window.__cvCartActivationDiscountCodeFix = true;
+
+  var appliedCartDiscount = null;
+  try{ appliedCartDiscount = JSON.parse(localStorage.getItem('appliedDiscount') || 'null'); }catch(e){ appliedCartDiscount = null; }
+
+  function money(n){ return 'SAR ' + Math.round(Number(n || 0)).toLocaleString(); }
+  function percentOf(v){ var n = Number(v); return Number.isFinite(n) ? n : 0; }
+  function itemQty(item){ return Math.max(1, Number(item && item.qty || 1)); }
+  function itemVatRate(item){ return Number(item && item.vatRate || (window.settings && settings.vat_rate) || 15); }
+  function itemBeforeVat(item){ return Number(item && (item.priceBeforeVat || item.originalPrice) || 0); }
+  function itemHasProductDiscount(item){ return Number(item && item.discountPercent || 0) > 0; }
+  function itemLineTotalCurrent(item){ return Number(item && item.price || 0) * itemQty(item); }
+  function safeText(v){ return String(v == null ? '' : v).replace(/[&<>'"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]; }); }
+
+  function normalizeDiscountCode(row){
+    row = row || {};
+    return {
+      code: String(row.code || row.discount_code || '').trim().toUpperCase(),
+      percent: Number(row.percent || row.discountPercent || row.discount_percent || row.value || 0),
+      active: row.active === false || row.active === 0 ? false : true,
+      expires_at: row.expires_at || row.expiry || row.expiresAt || null
+    };
+  }
+
+  async function validateCartDiscountCode(code){
+    try{
+      var res = await fetch('/api/discounts/validate/' + encodeURIComponent(code), {cache:'no-store'});
+      var data = await res.json().catch(function(){ return {}; });
+      if(!res.ok || !data.valid) return null;
+      return normalizeDiscountCode(data.discount || data);
+    }catch(e){ return null; }
+  }
+  function isCodeExpired(code){
+    if(!code || !code.expires_at) return false;
+    var d = new Date(code.expires_at);
+    return !isNaN(d.getTime()) && d < new Date();
+  }
+
+  function eligibleBeforeVatSubtotal(){
+    return (window.cart || cart || []).reduce(function(sum,item){
+      if(itemHasProductDiscount(item)) return sum;
+      return sum + itemBeforeVat(item) * itemQty(item);
+    }, 0);
+  }
+
+  function discountedItemsCount(){
+    return (window.cart || cart || []).filter(itemHasProductDiscount).length;
+  }
+
+  function cartTotals(){
+    var code = appliedCartDiscount && Number(appliedCartDiscount.percent || 0) > 0 ? appliedCartDiscount : null;
+    var discountPercent = code ? Number(code.percent || 0) : 0;
+    var subtotalBeforeVat = 0;
+    var productDiscountedCount = 0;
+    var codeDiscountBeforeVat = 0;
+    var vatTotal = 0;
+    var total = 0;
+
+    (window.cart || cart || []).forEach(function(item){
+      var qty = itemQty(item);
+      var before = itemBeforeVat(item);
+      var vatRate = itemVatRate(item);
+      subtotalBeforeVat += before * qty;
+      if(itemHasProductDiscount(item)){
+        productDiscountedCount += qty;
+        total += itemLineTotalCurrent(item);
+        var lineCurrent = itemLineTotalCurrent(item);
+        vatTotal += lineCurrent - (lineCurrent / (1 + vatRate / 100));
+      }else{
+        var lineBefore = before * qty;
+        var lineDiscount = discountPercent ? (lineBefore * discountPercent / 100) : 0;
+        var afterBeforeVat = Math.max(0, lineBefore - lineDiscount);
+        codeDiscountBeforeVat += lineDiscount;
+        vatTotal += afterBeforeVat * vatRate / 100;
+        total += afterBeforeVat * (1 + vatRate / 100);
+      }
+    });
+
+    return {
+      subtotalBeforeVat: subtotalBeforeVat,
+      codeDiscountBeforeVat: codeDiscountBeforeVat,
+      vatTotal: vatTotal,
+      total: total,
+      productDiscountedCount: productDiscountedCount,
+      code: code
+    };
+  }
+
+  function saveCartDiscount(){
+    if(appliedCartDiscount) localStorage.setItem('appliedDiscount', JSON.stringify(appliedCartDiscount));
+    else localStorage.removeItem('appliedDiscount');
+  }
+
+  function cartPanel(){ return document.getElementById('cartPanel'); }
+  function cartWrap(){ return document.getElementById('cartItems'); }
+
+  function cartItemImageSafe(item){
+    try{ return typeof cartItemImage === 'function' ? cartItemImage(item) : ''; }catch(e){ return ''; }
+  }
+
+  window.openCart = openCart = function(){
+    var panel = cartPanel();
+    var wrap = cartWrap();
+    if(!panel || !wrap) return;
+
+    window.cart = cart = (cart || []).map(function(i){ return typeof lightweightCartItem === 'function' ? lightweightCartItem(i) : i; });
+    if(typeof saveCartSafe === 'function') saveCartSafe();
+
+    if(!cart.length){
+      appliedCartDiscount = null;
+      saveCartDiscount();
+      wrap.innerHTML = '<p>' + safeText((window.T && T[lang] && T[lang].empty) || 'Your cart is empty.') + '</p>';
+    }else{
+      wrap.innerHTML = cart.map(function(i,index){
+        var img = cartItemImageSafe(i);
+        var hasDiscount = itemHasProductDiscount(i);
+        return '<div class="cart-item cart-item-rich">' +
+          (img ? '<img src="' + safeText(img) + '" alt="' + safeText(i.name) + '">' : '') +
+          '<div><strong>' + safeText(i.name) + '</strong><br>' +
+          'Color: ' + safeText(i.color || '') + (i.colorCode ? ' (' + safeText(i.colorCode) + ')' : '') + '<br>' +
+          'Fabric: ' + safeText(i.fabric || '') + '<br>' +
+          'Size: ' + safeText(i.size || '') + '<br>' +
+          (hasDiscount ? '<small class="discount-price">Product already under discount: ' + Number(i.discountPercent || 0) + '% — no additional code discount.</small><br>' : '') +
+          '<strong>' + money(itemLineTotalCurrent(i)) + '</strong><br>' +
+          '<button type="button" data-cart-action="qty-minus" data-cart-index="' + index + '">-</button> ' +
+          '<span class="qty">' + itemQty(i) + '</span> ' +
+          '<button type="button" data-cart-action="qty-plus" data-cart-index="' + index + '">+</button> ' +
+          '<button type="button" data-cart-action="remove" data-cart-index="' + index + '">Remove</button>' +
+          '</div></div>';
+      }).join('') +
+      '<div class="cart-discount-box" style="margin-top:14px;padding:12px;border:1px solid #e6d8c5;border-radius:14px;background:#fffaf2;">' +
+        '<strong>Discount Code</strong>' +
+        '<p style="margin:6px 0 10px;font-size:13px;">Code discount applies before VAT only to products without existing discounts.</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<input id="cartDiscountCode" value="' + safeText(appliedCartDiscount && appliedCartDiscount.code || '') + '" placeholder="Enter code e.g. CV10" style="flex:1;min-width:160px;padding:10px;border:1px solid #ddd;border-radius:10px;">' +
+          '<button type="button" class="btn secondary" data-cart-action="apply-code">Apply</button>' +
+          '<button type="button" class="btn secondary" data-cart-action="clear-code">Clear</button>' +
+        '</div>' +
+        '<p id="cartDiscountMessage" style="margin:8px 0 0;font-size:13px;"></p>' +
+      '</div>';
+    }
+
+    renderCartTotals();
+    panel.classList.remove('hidden');
   };
 
-  setTimeout(function(){
-    try{ if(document.getElementById('productGrid') && typeof applySortAndFilter === 'function') applySortAndFilter(); }catch(e){}
+  window.closeCart = closeCart = function(){
+    var panel = cartPanel();
+    if(panel) panel.classList.add('hidden');
+  };
+
+  function renderCartTotals(message, isError){
+    var totalEl = document.getElementById('cartTotal');
+    if(!totalEl) return;
+    var t = cartTotals();
+    var html = '<div class="cart-total-lines">' +
+      '<div>Subtotal before VAT: <strong>' + money(t.subtotalBeforeVat) + '</strong></div>';
+    if(t.code){
+      html += '<div class="discount-price">Code discount before VAT (' + safeText(t.code.code) + ' - ' + Number(t.code.percent || 0) + '%): -<strong>' + money(t.codeDiscountBeforeVat) + '</strong></div>';
+    }
+    html += '<div>VAT after discount: <strong>' + money(t.vatTotal) + '</strong></div>' +
+      '<div>Total incl. VAT: <strong>' + money(t.total) + '</strong></div>' +
+      '</div>';
+    totalEl.innerHTML = html;
+
+    var msg = document.getElementById('cartDiscountMessage');
+    if(msg){
+      var baseMsg = '';
+      if(t.productDiscountedCount && t.code){ baseMsg = 'Some products are already under discount, so no additional code discount was added to those products.'; }
+      msg.textContent = message || baseMsg;
+      msg.className = isError ? 'discount-red' : 'discount-price';
+      msg.style.color = isError ? '#b00020' : '#b11226';
+    }
+  }
+
+  async function applyCartDiscountCode(){
+    var input = document.getElementById('cartDiscountCode');
+    var codeText = String(input && input.value || '').trim().toUpperCase();
+    if(!codeText){
+      appliedCartDiscount = null;
+      saveCartDiscount();
+      renderCartTotals('Please add a discount code.', true);
+      return;
+    }
+    var eligible = eligibleBeforeVatSubtotal();
+    if(eligible <= 0){
+      appliedCartDiscount = null;
+      saveCartDiscount();
+      renderCartTotals('This product is already under discount, so no additional discount will be added.', true);
+      return;
+    }
+    var found = await validateCartDiscountCode(codeText);
+    if(!found){
+      appliedCartDiscount = null;
+      saveCartDiscount();
+      renderCartTotals('Invalid discount code.', true);
+      return;
+    }
+    if(isCodeExpired(found)){
+      appliedCartDiscount = null;
+      saveCartDiscount();
+      renderCartTotals('Discount code expired.', true);
+      return;
+    }
+    appliedCartDiscount = found;
+    saveCartDiscount();
+    var msg = 'Code applied: ' + found.percent + '% discount before VAT.';
+    if(discountedItemsCount()) msg += ' Products already under discount were excluded.';
+    renderCartTotals(msg, false);
+  }
+
+  window.checkout = checkout = function(){
+    if(!cart || !cart.length){ alert((window.T && T[lang] && T[lang].empty) || 'Your cart is empty.'); return; }
+    localStorage.setItem('cartTotals', JSON.stringify(cartTotals()));
+    if(typeof saveCartSafe === 'function') saveCartSafe();
+    window.location.href = 'review.html';
+  };
+
+  document.addEventListener('click', function(e){
+    var target = e.target.closest('button, a');
+    if(!target) return;
+
+    var action = target.getAttribute('data-cart-action');
+    if(action){
+      e.preventDefault();
+      e.stopPropagation();
+      var idx = Number(target.getAttribute('data-cart-index'));
+      if(action === 'qty-minus' && cart[idx]){ cart[idx].qty = Math.max(1, itemQty(cart[idx]) - 1); if(typeof saveCartSafe === 'function') saveCartSafe(); if(typeof updateCartCount === 'function') updateCartCount(); openCart(); }
+      if(action === 'qty-plus' && cart[idx]){ cart[idx].qty = itemQty(cart[idx]) + 1; if(typeof saveCartSafe === 'function') saveCartSafe(); if(typeof updateCartCount === 'function') updateCartCount(); openCart(); }
+      if(action === 'remove' && cart[idx]){ cart.splice(idx,1); if(typeof saveCartSafe === 'function') saveCartSafe(); if(typeof updateCartCount === 'function') updateCartCount(); openCart(); }
+      if(action === 'apply-code') applyCartDiscountCode();
+      if(action === 'clear-code'){ appliedCartDiscount = null; saveCartDiscount(); renderCartTotals('Discount code removed.', false); }
+      return;
+    }
+
+    var txt = (target.textContent || '').replace(/\s+/g,' ').trim().toLowerCase();
+    var isCartButton = target.id === 'cartBtn' || target.getAttribute('href') === '#cart' || /^cart\s*\d*/i.test((target.textContent || '').trim()) || txt === 'السلة' || txt.indexOf('السلة') >= 0;
+    if(isCartButton){ e.preventDefault(); e.stopPropagation(); openCart(); return; }
+
+    if(target.closest('#cartPanel') && (txt === 'checkout' || txt === 'الدفع')){ e.preventDefault(); e.stopPropagation(); checkout(); return; }
+    if(target.closest('#cartPanel') && (txt === '×' || txt === 'x')){ e.preventDefault(); e.stopPropagation(); closeCart(); return; }
+    if(target.closest('#productModal') && (target.getAttribute('data-i18n') === 'addCart' || txt === 'add to cart' || txt === 'أضف للسلة')){
+      e.preventDefault(); e.stopPropagation(); if(typeof addCurrentToCart === 'function') addCurrentToCart(); return;
+    }
+  }, true);
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeCart();
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    if(typeof updateCartCount === 'function') updateCartCount();
+  });
+})();
+
+
+/* CV COLOR SWITCH + MODAL TOOL DEDUPE ONLY FIX 20260613
+   Scope: fixes product color image switching and removes duplicated modal tool button groups.
+   No admin/backend/cart/auth behavior is changed.
+*/
+(function(){
+  if(window.__cvColorSwitchToolDedupeFix20260613) return;
+  window.__cvColorSwitchToolDedupeFix20260613 = true;
+
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+  function safeUrl(v){
+    v = String(v || '').trim();
+    return v && !v.startsWith('file://') && !v.includes('/Users/') ? v : '';
+  }
+  function unique(list){ return Array.from(new Set((list || []).map(safeUrl).filter(Boolean))); }
+
+  function activeFabricLabel(){
     try{
-      if(typeof currentProduct !== 'undefined' && currentProduct && document.getElementById('modalPrice')){
-        document.getElementById('modalPrice').innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
-      }
+      if(typeof selectedFabricOption !== 'undefined' && selectedFabricOption && selectedFabricOption.label) return String(selectedFabricOption.label);
+      if(window.selectedFabricOption && window.selectedFabricOption.label) return String(window.selectedFabricOption.label);
+      const sel = document.getElementById('fabricSelect');
+      if(sel && sel.selectedOptions && sel.selectedOptions[0]) return sel.selectedOptions[0].textContent || '';
     }catch(e){}
-  }, 250);
+    return '';
+  }
+
+  function findColorKey(product, color){
+    const colors = product && product.colors ? product.colors : {};
+    const keys = Object.keys(colors);
+    if(!keys.length) return '';
+    if(colors[color]) return color;
+    const wanted = norm(color);
+    return keys.find(k => norm(k) === wanted) ||
+           keys.find(k => norm(k).includes(wanted) || wanted.includes(norm(k))) ||
+           keys[0];
+  }
+
+  function urlsFromColorValue(value, requestedFabric){
+    if(!value) return [];
+    const fabric = norm(requestedFabric);
+    const preferred = [];
+    const fallback = [];
+
+    if(Array.isArray(value.imageMeta)){
+      value.imageMeta.forEach(item => {
+        if(!item) return;
+        const url = safeUrl(item.url || item.src || item.image);
+        if(!url) return;
+        const itemFabric = norm(item.fabric || item.fabricLabel || item.fabric_name);
+        if(fabric && itemFabric && itemFabric === fabric) preferred.push(url);
+        fallback.push(url);
+      });
+    }
+    if(Array.isArray(value.images)) fallback.push(...value.images);
+    if(value.image) fallback.push(value.image);
+    if(value.url) fallback.push(value.url);
+    if(value.src) fallback.push(value.src);
+    return unique(preferred.length ? preferred : fallback);
+  }
+
+  function globalColorUrls(product, color){
+    const wanted = norm(color);
+    const out = [];
+    const arrays = [product && product.imageMeta, product && product.galleryMeta, product && product.images, product && product.gallery];
+    arrays.forEach(arr => {
+      if(!Array.isArray(arr)) return;
+      arr.forEach(item => {
+        if(typeof item === 'string'){ return; }
+        if(!item) return;
+        const itemColor = norm(item.color || item.colorName || item.colour || item.label);
+        if(itemColor && (itemColor === wanted || itemColor.includes(wanted) || wanted.includes(itemColor))){
+          out.push(item.url || item.src || item.image);
+        }
+      });
+    });
+    return unique(out);
+  }
+
+  window.getColorImages = function(color){
+    const product = (typeof currentProduct !== 'undefined' && currentProduct) ? currentProduct : (window.currentProduct || null);
+    if(!product) return [];
+    const actualKey = findColorKey(product, color);
+    const colors = product.colors || {};
+    const fabric = activeFabricLabel();
+    const direct = urlsFromColorValue(colors[actualKey], fabric);
+    if(direct.length) return direct;
+    const global = globalColorUrls(product, actualKey || color);
+    if(global.length) return global;
+    try{ return window.firstImage ? [firstImage(product)].filter(Boolean) : []; }catch(e){ return []; }
+  };
+
+  window.selectColor = function(color){
+    const product = (typeof currentProduct !== 'undefined' && currentProduct) ? currentProduct : (window.currentProduct || null);
+    if(!product) return;
+    const actualKey = findColorKey(product, color);
+    window.selectedColor = actualKey;
+    try{ selectedColor = actualKey; }catch(e){}
+    const images = window.getColorImages(actualKey);
+    const nextImage = images[0] || (window.firstImage ? firstImage(product) : '');
+    window.selectedImage = nextImage;
+    try{ selectedImage = nextImage; }catch(e){}
+    if(typeof window.renderColors === 'function') renderColors();
+    if(typeof window.renderThumbs === 'function') renderThumbs();
+    const main = document.getElementById('modalImage') || document.getElementById('cvFinalMainImg');
+    if(main && nextImage) main.src = nextImage;
+    if(typeof window.updateModalImage === 'function') updateModalImage();
+    if(typeof window.renderSelectionSummary === 'function') setTimeout(window.renderSelectionSummary, 20);
+  };
+
+  function removeDuplicateModalToolGroups(){
+    const modal = document.getElementById('productModal');
+    if(!modal) return;
+    // Remove the secondary injected tool blocks, keeping the single native UX95 inline buttons only.
+    modal.querySelectorAll('#cvModalTools, #cvPremiumTools, .cv-modal-tools, .cv-standalone-tools').forEach(el => el.remove());
+    const groups = Array.from(modal.querySelectorAll('.ux95-tools-inline'));
+    groups.slice(1).forEach(el => el.remove());
+    // Last safety net: if any other wrapper contains the same 3 tool actions, keep only the first wrapper.
+    const toolWrappers = Array.from(modal.querySelectorAll('div')).filter(el => {
+      const btns = Array.from(el.querySelectorAll('button[data-ux95-tool],button[data-cv-tool]'));
+      const types = new Set(btns.map(b => b.dataset.ux95Tool || b.dataset.cvTool).filter(Boolean));
+      return types.has('360') && types.has('room') && types.has('measure');
+    });
+    toolWrappers.slice(1).forEach(el => el.remove());
+  }
+
+  document.addEventListener('click', function(e){
+    const colorBtn = e.target && e.target.closest ? e.target.closest('.color-chip, [data-color], [data-product-color]') : null;
+    if(!colorBtn) return;
+    const color = colorBtn.getAttribute('data-color') || colorBtn.getAttribute('data-product-color') || (colorBtn.textContent || '').replace(/#[0-9a-fA-F]{3,8}/g,'').trim();
+    const product = (typeof currentProduct !== 'undefined' && currentProduct) ? currentProduct : (window.currentProduct || null);
+    if(color && product){
+      e.preventDefault();
+      e.stopPropagation();
+      setTimeout(function(){ window.selectColor(color); }, 0);
+    }
+  }, true);
+
+  const observer = new MutationObserver(removeDuplicateModalToolGroups);
+  document.addEventListener('DOMContentLoaded', function(){
+    removeDuplicateModalToolGroups();
+    observer.observe(document.body, {childList:true, subtree:true});
+  });
+  setInterval(removeDuplicateModalToolGroups, 1000);
 })();

@@ -1152,13 +1152,6 @@ function getProductFabricLabels(p){
   (p?.fabrics || []).forEach(f => { if(f && !out.includes(String(f))) out.push(String(f)); });
   return out;
 }
-function getProductColorLabels(p){
-  const out = [];
-  if(p && p.colors && typeof p.colors === 'object') Object.keys(p.colors).forEach(c => { if(c && !out.includes(String(c))) out.push(String(c)); });
-  (p?.colorOptions || []).forEach(c => { const v = c && (c.label || c.name || c.color || c); if(v && !out.includes(String(v))) out.push(String(v)); });
-  (p?.colorsList || p?.colorList || []).forEach(c => { if(c && !out.includes(String(c))) out.push(String(c)); });
-  return out;
-}
 function showDiscountEl(id, show){
   const el = document.getElementById(id);
   if(el) el.style.display = show ? '' : 'none';
@@ -1193,14 +1186,11 @@ function renderDiscountVariantTargets(){
   const product = getDiscountProductById(productId);
   const sizeEl = document.getElementById('discountSizeTarget');
   const fabricEl = document.getElementById('discountFabricTarget');
-  const colorEl = document.getElementById('discountColorTarget');
 
-  const needsSize = targetType === 'product' && product && (scope === 'size' || scope === 'combo' || scope === 'comboColor');
-  const needsFabric = targetType === 'product' && product && (scope === 'fabric' || scope === 'combo' || scope === 'comboColor');
-  const needsColor = targetType === 'product' && product && (scope === 'color' || scope === 'comboColor');
+  const needsSize = targetType === 'product' && product && (scope === 'size' || scope === 'combo');
+  const needsFabric = targetType === 'product' && product && (scope === 'fabric' || scope === 'combo');
   showDiscountEl('discountSizeTarget', !!needsSize);
   showDiscountEl('discountFabricTarget', !!needsFabric);
-  showDiscountEl('discountColorTarget', !!needsColor);
 
   if(sizeEl){
     const selected = sizeEl.value;
@@ -1211,11 +1201,6 @@ function renderDiscountVariantTargets(){
     const selected = fabricEl.value;
     const fabrics = product ? getProductFabricLabels(product) : [];
     fabricEl.innerHTML = '<option value="">Choose fabric</option>' + fabrics.map(v => discountOptionHtml(v, v, v === selected)).join('');
-  }
-  if(colorEl){
-    const selected = colorEl.value;
-    const colors = product ? getProductColorLabels(product) : [];
-    colorEl.innerHTML = '<option value="">Choose color</option>' + colors.map(v => discountOptionHtml(v, v, v === selected)).join('');
   }
 }
 function buildDiscountRuleFromForm(){
@@ -1236,11 +1221,9 @@ function buildDiscountRuleFromForm(){
   if(!productId){ showAdminStatus('Please choose specific product.', true); return null; }
   const size = document.getElementById('discountSizeTarget')?.value || '';
   const fabric = document.getElementById('discountFabricTarget')?.value || '';
-  const color = document.getElementById('discountColorTarget')?.value || '';
-  if((applyScope === 'size' || applyScope === 'combo' || applyScope === 'comboColor') && !size){ showAdminStatus('Please choose size for this product.', true); return null; }
-  if((applyScope === 'fabric' || applyScope === 'combo' || applyScope === 'comboColor') && !fabric){ showAdminStatus('Please choose fabric for this product.', true); return null; }
-  if((applyScope === 'color' || applyScope === 'comboColor') && !color){ showAdminStatus('Please choose color for this product.', true); return null; }
-  return {targetType, productId, applyScope, size, fabric, color, percent, active};
+  if((applyScope === 'size' || applyScope === 'combo') && !size){ showAdminStatus('Please choose size for this product.', true); return null; }
+  if((applyScope === 'fabric' || applyScope === 'combo') && !fabric){ showAdminStatus('Please choose fabric for this product.', true); return null; }
+  return {targetType, productId, applyScope, size, fabric, percent, active};
 }
 function ruleMatchesProduct(rule, p){
   if(!rule || !p) return false;
@@ -1251,14 +1234,13 @@ function ruleMatchesProduct(rule, p){
 }
 function upsertProductDiscountRule(p, rule){
   const cleanRule = {
-    id: [rule.targetType, rule.applyScope, rule.category || rule.productId || 'all', rule.size || '', rule.fabric || '', rule.color || ''].join('|'),
+    id: [rule.targetType, rule.applyScope, rule.category || rule.productId || 'all', rule.size || '', rule.fabric || ''].join('|'),
     targetType: rule.targetType,
     category: rule.category || '',
     productId: rule.productId || '',
     applyScope: rule.applyScope || 'product',
     size: rule.size || '',
     fabric: rule.fabric || '',
-    color: rule.color || '',
     percent: Number(rule.active ? rule.percent : 0),
     active: !!rule.active
   };
@@ -1314,9 +1296,7 @@ function describeDiscountRule(r){
   if(r.targetType === 'product') parts.push('Specific Product');
   if(r.applyScope === 'size') parts.push('Size: ' + r.size);
   if(r.applyScope === 'fabric') parts.push('Fabric: ' + r.fabric);
-  if(r.applyScope === 'color') parts.push('Color: ' + r.color);
   if(r.applyScope === 'combo') parts.push('Size: ' + r.size + ' + Fabric: ' + r.fabric);
-  if(r.applyScope === 'comboColor') parts.push('Size: ' + r.size + ' + Fabric: ' + r.fabric + ' + Color: ' + r.color);
   parts.push(Number(r.percent || 0) + '% discount');
   return parts.join(' | ');
 }
@@ -4796,7 +4776,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   }
 
   function resetDiscountForm(){
-    ['discountTargetType','discountCategoryTarget','discountProductTarget','discountApplyScope','discountSizeTarget','discountFabricTarget','discountColorTarget','bulkDiscount'].forEach(id => { if(q(id)) q(id).value = ''; });
+    ['discountTargetType','discountCategoryTarget','discountProductTarget','discountApplyScope','discountSizeTarget','discountFabricTarget','bulkDiscount'].forEach(id => { if(q(id)) q(id).value = ''; });
     if(q('discountStatus')) q('discountStatus').value = 'active';
     setDiscountEditMode(null);
     if(typeof window.renderDiscountTargets === 'function') window.renderDiscountTargets();
@@ -4916,20 +4896,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
   }
 
-  function getProductColorsForDiscount(p){
-    const out = [];
-    if(p && p.colors && typeof p.colors === 'object') Object.keys(p.colors).forEach(c => { if(c) out.push(c); });
-    const add = (v) => {
-      if(v === undefined || v === null) return;
-      if(typeof v === 'object') v = v.label || v.name || v.value || v.color || v.title || '';
-      String(v).split(',').forEach(x => { const t = x.trim(); if(t) out.push(t); });
-    };
-    if(p && Array.isArray(p.colorOptions)) p.colorOptions.forEach(add);
-    if(p && Array.isArray(p.colorsList)) p.colorsList.forEach(add);
-    if(p && Array.isArray(p.colorList)) p.colorList.forEach(add);
-    return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
-  }
-
   function ensureDiscountApplyScopeOptions(){
     const el = q('discountApplyScope');
     if(!el) return;
@@ -4938,11 +4904,9 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       '<option value="product">Product Only</option>',
       '<option value="size">Size Only</option>',
       '<option value="fabric">Fabric Only</option>',
-      '<option value="color">Color Only</option>',
-      '<option value="combo">Size + Fabric Combination</option>',
-      '<option value="comboColor">Size + Fabric + Color Combination</option>'
+      '<option value="combo">Size + Fabric Combination</option>'
     ].join('');
-    el.value = ['product','size','fabric','color','combo','comboColor'].includes(current) ? current : 'product';
+    el.value = ['product','size','fabric','combo'].includes(current) ? current : 'product';
   }
   function hideDiscountSelect(id){
     const el = q(id);
@@ -4965,7 +4929,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     const scopeEl = q('discountApplyScope');
     const sizeEl = q('discountSizeTarget');
     const fabricEl = q('discountFabricTarget');
-    const colorEl = q('discountColorTarget');
 
     if(!scopeEl || !sizeEl || !fabricEl) return;
 
@@ -4973,7 +4936,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       hideDiscountSelect('discountApplyScope');
       hideDiscountSelect('discountSizeTarget');
       hideDiscountSelect('discountFabricTarget');
-      hideDiscountSelect('discountColorTarget');
       return;
     }
 
@@ -4983,12 +4945,10 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
 
     const sizes = getProductSizesForDiscount(p);
     const fabrics = getProductFabricsForDiscount(p);
-    const colors = getProductColorsForDiscount(p);
     const selectedSize = sizeEl.value;
     const selectedFabric = fabricEl.value;
-    const selectedColor = colorEl ? colorEl.value : '';
 
-    if(applyScope === 'size' || applyScope === 'combo' || applyScope === 'comboColor'){
+    if(applyScope === 'size' || applyScope === 'combo'){
       showDiscountSelect('discountSizeTarget');
       sizeEl.innerHTML = sizes.length ? '<option value="">Choose Size</option>' + sizes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('') : '<option value="">No sizes found for this product</option>';
       if(selectedSize) sizeEl.value = selectedSize;
@@ -4996,22 +4956,12 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       hideDiscountSelect('discountSizeTarget');
     }
 
-    if(applyScope === 'fabric' || applyScope === 'combo' || applyScope === 'comboColor'){
+    if(applyScope === 'fabric' || applyScope === 'combo'){
       showDiscountSelect('discountFabricTarget');
       fabricEl.innerHTML = fabrics.length ? '<option value="">Choose Fabric</option>' + fabrics.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('') : '<option value="">No fabrics found for this product</option>';
       if(selectedFabric) fabricEl.value = selectedFabric;
     }else{
       hideDiscountSelect('discountFabricTarget');
-    }
-
-    if(colorEl){
-      if(applyScope === 'color' || applyScope === 'comboColor'){
-        showDiscountSelect('discountColorTarget');
-        colorEl.innerHTML = colors.length ? '<option value="">Choose Color</option>' + colors.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('') : '<option value="">No colors found for this product</option>';
-        if(selectedColor) colorEl.value = selectedColor;
-      }else{
-        hideDiscountSelect('discountColorTarget');
-      }
     }
   }
 
@@ -5045,7 +4995,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     hideDiscountSelect('discountApplyScope');
     hideDiscountSelect('discountSizeTarget');
     hideDiscountSelect('discountFabricTarget');
-    hideDiscountSelect('discountColorTarget');
 
     if(!type) return;
 
@@ -5078,7 +5027,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
         applyScope: newType === 'product' ? (val('discountApplyScope') || 'product') : 'product',
         size: val('discountSizeTarget'),
         fabric: val('discountFabricTarget'),
-        color: val('discountColorTarget'),
         active: val('discountStatus') !== 'inactive',
         publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('discountPublishPages') : ['discounted-items.html'])
       };
@@ -5089,7 +5037,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       applyScope: 'product',
       size: '',
       fabric: '',
-      color: '',
       active: true,
       publishPages: (typeof window.getSelectedPublishPages === 'function' ? window.getSelectedPublishPages('discountPublishPages') : ['discounted-items.html'])
     };
@@ -5098,8 +5045,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   function discountRuleMatches(rule, selection){
     return String(rule.scope || '') === String(selection.applyScope || '') &&
       String(rule.size || '') === String(selection.size || '') &&
-      String(rule.fabric || '') === String(selection.fabric || '') &&
-      String(rule.color || '') === String(selection.color || '');
+      String(rule.fabric || '') === String(selection.fabric || '');
   }
 
   async function updateDiscountedProducts(percent, selection){
@@ -5119,9 +5065,8 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
         if(selection.active && pct > 0){
           rules.push({
             scope: selection.applyScope,
-            size: selection.applyScope === 'size' || selection.applyScope === 'combo' || selection.applyScope === 'comboColor' ? selection.size : '',
-            fabric: selection.applyScope === 'fabric' || selection.applyScope === 'combo' || selection.applyScope === 'comboColor' ? selection.fabric : '',
-            color: selection.applyScope === 'color' || selection.applyScope === 'comboColor' ? selection.color : '',
+            size: selection.applyScope === 'size' || selection.applyScope === 'combo' ? selection.size : '',
+            fabric: selection.applyScope === 'fabric' || selection.applyScope === 'combo' ? selection.fabric : '',
             percent: pct,
             active: true,
             updatedAt: new Date().toISOString(),
@@ -5168,9 +5113,8 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     if(!selection.type) return show('Please choose a discount target.', true);
     if(selection.type !== 'all' && !selection.target) return show('Please choose a discount target.', true);
     if(percent < 0 || percent > 90) return show('Discount must be between 0 and 90.', true);
-    if(selection.type === 'product' && (selection.applyScope === 'size' || selection.applyScope === 'combo' || selection.applyScope === 'comboColor') && !selection.size) return show('Please choose a size for this product.', true);
-    if(selection.type === 'product' && (selection.applyScope === 'fabric' || selection.applyScope === 'combo' || selection.applyScope === 'comboColor') && !selection.fabric) return show('Please choose a fabric for this product.', true);
-    if(selection.type === 'product' && (selection.applyScope === 'color' || selection.applyScope === 'comboColor') && !selection.color) return show('Please choose a color for this product.', true);
+    if(selection.type === 'product' && (selection.applyScope === 'size' || selection.applyScope === 'combo') && !selection.size) return show('Please choose a size for this product.', true);
+    if(selection.type === 'product' && (selection.applyScope === 'fabric' || selection.applyScope === 'combo') && !selection.fabric) return show('Please choose a fabric for this product.', true);
 
     try{
       const count = await updateDiscountedProducts(percent, selection);
@@ -5293,7 +5237,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
         const details = [];
         if(r.size) details.push('Size: ' + r.size);
         if(r.fabric) details.push('Fabric: ' + r.fabric);
-        if(r.color) details.push('Color: ' + r.color);
         const scope = String(r.scope || 'product');
         entries.push({
           key: `rule:${productId}:${idx}`,
@@ -5303,7 +5246,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
           scope,
           size:r.size || '',
           fabric:r.fabric || '',
-          color:r.color || '',
           percent:Number(r.percent || 0),
           active:r.active !== false,
           label:`${scope.toUpperCase()} discount: ${Number(r.percent || 0)}%${details.length ? ' | ' + details.join(' | ') : ''}${r.active === false ? ' | Inactive' : ''}`
@@ -5353,7 +5295,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       await window.renderDiscountVariantTargets();
       if(q('discountSizeTarget')) q('discountSizeTarget').value = entry.size || '';
       if(q('discountFabricTarget')) q('discountFabricTarget').value = entry.fabric || '';
-      if(q('discountColorTarget')) q('discountColorTarget').value = entry.color || '';
       if(q('bulkDiscount')) q('bulkDiscount').value = entry.percent || '';
       if(q('discountStatus')) q('discountStatus').value = entry.active === false ? 'inactive' : 'active';
       setDiscountEditMode({key});
