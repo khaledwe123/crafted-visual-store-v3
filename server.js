@@ -1138,104 +1138,8 @@ function htmlFileForRequest(req){
   if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
-function escapeHtmlAttr(value){
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-function stripHtmlText(value){
-  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-function publicBaseUrl(req, settings){
-  const configured = String(settings.site_url || process.env.PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
-  if(configured) return configured;
-  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
-  return `${proto}://${req.get('host')}`.replace(/\/$/, '');
-}
-function seoKeyForHtmlFile(file){
-  const name = path.basename(file);
-  const map = {
-    'index.html':'home',
-    'shop.html':'shop',
-    'discounted-items.html':'discounted',
-    'contact.html':'contact',
-    'account.html':'account',
-    'auth.html':'account',
-    'track-order.html':'track',
-    'review.html':'review',
-    'payment.html':'payment',
-    'thankyou.html':'thankyou',
-    'page.html':'page',
-    'estimator final.html':'estimator'
-  };
-  return map[name] || name.replace(/\.html$/i, '');
-}
-function localizedSeoValue(pageSeo, base, lang){
-  return pageSeo?.[`${base}_${lang}`] || pageSeo?.[base] || pageSeo?.[`${base}_en`] || '';
-}
-function upsertHeadTag(html, regex, tag){
-  if(regex.test(html)) return html.replace(regex, tag);
-  return html.replace(/<head([^>]*)>/i, `<head$1>\n  ${tag}`);
-}
-function applyServerSeoTransforms(html, req, file){
-  try{
-    const settings = publicSettings(getSettingObject());
-    const pageKey = seoKeyForHtmlFile(file);
-    const lang = String(req.query.lang || '').toLowerCase() === 'ar' ? 'ar' : 'en';
-    const seoPages = Object.assign({}, DEFAULT_SEO_PAGES, settings.seo_pages || {});
-    const pageSeo = seoPages[pageKey] || seoPages.home || {};
-    const title = stripHtmlText(localizedSeoValue(pageSeo, 'title', lang));
-    const description = stripHtmlText(localizedSeoValue(pageSeo, 'description', lang));
-    const keywords = Array.isArray(pageSeo.keywords) ? pageSeo.keywords.join(', ') : stripHtmlText(pageSeo.keywords || '');
-    const baseUrl = publicBaseUrl(req, settings);
-    const cleanPath = req.path === '/' ? '/' : req.path;
-    const canonical = `${baseUrl}${cleanPath}`;
-    const imageRaw = settings.seo_default_image || settings.hero_image || (Array.isArray(settings.hero_banners) && settings.hero_banners[0]) || 'assets/products/product_01.png';
-    const imageUrl = String(imageRaw || '').startsWith('http') ? imageRaw : `${baseUrl}/${String(imageRaw || '').replace(/^\/+/, '')}`;
-    const brandName = lang === 'ar' ? (settings.seo_store_name_ar || settings.brand_ar || 'Bayt Crafted') : (settings.seo_store_name_en || settings.brand_en || 'Bayt Crafted');
-    let out = html;
-    if(title) out = out.replace(/<title>.*?<\/title>/is, `<title>${escapeHtmlAttr(title)}</title>`);
-    const tags = [
-      ['meta[name="description"]', /<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${escapeHtmlAttr(description)}">`],
-      ['meta[name="keywords"]', /<meta\s+name=["']keywords["'][^>]*>/i, `<meta name="keywords" content="${escapeHtmlAttr(keywords)}">`],
-      ['meta[name="robots"]', /<meta\s+name=["']robots["'][^>]*>/i, `<meta name="robots" content="index, follow, max-image-preview:large">`],
-      ['link[rel="canonical"]', /<link\s+rel=["']canonical["'][^>]*>/i, `<link rel="canonical" href="${escapeHtmlAttr(canonical)}">`],
-      ['meta[property="og:title"]', /<meta\s+property=["']og:title["'][^>]*>/i, `<meta property="og:title" content="${escapeHtmlAttr(title)}">`],
-      ['meta[property="og:description"]', /<meta\s+property=["']og:description["'][^>]*>/i, `<meta property="og:description" content="${escapeHtmlAttr(description)}">`],
-      ['meta[property="og:type"]', /<meta\s+property=["']og:type["'][^>]*>/i, `<meta property="og:type" content="website">`],
-      ['meta[property="og:url"]', /<meta\s+property=["']og:url["'][^>]*>/i, `<meta property="og:url" content="${escapeHtmlAttr(canonical)}">`],
-      ['meta[property="og:image"]', /<meta\s+property=["']og:image["'][^>]*>/i, `<meta property="og:image" content="${escapeHtmlAttr(imageUrl)}">`],
-      ['meta[property="og:locale"]', /<meta\s+property=["']og:locale["'][^>]*>/i, `<meta property="og:locale" content="${lang === 'ar' ? 'ar_SA' : 'en_US'}">`],
-      ['meta[name="twitter:card"]', /<meta\s+name=["']twitter:card["'][^>]*>/i, `<meta name="twitter:card" content="summary_large_image">`],
-      ['meta[name="twitter:title"]', /<meta\s+name=["']twitter:title["'][^>]*>/i, `<meta name="twitter:title" content="${escapeHtmlAttr(title)}">`],
-      ['meta[name="twitter:description"]', /<meta\s+name=["']twitter:description["'][^>]*>/i, `<meta name="twitter:description" content="${escapeHtmlAttr(description)}">`],
-      ['meta[name="twitter:image"]', /<meta\s+name=["']twitter:image["'][^>]*>/i, `<meta name="twitter:image" content="${escapeHtmlAttr(imageUrl)}">`]
-    ];
-    tags.forEach(([, regex, tag]) => { out = upsertHeadTag(out, regex, tag); });
-    const schema = {
-      '@context':'https://schema.org',
-      '@type':'FurnitureStore',
-      name:brandName,
-      url:baseUrl,
-      image:imageUrl,
-      address:{'@type':'PostalAddress', addressLocality:'Riyadh', addressCountry:'SA'}
-    };
-    const schemaTag = `<script type="application/ld+json" id="server-seo-store-schema">${JSON.stringify(schema).replace(/</g, '\\u003c')}</script>`;
-    if(/<script[^>]+id=["']server-seo-store-schema["'][\s\S]*?<\/script>/i.test(out)){
-      out = out.replace(/<script[^>]+id=["']server-seo-store-schema["'][\s\S]*?<\/script>/i, schemaTag);
-    } else {
-      out = out.replace(/<head([^>]*)>/i, `<head$1>\n  ${schemaTag}`);
-    }
-    return out;
-  }catch(e){
-    console.warn('Server SEO transform skipped:', e.message);
-    return html;
-  }
-}
-function applyHtmlSecurityTransforms(html, nonce, req, file){
-  let out = applyServerSeoTransforms(html, req, file);
+function applyHtmlSecurityTransforms(html, nonce){
+  let out = html;
   if(!out.includes('cv-csp-action-bridge.js')){
     out = out.replace(/<head([^>]*)>/i, `<head$1>\n  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
   }
@@ -1275,7 +1179,7 @@ app.get(['/', '/*.html'], (req,res,next)=>{
   if(!file) return next();
   try{
     const html = fs.readFileSync(file, 'utf8');
-    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce, req, file));
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
   }catch(e){ next(e); }
 });
 
