@@ -1,0 +1,22 @@
+Crafted Visual - All Devices Compatibility Upgrade
+
+Added:
+- Desktop, tablet, and mobile responsive layout rules.
+- Mobile hamburger menu.
+- Bottom mobile navigation: Home, Shop, Cart, Account.
+- Touch-friendly product option buttons.
+- Mobile product modal optimized as bottom sheet.
+- Sticky mobile Add to Cart CTA inside product details.
+- Responsive cart drawer.
+- Responsive product grids and admin grids.
+- Tablet two-column product modal layout.
+- Lazy loading and async decoding for images.
+- RTL mobile layout support.
+
+Recommended testing:
+1. Desktop: 1440px wide.
+2. Tablet: iPad portrait and landscape.
+3. Mobile: iPhone/Android 390px and 430px.
+4. Arabic version: verify RTL menu and product modal.
+5. Shop: open product, choose color/size/fabric, add to cart.
+6. Cart: open/close and proceed to checkout.

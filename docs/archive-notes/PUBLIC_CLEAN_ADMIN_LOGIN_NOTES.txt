@@ -1,0 +1,1 @@
+Removed the public 95/100 top ribbon and public Analytics / Room Tools nav links. Admin remains protected at /admin-login.html and /admin.html. Check /api/version for UX95-CLEAN-PUBLIC-ADMIN-LOGIN-20260607-3.

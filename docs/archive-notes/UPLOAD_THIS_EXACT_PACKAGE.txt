@@ -1,0 +1,22 @@
+CRAFTED VISUAL UX95 FINAL VISIBLE PACKAGE
+
+Upload the CONTENTS of this extracted folder to GitHub root.
+GitHub root must show: index.html, shop.html, admin.html, server.js, package.json, ux95-final-visible.css, ux95-final-visible.js.
+
+After Railway deploy, open:
+/
+/shop.html
+/admin.html
+/api/version
+
+You should visibly see:
+- Top ribbon: 95/100 Customer Journey Active
+- Mobile hamburger at phone width
+- Mobile bottom navigation at phone width
+- WhatsApp expert button
+- Shop by Room / Premium Tools sections
+- 360 viewer / room visualizer / measure-in-room popup
+- Wishlist buttons on product cards
+- Analytics Center / UX95 Analytics in admin
+
+If /api/version does not show UX95-FINAL-VISIBLE-20260607-2, Railway is not deploying this package.

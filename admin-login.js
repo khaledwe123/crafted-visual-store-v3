@@ -5,11 +5,37 @@ document.addEventListener("DOMContentLoaded", () => {
   const passwordInput = document.getElementById("password");
   const status = document.getElementById("loginStatus");
 
-  // Remove old prototype data that used to downgrade admin@craftedvisual.com to role=admin.
-  try {
-    localStorage.removeItem("cvAdminUsers");
-    sessionStorage.removeItem("cvAdminSession");
-  } catch (_) {}
+  function clearAdminAuth(){
+    [localStorage, sessionStorage].forEach((store) => {
+      try {
+        ["cvAdminSession", "cvAdminApiToken", "adminToken", "token", "authToken", "adminSession"].forEach(k => store.removeItem(k));
+      } catch (_) {}
+    });
+  }
+  function saveAdminAuth(data){
+    const user = data && data.user;
+    // The real JWT is stored by the server in an HttpOnly cookie.
+    // This non-secret marker only keeps legacy admin scripts from assuming the user is logged out.
+    [localStorage, sessionStorage].forEach((store) => {
+      try {
+        store.setItem("cvAdminApiToken", "cookie-auth");
+        store.setItem("adminToken", "cookie-auth");
+        store.setItem("token", "cookie-auth");
+        store.setItem("authToken", "cookie-auth");
+      } catch (_) {}
+    });
+    if(user){
+      const userJson = JSON.stringify(user);
+      [localStorage, sessionStorage].forEach((store) => {
+        try {
+          store.setItem("cvAdminSession", userJson);
+          store.setItem("adminSession", userJson);
+        } catch (_) {}
+      });
+    }
+  }
+
+  clearAdminAuth();
 
   async function doLogin(event) {
     if (event) event.preventDefault();
@@ -25,22 +51,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ email, password })
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
+        clearAdminAuth();
         status.textContent = data.error || "Invalid login.";
         status.className = "admin-save-status error";
         return;
       }
 
-      localStorage.setItem("cvAdminApiToken", data.token);
-      sessionStorage.setItem("cvAdminApiToken", data.token);
-      sessionStorage.setItem("cvAdminSession", JSON.stringify(data.user));
-      localStorage.setItem("cvAdminSession", JSON.stringify(data.user));
-
+      saveAdminAuth(data);
       window.location.href = "/admin.html";
     } catch (err) {
       console.error("Admin login failed", err);

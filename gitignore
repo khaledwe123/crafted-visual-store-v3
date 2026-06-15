@@ -1,6 +1,12 @@
 node_modules/
-data/
-uploads/
 .env
-*.sqlite
+.env.*
+!.env.example
 *.db
+*.sqlite
+*.sqlite3
+database.sqlite
+uploads/
+.DS_Store
+__MACOSX/
+npm-debug.log*

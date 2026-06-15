@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
   <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
   <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
 <header class="nav">
@@ -20,16 +21,14 @@
 
 <main class="review-page">
   <h1>Payment</h1>
-  <p>Select a payment method. The order will be saved and marked as awaiting payment verification until the admin or payment gateway confirms it.</p>
+  <p>Select your payment method to complete the order.</p>
 
   <section class="review-box" id="paymentSummary"></section>
 
   <section class="review-box">
     <h2>Accepted Payment Methods</h2>
     <div class="payment-grid">
-      <button class="payment-card selected" onclick="selectPayment('Bank Transfer', this)"><span class="pay-logo mada">Bank</span><strong>Bank Transfer</strong></button>
-      <button class="payment-card" onclick="selectPayment('Cash on Delivery', this)"><span class="pay-logo mada">COD</span><strong>Cash on Delivery</strong></button>
-      <button class="payment-card" onclick="selectPayment('Geidea Hosted Checkout', this)"><span class="pay-logo visa">Geidea</span><strong>Geidea Hosted Checkout</strong></button>
+      <button class="payment-card selected" onclick="selectPayment('Mada', this)"><span class="pay-logo mada">mada</span><strong>Mada</strong></button>
       <button class="payment-card" onclick="selectPayment('Visa', this)"><span class="pay-logo visa">VISA</span><strong>Visa</strong></button>
       <button class="payment-card" onclick="selectPayment('Mastercard', this)"><span class="pay-logo mastercard"><i></i><b></b></span><strong>Mastercard</strong></button>
       <button class="payment-card" onclick="selectPayment('Apple Pay', this)"><span class="pay-logo apple"> Pay</span><strong>Apple Pay</strong></button>
@@ -37,38 +36,33 @@
     </div>
   </section>
 
-  <section class="review-box" id="cardDetailsBox" style="display:none">
-    <h2>Card / Gateway Details</h2>
+  <section class="review-box">
+    <h2>Card Details</h2>
     <input id="cardName" placeholder="Name on Card">
     <input id="cardNumber" placeholder="Card Number">
     <div class="admin-grid-3">
       <input id="expiry" placeholder="MM/YY">
       <input id="cvv" placeholder="CVV">
     </div>
-    <p class="small-note">Live card collection should be handled by Geidea Hosted Checkout, not by this website. Keep this section hidden until Geidea sandbox credentials are connected.</p>
+    <p class="small-note">Demo payment page. Connect a real Saudi payment gateway such as Moyasar, HyperPay, Tap, or PayTabs for live payments.</p>
   </section>
 
-  <button class="btn primary" onclick="payNow()">Confirm Payment Method</button>
+  <button class="btn primary" onclick="payNow()">Pay Now</button>
 </main>
 
 <script>
-let selectedPayment = "Bank Transfer";
+let selectedPayment = "Mada";
 const order = JSON.parse(localStorage.getItem("pendingOrder") || "null");
 if(!order){ location.href = "review.html"; }
-
-function money(value){
-  return Number(value || 0).toLocaleString();
-}
 
 function render(){
   document.getElementById("paymentSummary").innerHTML = `
     <h2>Order Summary</h2>
     <p><strong>Order:</strong> ${order.id}</p>
-    <p><strong>Customer:</strong> ${order.customer?.name || "Customer"}</p>
-    <p><strong>Subtotal:</strong> SAR ${money(order.subtotal)}</p>
-    <p><strong>Delivery:</strong> SAR ${money(order.delivery)}</p>
-    <h2>Total: SAR ${money(order.total)}</h2>
-    <p class="small-note"><strong>Status:</strong> Order saved. Payment is not marked paid until admin or payment gateway verification.</p>
+    <p><strong>Customer:</strong> ${order.customer.name}</p>
+    <p><strong>Subtotal:</strong> SAR ${Number(order.subtotal).toLocaleString()}</p>
+    <p><strong>Delivery:</strong> SAR ${Number(order.delivery).toLocaleString()}</p>
+    <h2>Total: SAR ${Number(order.total).toLocaleString()}</h2>
   `;
 }
 render();
@@ -77,44 +71,92 @@ function selectPayment(method, el){
   selectedPayment = method;
   document.querySelectorAll(".payment-card").forEach(x=>x.classList.remove("selected"));
   el.classList.add("selected");
-  const cardBox = document.getElementById("cardDetailsBox");
-  if(cardBox){ cardBox.style.display = "none"; }
 }
 
 async function payNow(){
-  const orderNo = order.id;
-  const payload = {
-    payment_method: selectedPayment,
-    payment_status: selectedPayment === "Cash on Delivery" ? "cod_pending" : "awaiting_payment_verification",
-    status: selectedPayment === "Cash on Delivery" ? "confirmed" : "awaiting_payment",
-    note: "Customer selected " + selectedPayment + " on website payment page.",
-    customer_email: order.customer?.email || ""
-  };
-
-  try{
-    if(window.CV_API && await CV_API.available()){
-      await CV_API.request(`/orders/${encodeURIComponent(orderNo)}/payment`, { method:"POST", body:payload });
-    } else {
-      // Offline prototype fallback only. Do not mark as Paid.
-      const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-      const idx = orders.findIndex(o => o.id === order.id);
-      const updated = {...order, paymentMethod:selectedPayment, paymentStatus:payload.payment_status, orderStatus:payload.status, updatedAt:new Date().toISOString()};
-      if(idx >= 0) orders[idx] = updated; else orders.push(updated);
-      localStorage.setItem("orders", JSON.stringify(orders));
-    }
-
-    order.paymentMethod = selectedPayment;
-    order.paymentStatus = payload.payment_status;
-    order.orderStatus = payload.status;
-    order.updatedAt = new Date().toISOString();
-    localStorage.setItem("lastOrder", JSON.stringify(order));
-    localStorage.removeItem("pendingOrder");
-    localStorage.removeItem("cart");
-    sessionStorage.removeItem("cart");
-    location.href = "thankyou.html?order=" + encodeURIComponent(orderNo) + "&status=" + encodeURIComponent(payload.payment_status);
-  }catch(err){
-    alert("Payment/order update failed: " + err.message);
+  if(!document.getElementById("cardName").value || !document.getElementById("cardNumber").value){
+    alert("Please add payment details.");
+    return;
   }
+  order.paymentMethod = selectedPayment;
+  order.paymentStatus = "Paid";
+  order.orderStatus = "Paid";
+  order.paidAt = new Date().toISOString();
+
+  const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+  orders.push(order);
+  localStorage.setItem("orders", JSON.stringify(orders));
+  localStorage.removeItem("pendingOrder");
+  localStorage.removeItem("cart");
+
+  await crmSendEmail({
+    orderId: order.id,
+    to: order.customer?.email,
+    from: "do-not-reply@craftedvisual.com",
+    fromName: "Crafted Visual Customer Care",
+    subject: "Crafted Visual Payment Confirmation - " + order.id,
+    body: paymentMessage(order),
+    customer: order.customer
+  });
+
+  await crmSendWhatsApp({
+    orderId: order.id,
+    to: order.customer?.mobile,
+    body: paymentMessage(order),
+    customer: order.customer
+  });
+
+  location.href = "thankyou.html?order=" + encodeURIComponent(order.id);
+}
+
+function paymentMessage(order){
+  return `Dear ${order.customer.name},
+
+Thank you for your order with Crafted Visual.
+
+Order Number: ${order.id}
+Payment Status: Paid
+Order Status: ${order.orderStatus || "Paid"}
+Total Paid: SAR ${Number(order.total).toLocaleString()}
+
+We will now start processing your order and keep you updated at every stage.
+
+Best regards,
+Crafted Visual Customer Care`;
+}
+
+async function crmSendEmail(payload){
+  const settings = await getSettings();
+  const record = {...payload, id:"EMAIL-" + Date.now(), channel:"Email", status:"Queued", date:new Date().toISOString()};
+  if(settings.crm_email_api_url){
+    try{
+      const res = await fetch(settings.crm_email_api_url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(record)});
+      record.status = res.ok ? "Sent by CRM" : "CRM API Error";
+    }catch(e){ record.status = "CRM API Error"; record.error = String(e); }
+  }
+  const outbox = JSON.parse(localStorage.getItem("crmEmailOutbox") || "[]");
+  outbox.push(record);
+  localStorage.setItem("crmEmailOutbox", JSON.stringify(outbox));
+}
+
+async function crmSendWhatsApp(payload){
+  const settings = await getSettings();
+  const record = {...payload, id:"WA-" + Date.now(), channel:"WhatsApp", status:"Queued", date:new Date().toISOString()};
+  if(settings.whatsapp_business_api_url){
+    try{
+      const res = await fetch(settings.whatsapp_business_api_url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(record)});
+      record.status = res.ok ? "Sent by WhatsApp API" : "WhatsApp API Error";
+    }catch(e){ record.status = "WhatsApp API Error"; record.error = String(e); }
+  }
+  const outbox = JSON.parse(localStorage.getItem("crmWhatsAppOutbox") || "[]");
+  outbox.push(record);
+  localStorage.setItem("crmWhatsAppOutbox", JSON.stringify(outbox));
+}
+
+async function getSettings(){
+  const local = localStorage.getItem("cms_settings");
+  if(local) return JSON.parse(local);
+  try { return await fetch("settings.json").then(r=>r.json()); } catch(e){ return {}; }
 }
 </script>
   <script src="analytics-tracker.js"></script>
@@ -122,5 +164,6 @@ async function payNow(){
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
+  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
 </body>
 </html>

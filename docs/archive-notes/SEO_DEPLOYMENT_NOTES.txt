@@ -1,0 +1,36 @@
+SEO upgrade included in this version:
+
+1. Live backend SEO settings
+- /api/settings now stores SEO data in the database.
+- Admin SEO Words changes publish to live website pages.
+
+2. Page meta tags
+- Dynamic title, description, keywords, robots, author, language.
+- English and Arabic SEO fields supported.
+
+3. Open Graph / social sharing
+- og:title, og:description, og:type, og:url, og:image, og:locale.
+- Twitter summary large image tags.
+
+4. Canonical + alternate
+- Canonical URL is generated per page.
+- Alternate hreflang is generated for the active language.
+
+5. Schema.org structured data
+- FurnitureStore schema on all pages.
+- Product schema when a product is opened or product URL is used.
+
+6. Sitemap + robots
+- /sitemap.xml generated automatically from live pages and active products.
+- /robots.txt generated automatically and points to sitemap.xml.
+
+7. Required Railway variable for best SEO
+- PUBLIC_SITE_URL=https://your-live-domain.com
+Example:
+PUBLIC_SITE_URL=https://crafted-visual-store-v2-production.up.railway.app
+
+After deploy test:
+- /robots.txt
+- /sitemap.xml
+- Open shop.html, view source or inspect head for meta tags.
+- Use Google Rich Results Test for product schema.

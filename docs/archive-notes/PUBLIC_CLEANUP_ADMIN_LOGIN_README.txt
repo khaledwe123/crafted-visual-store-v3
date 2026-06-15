@@ -1,0 +1,1 @@
+Removed public 95/100 ribbon, public analytics/room tools buttons, and public UX promo sections. Admin login remains at /admin-login.html. Product room tools remain inside product detail modal. Test /api/version for UX95-PUBLIC-CLEAN-ADMIN-LOGIN-20260607-5.

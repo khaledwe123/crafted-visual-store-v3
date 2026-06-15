@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium">
   <script src="apiClient.js" defer></script>
   <script src="admin-login.js?v=superadmin-final-20260607" defer></script>
+  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
   <main class="admin-login-page">
@@ -28,5 +29,24 @@
 
   <script src="responsive-all-devices.js?v=20260607v2" defer></script>
   <script src="cv-premium-journey.js?v=20260607premium" defer></script>
+
+<!-- CV_ADMIN_LOGIN_ARABIC_ONLY_FIX_20260615 -->
+<script>
+(function(){
+  function currentLang(){ try{ return new URLSearchParams(location.search).get('lang') || localStorage.getItem('lang') || 'en'; }catch(e){ return localStorage.getItem('lang') || 'en'; } }
+  if(!String(currentLang()).toLowerCase().startsWith('ar')) return;
+  document.documentElement.lang='ar';
+  document.documentElement.dir='rtl';
+  document.title='تسجيل دخول الإدارة | كرافتد فيجوال';
+  document.addEventListener('DOMContentLoaded', function(){
+    var h=document.querySelector('.admin-login-card h1'); if(h) h.textContent='تسجيل دخول إدارة كرافتد فيجوال';
+    var p=document.querySelector('.admin-login-card p'); if(p) p.textContent='سجل الدخول باستخدام بريد وكلمة مرور مسؤول Railway.';
+    var email=document.getElementById('email'); if(email) email.placeholder='البريد الإلكتروني';
+    var pass=document.getElementById('password'); if(pass) pass.placeholder='كلمة المرور';
+    var btn=document.getElementById('loginBtn'); if(btn) btn.textContent='تسجيل الدخول';
+  });
+})();
+</script>
+
 </body>
 </html>

@@ -197,3 +197,29 @@ table{min-width:720px;}
 [dir="rtl"] .mobile-menu-toggle{margin-right:auto;margin-left:0;}
 [dir="rtl"] #mainMenu a{justify-content:flex-end;}
 [dir="rtl"] .mobile-bottom-nav{direction:rtl;}
+
+
+/* CV_FINAL_MOBILE_ADMIN_FIX */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, video, iframe { max-width: 100%; }
+@media (max-width: 768px) {
+  .nav, header.nav { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 16px; }
+  .brand { font-size: 20px; line-height: 1.1; }
+  .admin-top-nav, .nav nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+  .admin-top-nav a, .admin-top-nav button, .nav nav a, .nav nav button { min-height: 44px; padding: 10px 12px; }
+  .admin-wrap, main.admin-wrap { width: 100%; padding: 18px 14px; box-sizing: border-box; }
+  .admin-user-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .cms-tabs { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .cms-tabs button { min-height: 44px; white-space: normal; }
+  .admin-grid, .admin-grid-3, .banner-admin-grid, .analytics-grid-2 { grid-template-columns: 1fr !important; }
+  input, select, textarea, button, .btn { max-width: 100%; min-height: 44px; font-size: 16px; box-sizing: border-box; }
+  textarea { min-height: 96px; }
+  .admin-panel { padding: 16px; border-radius: 16px; overflow: hidden; }
+  .table-scroll, .permissions-matrix, .admin-list { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 620px; }
+  .admin-item { display: grid; grid-template-columns: 1fr; gap: 10px; }
+}
+@media (max-width: 390px) {
+  .cms-tabs { grid-template-columns: 1fr !important; }
+  .admin-wrap, main.admin-wrap { padding: 14px 10px; }
+}
