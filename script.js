@@ -2148,3 +2148,194 @@ openProduct = function(id){
   else setTimeout(syncAfterLoad, 350);
 })();
 
+
+
+/* CV targeted fix: scoped discounts (product / size / fabric / color / size+fabric / size+fabric+color)
+   Source: Final for checking.zip
+   Scope: shop price display + modal price + cart price only.
+   Does not change admin, menu, page builder, reviews, auth, analytics, or styling. */
+(function(){
+  'use strict';
+  if(window.__cvScopedDiscountDisplayFix20260615) return;
+  window.__cvScopedDiscountDisplayFix20260615 = true;
+
+  function cvNorm(v){ return String(v == null ? '' : v).trim(); }
+  function cvLow(v){ return cvNorm(v).toLowerCase(); }
+  function cvNum(v){ const n = Number(v || 0); return Number.isFinite(n) ? n : 0; }
+  function cvArr(v){ return Array.isArray(v) ? v : []; }
+  function cvLabel(v){
+    if(v == null) return '';
+    if(typeof v === 'object') return cvNorm(v.label || v.name || v.value || v.size || v.fabric || v.color || v.title || '');
+    return cvNorm(v);
+  }
+  function cvColorName(color){
+    if(color == null) return '';
+    if(typeof color === 'object') return cvNorm(color.label || color.name || color.value || color.color || color.title || '');
+    return cvNorm(color);
+  }
+  function cvRulePercent(rule){
+    return Math.max(0, Math.min(95, cvNum(rule && (rule.percent || rule.discountPercent || rule.discount_percent || rule.discount || rule.value))));
+  }
+  function cvRuleActive(rule){
+    if(!rule || cvRulePercent(rule) <= 0) return false;
+    if(rule.active === false || rule.enabled === false) return false;
+    const status = cvLow(rule.status);
+    if(status === 'inactive' || status === 'disabled' || status === 'off') return false;
+    const now = Date.now();
+    const start = rule.startDate || rule.start_date || rule.starts_at || rule.startAt;
+    const end = rule.endDate || rule.end_date || rule.expires_at || rule.expiry || rule.endAt;
+    if(start && !Number.isNaN(Date.parse(start)) && Date.parse(start) > now) return false;
+    if(end && !Number.isNaN(Date.parse(end)) && Date.parse(end) < now) return false;
+    return true;
+  }
+  function cvScope(rule){
+    return cvLow(rule && (rule.scope || rule.applyScope || rule.type || rule.targetScope || 'product'))
+      .replace(/\s+/g, '_')
+      .replace(/\+/g, '_')
+      .replace(/__+/g, '_');
+  }
+  function cvRuleMatches(rule, product, sizeOpt, fabricOpt, colorName){
+    if(!cvRuleActive(rule)) return false;
+
+    const scope = cvScope(rule);
+    const wantedSize = cvLow(rule.size || rule.sizeLabel || rule.variantSize || rule.selectedSize);
+    const wantedFabric = cvLow(rule.fabric || rule.fabricLabel || rule.variantFabric || rule.selectedFabric);
+    const wantedColor = cvLow(rule.color || rule.colour || rule.colorLabel || rule.variantColor || rule.selectedColor);
+
+    const actualSize = cvLow(cvLabel(sizeOpt));
+    const actualFabric = cvLow(cvLabel(fabricOpt));
+    const actualColor = cvLow(colorName);
+
+    if(scope === 'product') return true;
+    if(scope === 'size') return !!wantedSize && wantedSize === actualSize;
+    if(scope === 'fabric') return !!wantedFabric && wantedFabric === actualFabric;
+    if(scope === 'color') return !!wantedColor && wantedColor === actualColor;
+    if(scope === 'combo' || scope === 'size_fabric' || scope === 'size_fabric_combination'){
+      return !!wantedSize && !!wantedFabric && wantedSize === actualSize && wantedFabric === actualFabric && (!wantedColor || wantedColor === actualColor);
+    }
+    if(scope === 'combo_color' || scope === 'variant' || scope === 'size_fabric_color' || scope === 'size_fabric_color_combination'){
+      return !!wantedSize && !!wantedFabric && !!wantedColor && wantedSize === actualSize && wantedFabric === actualFabric && wantedColor === actualColor;
+    }
+
+    // Backward compatibility for older saved rules that have size/fabric/color fields but no reliable scope.
+    if(wantedSize || wantedFabric || wantedColor){
+      if(wantedSize && wantedSize !== actualSize) return false;
+      if(wantedFabric && wantedFabric !== actualFabric) return false;
+      if(wantedColor && wantedColor !== actualColor) return false;
+      return true;
+    }
+
+    return false;
+  }
+  function cvProductColors(product){
+    const names = Object.keys((product && product.colors) || {});
+    return names.length ? names : [''];
+  }
+  function cvEffectiveDiscountPercent(product, sizeOpt, fabricOpt, colorName){
+    product = product || {};
+    const chosenColor = cvColorName(colorName || (typeof selectedColor !== 'undefined' ? selectedColor : ''));
+    let best = Math.max(0, Math.min(95, cvNum(product.discountPercent || product.discount_percent || product.discount || 0)));
+
+    cvArr(product.discountRules).forEach(rule => {
+      if(cvRuleMatches(rule, product, sizeOpt, fabricOpt, chosenColor)) best = Math.max(best, cvRulePercent(rule));
+    });
+    cvArr(product.discounts).forEach(rule => {
+      if(cvRuleMatches(rule, product, sizeOpt, fabricOpt, chosenColor)) best = Math.max(best, cvRulePercent(rule));
+    });
+
+    return Math.max(0, Math.min(95, best));
+  }
+  function cvVariantRows(product){
+    product = (typeof normalizeProduct === 'function') ? normalizeProduct(product || {}) : (product || {});
+    const sizes = product.sizeOptions && product.sizeOptions.length ? product.sizeOptions : [null];
+    const fabrics = product.fabricOptions && product.fabricOptions.length ? product.fabricOptions : [null];
+    const colors = cvProductColors(product);
+    const rows = [];
+    sizes.forEach(sizeOpt => {
+      fabrics.forEach(fabricOpt => {
+        colors.forEach(colorName => {
+          let before = 0;
+          try{ before = Number(priceIncludingVat(product, sizeOpt, fabricOpt) || 0); }catch(e){ before = Number(product.price || 0); }
+          if(before <= 0) return;
+          const percent = cvEffectiveDiscountPercent(product, sizeOpt, fabricOpt, colorName);
+          const final = Math.round(before * (1 - percent / 100));
+          rows.push({product, sizeOpt, fabricOpt, colorName, before, final, percent});
+        });
+      });
+    });
+    if(!rows.length){
+      const before = Number(product.price || 0);
+      const percent = cvEffectiveDiscountPercent(product, null, null, '');
+      rows.push({product, sizeOpt:null, fabricOpt:null, colorName:'', before, final:Math.round(before * (1 - percent/100)), percent});
+    }
+    return rows;
+  }
+  function cvLowestVariant(product){
+    const rows = cvVariantRows(product);
+    return rows.sort((a,b) => a.final - b.final || b.percent - a.percent)[0];
+  }
+
+  window.cvEffectiveDiscountPercent = cvEffectiveDiscountPercent;
+  window.cvLowestDiscountedVariant = cvLowestVariant;
+
+  const originalPriceIncludingVat = window.priceIncludingVat || (typeof priceIncludingVat === 'function' ? priceIncludingVat : null);
+  const originalPriceBeforeVat = window.priceBeforeVat || (typeof priceBeforeVat === 'function' ? priceBeforeVat : null);
+  const originalVatAmount = window.vatAmount || (typeof vatAmount === 'function' ? vatAmount : null);
+  const originalVatRate = window.vatRate || (typeof vatRate === 'function' ? vatRate : null);
+  const originalMoney = window.money || (typeof money === 'function' ? money : (v => 'SAR ' + Math.round(Number(v||0)).toLocaleString()));
+
+  window.finalPrice = finalPrice = function(product, sizeOpt=null, fabricOpt=null, colorName){
+    product = (typeof normalizeProduct === 'function') ? normalizeProduct(product || {}) : (product || {});
+    const explicitVariant = !!(sizeOpt || fabricOpt || colorName || (typeof selectedColor !== 'undefined' && selectedColor));
+    if(!explicitVariant){
+      const low = cvLowestVariant(product);
+      return low ? low.final : 0;
+    }
+    const color = colorName || (typeof selectedColor !== 'undefined' ? selectedColor : '');
+    const incl = originalPriceIncludingVat ? originalPriceIncludingVat(product, sizeOpt, fabricOpt) : Number(product.price || 0);
+    const discount = cvEffectiveDiscountPercent(product, sizeOpt, fabricOpt, color);
+    return Math.round(Number(incl || 0) * (1 - discount / 100));
+  };
+
+  window.priceHTML = priceHTML = function(product, sizeOpt=null, fabricOpt=null, colorName){
+    product = (typeof normalizeProduct === 'function') ? normalizeProduct(product || {}) : (product || {});
+    const color = colorName || (typeof selectedColor !== 'undefined' ? selectedColor : '');
+    const before = originalPriceBeforeVat ? originalPriceBeforeVat(product, sizeOpt, fabricOpt) : Number(product.price || 0);
+    const vatRateValue = originalVatRate ? originalVatRate(product) : Number(product.vatRate || 15);
+    const vat = originalVatAmount ? originalVatAmount(product, sizeOpt, fabricOpt) : before * vatRateValue / 100;
+    const incl = originalPriceIncludingVat ? originalPriceIncludingVat(product, sizeOpt, fabricOpt) : before + vat;
+    const discount = cvEffectiveDiscountPercent(product, sizeOpt, fabricOpt, color);
+    const final = Math.round(Number(incl || 0) * (1 - discount / 100));
+
+    let html = `<div class="price-detail">
+      <div>Selected price before VAT: <strong>${originalMoney(before)}</strong></div>
+      <div>VAT (${vatRateValue}%): <strong>${originalMoney(vat)}</strong></div>`;
+
+    if(discount > 0){
+      html += `<div>Total before discount: <strong class="old-price" style="text-decoration:line-through;opacity:.65;">${originalMoney(incl)}</strong></div>
+        <div>After discount: <strong class="discount-price" style="color:#c62828;">${originalMoney(final)}</strong> <span class="discount-badge" style="color:#c62828;">-${discount}% OFF</span></div>`;
+    }else{
+      html += `<div>Total incl. VAT: <strong>${originalMoney(incl)}</strong></div>`;
+    }
+    html += `</div>`;
+    return html;
+  };
+
+  // Patch listing price summaries used by newer shop cards without changing card layout.
+  if(typeof shopCardPriceHTML === 'function'){
+    window.shopCardPriceHTML = shopCardPriceHTML = function(product){
+      product = (typeof normalizeProduct === 'function') ? normalizeProduct(product || {}) : (product || {});
+      const low = cvLowestVariant(product);
+      if(!low) return `<div class="shop-price-summary"><small>From</small><br><strong>${originalMoney(product.price || 0)}</strong></div>`;
+      if(low.percent > 0){
+        return `<div class="shop-price-summary">
+          <small>From</small><br>
+          <span class="old-price" style="text-decoration:line-through;opacity:.65;">${originalMoney(low.before)}</span><br>
+          <strong class="discount-price" style="color:#c62828;">${originalMoney(low.final)}</strong>
+          <span class="discount-badge" style="color:#c62828;">-${low.percent}% OFF</span>
+        </div>`;
+      }
+      return `<div class="shop-price-summary"><small>From</small><br><strong>${originalMoney(low.final)}</strong></div>`;
+    };
+  }
+})();
