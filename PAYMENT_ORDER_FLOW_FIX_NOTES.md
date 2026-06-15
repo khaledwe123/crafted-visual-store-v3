@@ -1,25 +1,36 @@
-# Payment / Order Flow Fix Notes
+# Payment / Order Flow Fix
 
-## Fixed files
+## Files changed
 - `payment.html`
 - `thankyou.html`
 - `server.js`
 
 ## What was fixed
-1. Removed the fake browser-only payment success behavior from `payment.html`.
-2. Payment page no longer marks orders as `Paid` automatically.
-3. Added backend endpoint `POST /api/orders/:orderNo/payment`.
-4. Customer payment method selection now updates the real order in the backend as:
-   - `status = awaiting_payment` and `payment_status = awaiting_payment_verification` for bank/card/Geidea options.
-   - `status = confirmed` and `payment_status = cod_pending` for Cash on Delivery.
-5. Added basic customer email verification before a public payment-method update is accepted.
-6. Added CRM activity + automation outbox records when a payment method is selected.
-7. Updated the thank-you page to show pending/verification language instead of falsely saying paid.
-8. Kept Geidea-ready flow as a placeholder option without collecting live card data on the website.
+The old `payment.html` collected fake card details, pushed the order to browser `localStorage`, and immediately marked the payment as `Paid`.
 
-## Important note for Geidea
-This fix prepares the order flow for Geidea, but it does not include live Geidea API credentials or webhook verification. For production, connect Geidea Hosted Checkout from the backend and update orders to `paid` only after Geidea webhook/signature verification.
+That has been removed.
 
-## Validation performed
-- `node --check server.js` passed.
-- Full `npm test` could not run in this environment because dependencies were not installed and `better-sqlite3` could not compile/download headers under Node 22. The project requires Node 20.x as stated in `package.json`.
+## New behavior
+1. `review.html` continues to create the backend order using `/api/orders` when the backend is available.
+2. `payment.html` now requires backend availability.
+3. The customer selects a payment method:
+   - Bank Transfer
+   - Pay in Showroom
+   - Cash on Delivery
+   - Geidea
+4. The payment method is saved to the backend using:
+   - `POST /api/orders/:orderNo/payment-method`
+5. The order is **not** marked as paid.
+6. Backend statuses become:
+   - Manual methods: `payment_status = awaiting_manual_payment`, `status = payment_pending_review`
+   - Geidea option: `payment_status = awaiting_gateway_payment`, `status = awaiting_payment`
+7. `thankyou.html` now correctly says payment is pending verification.
+
+## Important
+This fix does not add live Geidea processing yet because real Geidea merchant API keys and webhook signature verification are required. It prepares the website safely so orders are saved in the backend and are not falsely marked as paid.
+
+## Upload instruction
+Replace only these files in your project:
+- `payment.html`
+- `thankyou.html`
+- `server.js`
