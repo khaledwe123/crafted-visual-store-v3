@@ -1,6 +1,10 @@
 
 /* Crafted Visual Arabic Auto Translation Engine */
 const CV_TRANSLATION_MAP = {
+  "crafted visual":"كرافتد فيزوال",
+  "crafted visuals":"كرافتد فيزوال",
+  "crafted visual cms":"كرافتد فيزوال CMS",
+  "crafted visual furniture":"كرافتد فيزوال للأثاث",
   "home":"الرئيسية","about us":"من نحن","shop":"المتجر","custom order":"طلب تفصيل","track order":"تتبع الطلب","my account":"حسابي","contact us":"اتصل بنا",
   "l shape sofas":"كنبات زاوية","l shape sofa":"كنبة زاوية","beds":"أسرة","bed":"سرير","single chairs":"كراسي مفردة","single chair":"كرسي مفرد",
   "dining tables":"طاولات طعام","coffee tables":"طاولات قهوة","tv units":"وحدات تلفاز","wardrobes":"خزائن ملابس","custom furniture":"أثاث حسب الطلب",
