@@ -6,12 +6,7 @@
   };
   function safeJSON(key, fallback){ try{return JSON.parse(localStorage.getItem(key)||'')||fallback;}catch{return fallback;} }
   function saveJSON(key,val){ try{localStorage.setItem(key, JSON.stringify(val));}catch(e){} }
-  function cvCurrentLang(){
-    try{
-      return (document.documentElement.getAttribute('lang') || localStorage.getItem('lang') || sessionStorage.getItem('lang') || 'en').toLowerCase().startsWith('ar') ? 'ar' : 'en';
-    }catch(e){ return 'en'; }
-  }
-  function text(en, ar){ return cvCurrentLang() === 'ar' ? (ar || en || '') : (en || ar || ''); }
+  function text(en, ar){ return (window.lang === 'ar') ? ar : en; }
   function esc(v){ return String(v==null?'':v).replace(/[&<>'"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[s])); }
   function productName(p){ try{return window.displayName ? displayName(p) : (p.name || p.name_en || 'Product');}catch{return p.name || p.name_en || 'Product';} }
   function productCat(p){ try{return window.displayCategory ? displayCategory(p) : (p.category || p.category_name || '');}catch{return p.category || p.category_name || '';}}
@@ -47,9 +42,7 @@
 
   function findProduct(id){ return (window.products||[]).find(p=>String(p.id)===String(id)); }
   function tinyCard(p){
-    const pid = esc(p.id || '');
-    const canOpen = !!findProduct(p.id);
-    return `<div class="cj-tiny-card" role="button" tabindex="0" data-cj-open-product="${pid}" data-cj-fallback-url="shop.html" data-cj-can-open="${canOpen ? '1' : '0'}">
+    return `<div class="cj-tiny-card" onclick="${findProduct(p.id)?`openProduct('${esc(p.id)}')`:`location.href='shop.html'`}">
       <img src="${esc(p.image||imgFor(p))}" alt="${esc(p.name||'Product')}">
       <strong>${esc((window.lang==='ar' && p.name_ar) ? p.name_ar : (p.name||'Product'))}</strong>
       <small>${esc(p.category||'')}</small>
@@ -83,39 +76,17 @@
     shelf.querySelector('.cj-shelf-grid').innerHTML = list.slice(0,4).map(tinyCard).join('');
   }
 
-  function cvSiteSettings(){
-    try{ if(typeof settings !== 'undefined' && settings) return settings; }catch(e){}
-    try{ if(window.settings) return window.settings; }catch(e){}
-    try{ return JSON.parse(localStorage.getItem('cms_settings') || sessionStorage.getItem('cms_settings') || '{}'); }catch(e){ return {}; }
-  }
-
-  function cvRefreshHomeJourneySoon(){
-    try{ setTimeout(injectHomeJourneySections, 40); }catch(e){}
-  }
   function injectHomeJourneySections(){
     if(!document.body || !location.pathname.match(/index\.html$|\/$/)) return;
-    const st = cvSiteSettings();
-    const saved = (((st || {}).page_content || {}).home || {}).home_shop_by_room || {};
-    const defaultCards = [
-      {key:'living', title_en:'Living Room', title_ar:'غرفة المعيشة', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html?category=' + encodeURIComponent('L Shape Sofas')},
-      {key:'bedroom', title_en:'Bedroom', title_ar:'غرفة النوم', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html?category=' + encodeURIComponent('Beds')},
-      {key:'majlis', title_en:'Majlis', title_ar:'المجلس', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html?category=' + encodeURIComponent('Single Chairs')},
-      {key:'custom', title_en:'Custom Made', title_ar:'تفصيل حسب الطلب', subtitle_en:'Explore', subtitle_ar:'استكشف', url:'shop.html'}
-    ];
-    const cards = defaultCards.map((card, i) => Object.assign({}, card, (Array.isArray(saved.cards) && saved.cards[i]) || {}));
-    let sec = document.getElementById('shopByRoom');
-    if(!sec){
-      sec = document.createElement('section');
-      sec.id = 'shopByRoom';
-      sec.className = 'cj-room-section';
-      const intro = document.querySelector('.intro');
-      if(intro) intro.parentNode.insertBefore(sec, intro.nextSibling);
-      else document.body.appendChild(sec);
+    if(!document.getElementById('shopByRoom')){
+      const sec = document.createElement('section');
+      sec.id = 'shopByRoom'; sec.className = 'cj-room-section';
+      sec.innerHTML = `<div class="cj-section-head"><h2>${text('Shop by Room','تسوق حسب الغرفة')}</h2><a href="shop.html">${text('Shop All','تسوق الكل')}</a></div>
+        <div class="cj-room-grid">
+          ${[['Living Room','غرفة المعيشة','L Shape Sofas'],['Bedroom','غرفة النوم','Beds'],['Majlis','المجلس','Single Chairs'],['Custom Made','تفصيل حسب الطلب','All']].map(r=>`<a class="cj-room" href="shop.html${r[2]!='All'?'?category='+encodeURIComponent(r[2]):''}"><span>${text(r[0],r[1])}</span><small>${text('Explore','استكشف')}</small></a>`).join('')}
+        </div>`;
+      const intro = document.querySelector('.intro'); if(intro) intro.parentNode.insertBefore(sec, intro.nextSibling);
     }
-    sec.innerHTML = `<div class="cj-section-head"><h2>${text(saved.title_en || 'Shop by Room', saved.title_ar || 'تسوق حسب الغرفة')}</h2><a href="${esc(saved.shop_all_url || 'shop.html')}">${text(saved.shop_all_en || 'Shop All', saved.shop_all_ar || 'تسوق الكل')}</a></div>
-      <div class="cj-room-grid">
-        ${cards.map(r=>`<a class="cj-room" href="${esc(r.url || 'shop.html')}"><span>${text(r.title_en || '', r.title_ar || '')}</span><small>${text(r.subtitle_en || 'Explore', r.subtitle_ar || 'استكشف')}</small></a>`).join('')}
-      </div>`;
   }
 
   function installWhatsApp(){
@@ -144,8 +115,8 @@
       const price = window.finalPrice ? finalPrice(p) : p.price;
       const colors = Object.entries(p.colors||{}).slice(0,5).map(([c,v])=>`<span title="${esc(c)}" style="background:${esc(v.hex||'#ccc')}"></span>`).join('');
       const fabrics = (p.fabricOptions||[]).slice(0,3).map(f=>`<small>${esc(f.label||f)}</small>`).join('');
-      return `<div class="card cj-product-card" data-product-id="${esc(p.id)}">
-        <button class="cj-wish ${isWish(p.id)?'active':''}" type="button" data-cj-wishlist="${esc(p.id)}" title="Wishlist">♥</button>
+      return `<div class="card cj-product-card">
+        <button class="cj-wish ${isWish(p.id)?'active':''}" onclick="cvToggleWishlist('${esc(p.id)}', event)" title="Wishlist">♥</button>
         <img src="${esc(imgFor(p))}" alt="${esc(productName(p))}">
         <div class="card-body">
           <h3>${esc(productName(p))}</h3>
@@ -154,8 +125,8 @@
           <div class="cj-starting">${text('Starting from','يبدأ من')} <strong>${money(price)}</strong></div>
           <div class="mini-swatches">${colors}</div>
           <div class="cj-fabric-tags">${fabrics}</div>
-          <div class="cj-delivery">${text((cvSiteSettings().made_to_order_en || 'Made to order: 15–20 working days'), (cvSiteSettings().made_to_order_ar || 'تفصيل حسب الطلب: 15–20 يوم عمل'))}</div>
-          <div class="cj-card-actions"><button class="btn secondary" type="button" data-cj-open-product="${esc(p.id)}" data-product-id="${esc(p.id)}" data-cj-mode="quick">${text('Quick View','عرض سريع')}</button><button class="btn primary" type="button" data-cj-open-product="${esc(p.id)}" data-product-id="${esc(p.id)}" data-cj-mode="customize">${text('Customize','خصص المنتج')}</button></div>
+          <div class="cj-delivery">${text('Made to order: 15–20 working days','تفصيل حسب الطلب: 15–20 يوم عمل')}</div>
+          <div class="cj-card-actions"><button class="btn secondary" onclick="openProduct('${esc(p.id)}')">${text('Quick View','عرض سريع')}</button><button class="btn primary" onclick="openProduct('${esc(p.id)}')">${text('Customize','خصص المنتج')}</button></div>
         </div>
       </div>`;
     }).join('');
@@ -173,7 +144,7 @@
     eventTrack('product_view', {product_id:p.id, product_name:productName(p)});
     const actions = document.querySelector('#productModal .modal-actions');
     if(actions && !document.getElementById('modalWishlistBtn')){
-      actions.insertAdjacentHTML('afterbegin', `<button id="modalWishlistBtn" class="btn secondary" type="button" data-cj-wishlist="${esc(p.id)}">${isWish(p.id)?text('Saved','محفوظ'):text('Add to Wishlist','أضف للمفضلة')}</button>`);
+      actions.insertAdjacentHTML('afterbegin', `<button id="modalWishlistBtn" class="btn secondary" type="button" onclick="cvToggleWishlist('${esc(p.id)}', event)">${isWish(p.id)?text('Saved','محفوظ'):text('Add to Wishlist','أضف للمفضلة')}</button>`);
     }
     const price = document.getElementById('modalPrice');
     if(price && !document.getElementById('cjSelectionSummary')){
@@ -221,197 +192,6 @@
     const r = oldAdd.apply(this, arguments); try{ fetch('/api/cart/abandoned',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart:JSON.parse(localStorage.getItem('cart')||'[]'), status:'open'})}); }catch(e){} return r;
   };
 
-  const cvPreviousApplyLang = window.applyLang;
-  if(typeof cvPreviousApplyLang === 'function' && !window.__cvShopByRoomLangRefresh){
-    window.__cvShopByRoomLangRefresh = true;
-    window.applyLang = function(){
-      const result = cvPreviousApplyLang.apply(this, arguments);
-      cvRefreshHomeJourneySoon();
-      setTimeout(translatePremiumToolsStatic, 60);
-      return result;
-    };
-  }
-  document.addEventListener('click', function(e){
-    if(e.target && (e.target.classList.contains('lang-btn') || e.target.closest('.lang-btn'))){ cvRefreshHomeJourneySoon(); setTimeout(translatePremiumToolsStatic, 80); }
-  }, true);
-
-
-
-  function translatePremiumToolsStatic(){
-    const ar = cvCurrentLang() === 'ar';
-    const pairs = [
-      ['Premium Furniture Tools','أدوات الأثاث المميزة'],
-      ['Use these customer journey tools before ordering.','استخدم هذه الأدوات قبل الطلب.'],
-      ['360° Viewer','عارض 360°'],
-      ['Viewer 360°','عارض 360°'],
-      ['Rotate the furniture preview.','شاهد المنتج من زوايا مختلفة.'],
-      ['Open Viewer','افتح العارض'],
-      ['Room Visualizer','مصمم الغرفة'],
-      ['Preview the product in a room layout.','شاهد المنتج داخل تصميم الغرفة.'],
-      ['Open Visualizer','افتح المصمم'],
-      ['Measure-in-Room','القياس داخل الغرفة'],
-      ['Confirm width, depth, height and delivery path.','تحقق من العرض والعمق والارتفاع ومسار التوصيل.'],
-      ['Open Tool','افتح الأداة'],
-      ['Featured','مميز'],
-      ['Best Rating','أفضل تقييم'],
-      ['All Categories','كل الفئات'],
-      ['Fabric options','خيارات القماش'],
-      ['Custom dimensions','مقاسات حسب الطلب'],
-      ['VAT included','شامل الضريبة'],
-      ['No ratings','لا توجد تقييمات'],
-      ['Starting from','يبدأ من'],
-      ['Quick View','عرض سريع'],
-      ['Customize','خصص المنتج']
-    ];
-    const enToAr = new Map(pairs);
-    const arToEn = new Map(pairs.map(([en,ar]) => [ar,en]));
-    const map = ar ? enToAr : arToEn;
-    const selector = '.ux95-section, .ux95-tool-grid, .ux95-tool-card, .page-hero, #shop, #productGrid, .product-grid';
-    const roots = [...document.querySelectorAll(selector)];
-    if(!roots.length) roots.push(document.body);
-    const seen = new Set();
-    roots.forEach(root => {
-      root.querySelectorAll('h1,h2,h3,p,small,button,a,option,span,strong').forEach(el => {
-        if(seen.has(el)) return;
-        seen.add(el);
-        const value = (el.textContent || '').trim();
-        if(map.has(value)) el.textContent = map.get(value);
-      });
-    });
-  }
-
-
-  function cjOpenProductById(id){
-    if(!id) return;
-    if(typeof window.openProduct === 'function'){
-      window.openProduct(String(id));
-    }else{
-      window.location.href = 'shop.html';
-    }
-  }
-
-  if(!window.__cvCJNoInlineProductActions){
-    window.__cvCJNoInlineProductActions = true;
-    document.addEventListener('click', function(e){
-      const wish = e.target && e.target.closest ? e.target.closest('[data-cj-wishlist]') : null;
-      if(wish){
-        e.preventDefault();
-        e.stopPropagation();
-        if(typeof window.cvToggleWishlist === 'function') window.cvToggleWishlist(wish.getAttribute('data-cj-wishlist'), e);
-        return;
-      }
-
-      const opener = e.target && e.target.closest ? e.target.closest('[data-cj-open-product]') : null;
-      if(opener){
-        e.preventDefault();
-        e.stopPropagation();
-        const canOpen = opener.getAttribute('data-cj-can-open');
-        const id = opener.getAttribute('data-cj-open-product');
-        if(canOpen === '0'){
-          window.location.href = opener.getAttribute('data-cj-fallback-url') || 'shop.html';
-          return;
-        }
-        cjOpenProductById(id);
-      }
-    }, true);
-
-    document.addEventListener('keydown', function(e){
-      if(e.key !== 'Enter' && e.key !== ' ') return;
-      const opener = e.target && e.target.closest ? e.target.closest('[data-cj-open-product]') : null;
-      if(opener){
-        e.preventDefault();
-        const id = opener.getAttribute('data-cj-open-product');
-        cjOpenProductById(id);
-      }
-    }, true);
-  }
-
-
-  /* CV MODAL CLOSE ONLY FIX - no other behavior changed */
-  function cvCloseProductModalOnly(){
-    const modal = document.getElementById('productModal');
-    if(!modal) return;
-    modal.classList.add('hidden');
-    modal.style.display = '';
-    document.body.classList.remove('modal-open');
-    const added = document.getElementById('addedBox');
-    if(added) added.remove();
-  }
-
-  if(!window.__cvProductModalCloseOnlyFix){
-    window.__cvProductModalCloseOnlyFix = true;
-    const previousCloseModal = window.closeModal;
-    window.closeModal = function(){
-      cvCloseProductModalOnly();
-      if(typeof previousCloseModal === 'function'){
-        try{ previousCloseModal.apply(this, arguments); }catch(e){}
-      }
-    };
-
-    document.addEventListener('click', function(e){
-      const modal = document.getElementById('productModal');
-      if(!modal || modal.classList.contains('hidden')) return;
-      const target = e.target;
-      const closeBtn = target && target.closest ? target.closest('[data-close-modal], .modal-close, .close-modal, .close, .modal-x, [aria-label="Close"], [aria-label="close"]') : null;
-      const clickedBackdrop = target === modal;
-      if(closeBtn || clickedBackdrop){
-        e.preventDefault();
-        e.stopPropagation();
-        cvCloseProductModalOnly();
-      }
-    }, true);
-
-    document.addEventListener('keydown', function(e){
-      if(e.key !== 'Escape') return;
-      const modal = document.getElementById('productModal');
-      if(modal && !modal.classList.contains('hidden')){
-        e.preventDefault();
-        cvCloseProductModalOnly();
-      }
-    }, true);
-  }
-
-  function boot(){ installWhatsApp(); translatePremiumToolsStatic(); injectHomeJourneySections(); setTimeout(injectHomeJourneySections, 900); setTimeout(injectHomeJourneySections, 1800); renderRecentlyViewed(); renderWishlistShelf(); }
+  function boot(){ installWhatsApp(); injectHomeJourneySections(); renderRecentlyViewed(); renderWishlistShelf(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,300)); else setTimeout(boot,300);
-  setTimeout(translatePremiumToolsStatic, 1200);
-  setTimeout(translatePremiumToolsStatic, 2200);
-})();
-
-
-/* CV FINAL QUICK VIEW / CUSTOMIZE BINDING RECOVERY - scoped only to product action buttons */
-(function(){
-  if(window.__cvFinalQuickCustomizeRecovery) return;
-  window.__cvFinalQuickCustomizeRecovery = true;
-
-  function getProductIdFromAction(el){
-    if(!el) return '';
-    return el.getAttribute('data-cj-open-product') ||
-      el.getAttribute('data-product-id') ||
-      el.closest('[data-product-id]')?.getAttribute('data-product-id') ||
-      el.closest('[data-cj-product-id]')?.getAttribute('data-cj-product-id') ||
-      '';
-  }
-
-  function openCvProduct(id, customize){
-    if(!id) return;
-    if(customize && typeof window.openCustomizeProduct === 'function'){
-      window.openCustomizeProduct(String(id));
-      return;
-    }
-    if(typeof window.openProduct === 'function'){
-      window.openProduct(String(id));
-      return;
-    }
-  }
-
-  document.addEventListener('click', function(e){
-    const action = e.target && e.target.closest ? e.target.closest('[data-cj-open-product], [data-shop-action="quick"], [data-shop-action="customize"], .quick-view-btn, .customize-btn') : null;
-    if(!action) return;
-    const isQuick = action.matches('[data-shop-action="quick"], .quick-view-btn') || action.getAttribute('data-cj-mode') === 'quick' || /quick view|عرض سريع/i.test((action.textContent || '').trim());
-    const isCustomize = action.matches('[data-shop-action="customize"], .customize-btn') || action.getAttribute('data-cj-mode') === 'customize' || /customize|خصص/i.test((action.textContent || '').trim());
-    if(!isQuick && !isCustomize && !action.hasAttribute('data-cj-open-product')) return;
-    e.preventDefault();
-    e.stopPropagation();
-    openCvProduct(getProductIdFromAction(action), isCustomize);
-  }, true);
 })();

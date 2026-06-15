@@ -67,10 +67,14 @@
     track('open_measure_tool',{});
   }
   function injectButtons(){
-    // Do not inject another tool button group into the product modal.
-    // The modal already has the UX95 tool buttons; this file only handles their click actions.
-    const duplicate = $('#cvModalTools');
-    if(duplicate) duplicate.remove();
+    // Add in product modal if present
+    const modalContent=$('#productModal .modal-content .modal-grid > div:last-child, .modal-content .modal-grid > div:last-child');
+    if(modalContent && !$('#cvModalTools')){
+      const div=document.createElement('div'); div.id='cvModalTools'; div.className='cv-modal-tools';
+      div.innerHTML='<button type="button" data-cv-tool="360">360° Viewer</button><button type="button" data-cv-tool="room">Room Visualizer</button><button type="button" data-cv-tool="measure">Measure in Room</button>';
+      modalContent.appendChild(div);
+    }
+    // Public standalone room tools removed from homepage. Tools remain inside product modal only.
   }
   document.addEventListener('click',e=>{ const btn=e.target.closest('[data-cv-tool], [data-ux95-tool]'); if(!btn)return; e.preventDefault(); const type=btn.dataset.cvTool||btn.dataset.ux95Tool; if(type==='360'||type==='spin')open360(); if(type==='room')openRoom(); if(type==='measure')openMeasure(); });
   const css=`.cv-modal-tools,.cv-standalone-tools{margin:18px 0;padding:18px;border:1px solid #e6d8c6;border-radius:18px;background:#fffaf2}.cv-standalone-tools{text-align:center;max-width:1100px;margin:36px auto}.cv-modal-tools button,.cv-standalone-tools button,.cv-tools-actions button,#cvCheckFit{border:0;background:#104735;color:#fff;border-radius:999px;padding:12px 18px;margin:6px;font-weight:800;cursor:pointer}.cv-tools-modal{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:16px}.cv-tools-modal.open{display:flex}.cv-tools-box{background:#fff;border-radius:24px;max-width:820px;width:100%;max-height:92vh;overflow:auto;padding:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);position:relative}.cv-tools-close{position:absolute;right:16px;top:16px;border:0;background:#111;color:#fff;border-radius:50%;width:38px;height:38px;font-size:24px;cursor:pointer}.cv-360-stage{height:360px;background:#f4eee5;border-radius:20px;display:grid;place-items:center;overflow:hidden}.cv-360-stage img{max-width:100%;max-height:100%;object-fit:contain}.cv-range{width:100%;margin:18px 0}.cv-room-stage{height:420px;background:linear-gradient(#f6efe6 0 58%,#d5c0a8 58%);border-radius:20px;position:relative;overflow:hidden;margin:16px 0}.cv-room-placeholder{position:absolute;inset:0;display:grid;place-items:center;font-size:28px;color:#856}.cv-room-stage #cvRoomBg{display:none;width:100%;height:100%;object-fit:cover}.cv-room-stage #cvRoomProduct{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:70%;max-height:70%;object-fit:contain;cursor:grab;filter:drop-shadow(0 24px 24px rgba(0,0,0,.25))}.cv-measure-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.cv-measure-grid label{font-weight:800}.cv-measure-grid input{width:100%;padding:12px;border:1px solid #ddd;border-radius:12px;margin-top:6px}.cv-fit-result{margin-top:14px;padding:14px;border-radius:14px;background:#f4eee5;font-weight:900}@media(max-width:700px){.cv-measure-grid{grid-template-columns:1fr}.cv-room-stage,.cv-360-stage{height:300px}.cv-tools-box{border-radius:18px;padding:18px}.cv-standalone-tools{margin:20px 12px}}`;

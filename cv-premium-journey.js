@@ -44,9 +44,14 @@
     return {label:s.label||'', width:Number(s.width||s.w||0), depth:Number(s.depth||s.d||0), height:Number(s.height||s.h||0)};
   }
   function installModalTools(){
-    const duplicate=document.getElementById('cvPremiumTools');
-    if(duplicate) duplicate.remove();
-    return;
+    const modal=document.getElementById('productModal'); if(!modal || modal.classList.contains('hidden')) return;
+    const content=modal.querySelector('.modal-content'); if(!content || document.getElementById('cvPremiumTools')) return;
+    const p=getProduct(); if(!p) return;
+    const tools=document.createElement('section'); tools.id='cvPremiumTools'; tools.className='cv-premium-tools';
+    tools.innerHTML=`<div class="cv-tool-buttons"><button type="button" data-tool="spin">${t('viewer360')}</button><button type="button" data-tool="room">${t('room')}</button><button type="button" data-tool="measure">${t('measure')}</button><button type="button" data-tool="reviews">${t('reviews')}</button></div><div id="cvToolPanel" class="cv-tool-panel"></div>`;
+    content.appendChild(tools);
+    tools.querySelectorAll('[data-tool]').forEach(btn=>btn.onclick=()=>showTool(btn.dataset.tool));
+    showTool('spin');
   }
   let spinTimer=null;
   function showTool(tool){

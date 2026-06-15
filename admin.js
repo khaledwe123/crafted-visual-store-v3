@@ -1124,188 +1124,39 @@ async function resetSeoDefaults(){
   renderSeoAdmin();
 }
 
-function discountOptionHtml(value, label, selected){
-  return `<option value="${String(value).replace(/"/g,'&quot')}" ${selected ? 'selected' : ''}>${String(label || value)}</option>`;
-}
-function productDisplayName(p){ return p && (p.name || p.name_en || p.id || p.sku || 'Product'); }
-function categoryDisplayName(c){ return typeof c === 'string' ? c : (c && (c.label_en || c.name || c.category || c.label)) || ''; }
-function getDiscountProductById(id){ return (products || []).find(p => String(p.id) === String(id) || String(p._dbId || '') === String(id)); }
-function getProductSizeLabels(p){
-  const out = [];
-  (p?.sizeOptions || []).forEach(s => { const v = s && (s.label || s.name || s.size || s); if(v && !out.includes(String(v))) out.push(String(v)); });
-  (p?.sizes || []).forEach(s => { if(s && !out.includes(String(s))) out.push(String(s)); });
-  return out;
-}
-function getProductFabricLabels(p){
-  const out = [];
-  (p?.fabricOptions || []).forEach(f => { const v = f && (f.label || f.name || f.fabric || f); if(v && !out.includes(String(v))) out.push(String(v)); });
-  (p?.fabrics || []).forEach(f => { if(f && !out.includes(String(f))) out.push(String(f)); });
-  return out;
-}
-function showDiscountEl(id, show){
-  const el = document.getElementById(id);
-  if(el) el.style.display = show ? '' : 'none';
-}
 function renderDiscountTargets(){
-  const targetType = document.getElementById('discountTargetType')?.value || '';
-  const categoryEl = document.getElementById('discountCategoryTarget');
-  const productEl = document.getElementById('discountProductTarget');
-  const scopeEl = document.getElementById('discountApplyScope');
-
-  showDiscountEl('discountCategoryTarget', targetType === 'category');
-  showDiscountEl('discountProductTarget', targetType === 'product');
-  showDiscountEl('discountApplyScope', targetType === 'product');
-
-  if(categoryEl){
-    const categoryNames = (categories || []).map(categoryDisplayName).filter(Boolean);
-    const uniqueCategories = [...new Set(categoryNames.concat((products || []).map(p=>p.category).filter(Boolean)))];
-    categoryEl.innerHTML = '<option value="">Choose product category</option>' + uniqueCategories.map(c => discountOptionHtml(c, c, false)).join('');
-  }
-  if(productEl){
-    const selected = productEl.value;
-    const productList = (products || []).filter(Boolean).slice().sort((a,b)=>productDisplayName(a).localeCompare(productDisplayName(b)));
-    productEl.innerHTML = '<option value="">Choose specific product</option>' + productList.map(prod => discountOptionHtml(prod.id, productDisplayName(prod), String(prod.id) === String(selected))).join('');
-  }
-  if(scopeEl && !scopeEl.value) scopeEl.value = 'product';
-  renderDiscountVariantTargets();
+  const scope = document.getElementById("discountScope")?.value || "product";
+  const target = document.getElementById("discountTarget");
+  if(!target) return;
+  if(scope === "all") target.innerHTML = `<option value="all">All Products</option>`;
+  else if(scope === "category") target.innerHTML = categories.map(c=>`<option>${c.label_en}</option>`).join("");
+  else target.innerHTML = products.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
 }
-function renderDiscountVariantTargets(){
-  const targetType = document.getElementById('discountTargetType')?.value || '';
-  const scope = document.getElementById('discountApplyScope')?.value || 'product';
-  const productId = document.getElementById('discountProductTarget')?.value || '';
-  const product = getDiscountProductById(productId);
-  const sizeEl = document.getElementById('discountSizeTarget');
-  const fabricEl = document.getElementById('discountFabricTarget');
-
-  const needsSize = targetType === 'product' && product && (scope === 'size' || scope === 'combo');
-  const needsFabric = targetType === 'product' && product && (scope === 'fabric' || scope === 'combo');
-  showDiscountEl('discountSizeTarget', !!needsSize);
-  showDiscountEl('discountFabricTarget', !!needsFabric);
-
-  if(sizeEl){
-    const selected = sizeEl.value;
-    const sizes = product ? getProductSizeLabels(product) : [];
-    sizeEl.innerHTML = '<option value="">Choose size</option>' + sizes.map(v => discountOptionHtml(v, v, v === selected)).join('');
-  }
-  if(fabricEl){
-    const selected = fabricEl.value;
-    const fabrics = product ? getProductFabricLabels(product) : [];
-    fabricEl.innerHTML = '<option value="">Choose fabric</option>' + fabrics.map(v => discountOptionHtml(v, v, v === selected)).join('');
-  }
-}
-function buildDiscountRuleFromForm(){
-  const targetType = document.getElementById('discountTargetType')?.value || '';
-  const percent = Number(document.getElementById('bulkDiscount')?.value || 0);
-  const active = (document.getElementById('discountStatus')?.value || 'active') === 'active';
-  if(!targetType){ showAdminStatus('Please choose a discount target.', true); return null; }
-  if(percent < 0 || percent > 90){ showAdminStatus('Discount must be between 0 and 90.', true); return null; }
-  if(!percent && active){ showAdminStatus('Please add discount percentage.', true); return null; }
-  if(targetType === 'all') return {targetType, applyScope:'product', percent, active};
-  if(targetType === 'category'){
-    const category = document.getElementById('discountCategoryTarget')?.value || '';
-    if(!category){ showAdminStatus('Please choose product category.', true); return null; }
-    return {targetType, category, applyScope:'product', percent, active};
-  }
-  const productId = document.getElementById('discountProductTarget')?.value || '';
-  const applyScope = document.getElementById('discountApplyScope')?.value || 'product';
-  if(!productId){ showAdminStatus('Please choose specific product.', true); return null; }
-  const size = document.getElementById('discountSizeTarget')?.value || '';
-  const fabric = document.getElementById('discountFabricTarget')?.value || '';
-  if((applyScope === 'size' || applyScope === 'combo') && !size){ showAdminStatus('Please choose size for this product.', true); return null; }
-  if((applyScope === 'fabric' || applyScope === 'combo') && !fabric){ showAdminStatus('Please choose fabric for this product.', true); return null; }
-  return {targetType, productId, applyScope, size, fabric, percent, active};
-}
-function ruleMatchesProduct(rule, p){
-  if(!rule || !p) return false;
-  if(rule.targetType === 'all') return true;
-  if(rule.targetType === 'category') return String(p.category || '') === String(rule.category || '');
-  if(rule.targetType === 'product') return String(p.id || '') === String(rule.productId || '');
-  return false;
-}
-function upsertProductDiscountRule(p, rule){
-  const cleanRule = {
-    id: [rule.targetType, rule.applyScope, rule.category || rule.productId || 'all', rule.size || '', rule.fabric || ''].join('|'),
-    targetType: rule.targetType,
-    category: rule.category || '',
-    productId: rule.productId || '',
-    applyScope: rule.applyScope || 'product',
-    size: rule.size || '',
-    fabric: rule.fabric || '',
-    percent: Number(rule.active ? rule.percent : 0),
-    active: !!rule.active
-  };
-  const list = Array.isArray(p.discountRules) ? p.discountRules.filter(r => r && r.id !== cleanRule.id) : [];
-  list.push(cleanRule);
-  p.discountRules = list.filter(r => r.active && Number(r.percent || 0) > 0);
-  if(cleanRule.applyScope === 'product') p.discountPercent = cleanRule.active ? Number(cleanRule.percent || 0) : 0;
-  return p;
-}
-async function saveDiscountProductsPermanent(list){
-  prototypeProductsWrite(products);
-  if(typeof CV_API === 'undefined') return;
-  try{
-    const hasApi = await CV_API.available();
-    if(!hasApi || !CV_API.token(true)) return;
-    for(const p of list){ await saveProductToBackend(p, p); }
-  }catch(e){
-    console.warn('Discounts saved locally but backend update failed:', e);
-    showAdminStatus('Discount saved locally. Backend update failed: ' + (e.message || e), true);
-  }
-}
-async function applyDiscount(){
-  if(typeof hasAdminPermission === 'function' && !hasAdminPermission('discounts','write')){ showAdminStatus('You have read-only access for this section.', true); return; }
-  products = (products || []).map(normalizeProduct);
-  const rule = buildDiscountRuleFromForm();
-  if(!rule) return;
-  const affected = [];
-  products = products.map(p => {
-    if(ruleMatchesProduct(rule, p)){
-      const updated = upsertProductDiscountRule({...p}, rule);
-      affected.push(updated);
-      return updated;
+function applyDiscount(){
+  if(typeof hasAdminPermission === "function" && !hasAdminPermission("discounts","write")){ showAdminStatus("You have read-only access for this section.", true); return; }
+  const scope = document.getElementById("discountScope").value;
+  const target = document.getElementById("discountTarget").value;
+  const percent = Number(document.getElementById("bulkDiscount").value || 0);
+  if(percent < 0 || percent > 90){ alert("Discount must be between 0 and 90"); return; }
+  products = products.map(p=>{
+    if(scope === "all" || (scope === "category" && p.category === target) || (scope === "product" && p.id === target)){
+      return {...p, discountPercent: percent};
     }
     return p;
   });
-  if(!affected.length){ showAdminStatus('No matching product found for this discount.', true); return; }
-  await saveDiscountProductsPermanent(affected);
-  renderProductsAdmin(); renderDiscountList(); renderDiscountTargets();
-  showAdminStatus('Discount applied to ' + affected.length + ' product(s).');
+  prototypeProductsWrite(products);
+  renderProductsAdmin(); renderDiscountList();
 }
-async function clearDiscounts(){
-  if(typeof hasAdminPermission === 'function' && !hasAdminPermission('discounts','write')){ showAdminStatus('You have read-only access for this section.', true); return; }
-  products = (products || []).map(p=>({...p, discountPercent:0, discountRules:[]}));
-  await saveDiscountProductsPermanent(products);
-  renderProductsAdmin(); renderDiscountList(); renderDiscountTargets();
-  showAdminStatus('All product discounts cleared.');
-}
-function describeDiscountRule(r){
-  if(!r) return '';
-  const parts = [];
-  if(r.targetType === 'all') parts.push('All Products');
-  if(r.targetType === 'category') parts.push('Category: ' + r.category);
-  if(r.targetType === 'product') parts.push('Specific Product');
-  if(r.applyScope === 'size') parts.push('Size: ' + r.size);
-  if(r.applyScope === 'fabric') parts.push('Fabric: ' + r.fabric);
-  if(r.applyScope === 'combo') parts.push('Size: ' + r.size + ' + Fabric: ' + r.fabric);
-  parts.push(Number(r.percent || 0) + '% discount');
-  return parts.join(' | ');
+function clearDiscounts(){
+  products = products.map(p=>({...p, discountPercent:0}));
+  prototypeProductsWrite(products);
+  renderProductsAdmin(); renderDiscountList();
 }
 function renderDiscountList(){
-  const el = document.getElementById('discountList');
+  const el = document.getElementById("discountList");
   if(!el) return;
-  const rows = [];
-  (products || []).forEach(p => {
-    const productName = productDisplayName(p);
-    if(Number(p.discountPercent || 0) > 0){
-      rows.push(`<div class="admin-item"><div><strong>${productName}</strong><br>Product discount: ${Number(p.discountPercent || 0)}%</div><button type="button" onclick="editProduct('${p.id}')">Edit</button></div>`);
-    }
-    (Array.isArray(p.discountRules) ? p.discountRules : []).forEach(r => {
-      if(r && r.active && Number(r.percent || 0) > 0){
-        rows.push(`<div class="admin-item"><div><strong>${productName}</strong><br>${describeDiscountRule(r)}</div><button type="button" onclick="editProduct('${p.id}')">Edit</button></div>`);
-      }
-    });
-  });
-  el.innerHTML = rows.length ? rows.join('') : '<p>No active discounts.</p>';
+  const active = products.filter(p=>Number(p.discountPercent || 0)>0);
+  el.innerHTML = active.length ? active.map(p=>`<div class="admin-item"><div><strong>${p.name}</strong><br>${p.discountPercent}% discount</div><button type="button" onclick="editProduct('${p.id}')">Edit</button></div>`).join("") : "<p>No active discounts.</p>";
 }
 
 
@@ -1325,13 +1176,11 @@ function renderAdminUserBar(){
   const box = document.getElementById("adminUserBar");
   const u = currentAdmin();
   if(!box || !u) return;
-  box.innerHTML = `<strong>${u.name}</strong> | ${u.role} | ${u.email} <button type="button" id="adminLogoutBtn">Logout</button>`;
-  const btn = document.getElementById("adminLogoutBtn");
-  if(btn) btn.addEventListener("click", adminLogout);
+  box.innerHTML = `<strong>${u.name}</strong> | ${u.role} | ${u.email} <button type="button" onclick="adminLogout()">Logout</button>`;
 }
 
 function adminLogout(){
-  ['cvAdminApiToken','cvAdminSession','adminToken','token'].forEach(k=>{
+  ['cvAdminApiToken','cvAdminSession','adminToken'].forEach(k=>{
     localStorage.removeItem(k);
     sessionStorage.removeItem(k);
   });
@@ -1343,7 +1192,7 @@ function adminLogout(){
 let cvAdminUsersCache = [];
 
 async function loadAdminUsersFromBackend(){
-  if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) return [];
+  if(!(window.CV_API && CV_API.token(true))) return [];
   try{
     const rows = await CV_API.request('/admin-users', {admin:true});
     cvAdminUsersCache = Array.isArray(rows) ? rows : [];
@@ -1391,7 +1240,7 @@ async function addAdminUser(){
   }
   const permissions = role === "superadmin" ? cloneFullAdminPermissions() : collectPermissionMatrix();
   try{
-    if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) throw new Error("Missing admin token. Logout and login again.");
+    if(!(window.CV_API && await CV_API.available())) throw new Error("Live backend is not available.");
     await CV_API.request('/admin-users', {method:'POST', admin:true, body:{name,email,password,role,permissions,active:true}});
     document.getElementById("newAdminName").value = "";
     document.getElementById("newAdminEmail").value = "";
@@ -1430,7 +1279,7 @@ function saveDiscountCodesLocal(codes){
   try{ localStorage.setItem("discountCodes", JSON.stringify(codes)); }catch(e){}
 }
 async function loadDiscountCodesFromBackend(){
-  if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) return;
+  if(!(window.CV_API && CV_API.token(true))) return;
   try{
     const rows = await CV_API.request('/discounts', {admin:true});
     cvDiscountCodesCache = Array.isArray(rows) ? rows : [];
@@ -1445,7 +1294,7 @@ async function addDiscountCode(){
   const expiry = document.getElementById("discountCodeExpiry").value || null;
   if(!code || !percent){ showAdminStatus("Add discount code and percentage.", true); return; }
   try{
-    if(typeof CV_API !== 'undefined' && CV_API.token(true)){
+    if(window.CV_API && CV_API.token(true)){
       await CV_API.request('/discounts', {method:'POST', admin:true, body:{code, percent, expires_at:expiry||null, active:true}});
       await loadDiscountCodesFromBackend();
     } else {
@@ -1466,7 +1315,7 @@ async function toggleDiscountCode(id){
   try{
     const c = cvDiscountCodesCache.find(x=>x.id===id) || cvDiscountCodesCache[id];
     if(!c) return;
-    if(typeof CV_API !== 'undefined' && CV_API.token(true)){
+    if(window.CV_API && CV_API.token(true)){
       await CV_API.request('/discounts/'+c.id, {method:'PUT', admin:true, body:{active: !c.active}});
       await loadDiscountCodesFromBackend();
     } else {
@@ -1480,7 +1329,7 @@ async function deleteDiscountCode(id){
   const c = cvDiscountCodesCache.find(x=>x.id===id);
   if(!confirm("Delete discount code" + (c?" "+c.code:"") + "?")) return;
   try{
-    if(typeof CV_API !== 'undefined' && CV_API.token(true)){
+    if(window.CV_API && CV_API.token(true)){
       await CV_API.request('/discounts/'+id, {method:'DELETE', admin:true});
       await loadDiscountCodesFromBackend();
     } else {
@@ -1634,15 +1483,14 @@ function applyAdminPermissions(){
 }
 document.addEventListener("DOMContentLoaded", ()=>setTimeout(applyAdminPermissions, 100));
 
-async function saveDiscountPage(){
+function saveDiscountPage(){
   if(typeof hasAdminPermission === "function" && !hasAdminPermission("discounts","write")){ showAdminStatus("You have read-only access for this section.", true); return; }
   try{
     prototypeProductsWrite(products);
-    await saveDiscountProductsPermanent(products || []);
     localStorage.setItem("discountCodes", JSON.stringify(getDiscountCodes()));
     showAdminStatus("Discount page saved successfully.");
   }catch(e){
-    showAdminStatus("Could not save discount page: " + (e.message || e), true);
+    showAdminStatus("Could not save discount page.", true);
   }
 }
 
@@ -2115,7 +1963,7 @@ function analyticsSafe(v){
   return String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 }
 function analyticsToken(){
-  return (typeof CV_API !== 'undefined' && CV_API.token && CV_API.token(true)) || localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
+  return (window.CV_API && CV_API.token && CV_API.token(true)) || localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
 }
 async function analyticsApi(path){
   const headers = { 'Content-Type':'application/json' };
@@ -2355,7 +2203,7 @@ let cvMediaCache = [];
 
 async function loadMedia(){
   const grid = document.getElementById('mediaGrid');
-  if(!(typeof CV_API !== 'undefined' && CV_API.token(true))) return;
+  if(!(window.CV_API && CV_API.token(true))) return;
   try{
     cvMediaCache = await CV_API.request('/media', {admin:true});
   }catch(e){
@@ -2454,6 +2302,3 @@ async function assignMedia(id, targetType, targetId){
     showAdminStatus('Image assigned to ' + targetType + (targetId?(' #'+targetId):'') + '.');
   }catch(e){ showAdminStatus('Could not assign image: ' + (e.message || e), true); }
 }
-
-
-try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdminUsers; window.renderAdminUsers = renderAdminUsers; window.renderMenu = renderMenu; } catch(e) {}

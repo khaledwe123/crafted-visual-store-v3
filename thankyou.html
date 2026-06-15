@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
   <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
   <link rel="stylesheet" href="ux95-final-visible.css?v=20260607final2" />
-  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
 <header class="nav">
@@ -20,20 +19,21 @@
 <main class="review-page">
   <section class="review-box">
     <h1>Thank you for your order</h1>
-    <p>Your payment has been marked as paid.</p>
+    <p>Your order has been received. Payment will remain pending until verified by admin or the payment gateway.</p>
     <h2 id="orderId"></h2>
     <a class="btn primary" href="index.html">Continue Shopping</a>
   </section>
 </main>
 <script>
-const id = new URLSearchParams(location.search).get("order");
-document.getElementById("orderId").textContent = id ? "Order " + id : "";
+const params = new URLSearchParams(location.search);
+const id = params.get("order");
+const status = params.get("status");
+document.getElementById("orderId").textContent = id ? `Order ${id}${status ? " | Payment: " + status.replaceAll("_", " ") : ""}` : "";
 </script>
   <script src="analytics-tracker.js"></script>
   <script src="customer-journey-95.js"></script>
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
-  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
 </body>
 </html>

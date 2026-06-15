@@ -9,7 +9,6 @@
   <script src="apiClient.js"></script>
   <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
   <link rel="stylesheet" href="cv-premium-journey.css?v=20260607premium" />
-  <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
 <header class="nav">
@@ -22,9 +21,9 @@
     <h1 id="formTitle">Sign In</h1>
 
     <div class="auth-tabs">
-      <button type="button" id="tabSignIn" data-auth-mode="signin" class="active">Sign In</button>
-      <button type="button" id="tabSignUp" data-auth-mode="signup">Sign Up</button>
-      <button type="button" id="tabForgot" data-auth-mode="forgot">Forgot Password</button>
+      <button type="button" onclick="showMode('signin')" id="tabSignIn" class="active">Sign In</button>
+      <button type="button" onclick="showMode('signup')" id="tabSignUp">Sign Up</button>
+      <button type="button" onclick="showMode('forgot')" id="tabForgot">Forgot Password</button>
     </div>
 
     <div id="signupFields" style="display:none">
@@ -42,10 +41,10 @@
     <div class="captcha-box">
       <label id="captchaQuestion"></label>
       <input id="captchaAnswer" placeholder="Captcha answer">
-      <button type="button" class="btn secondary" id="refreshCaptchaBtn">Refresh Captcha</button>
+      <button type="button" class="btn secondary" onclick="generateCaptcha()">Refresh Captcha</button>
     </div>
 
-    <button class="btn primary" id="submitBtn">Sign In</button>
+    <button class="btn primary" id="submitBtn" onclick="submitAuth()">Sign In</button>
     <div id="authStatus" class="admin-save-status"></div>
   </section>
 </main>
@@ -95,10 +94,9 @@ function showMode(next){
 }
 
 function getUsers(){ return JSON.parse(localStorage.getItem("users") || "[]"); }
-function saveUsers(users){ localStorage.setItem("users", JSON.stringify(users.map(u=>({name:u.name,email:u.email,mobile:u.mobile,addresses:u.addresses||[],createdAt:u.createdAt})))); }
-function validEmail(email){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+function saveUsers(users){ localStorage.setItem("users", JSON.stringify(users)); }
 
-async function submitAuth(){
+function submitAuth(){
   if(!validateCaptcha()){
     showStatus("Captcha is incorrect.", true);
     generateCaptcha();
@@ -107,42 +105,31 @@ async function submitAuth(){
 
   const email = document.getElementById("email").value.trim().toLowerCase();
   const password = document.getElementById("password").value;
+  const users = getUsers();
 
   if(mode === "signup"){
     const name = document.getElementById("name").value.trim();
     const mobile = document.getElementById("mobile").value.trim();
-    if(!name || !mobile || !validEmail(email) || !password){ showStatus("Please fill all required fields with a valid email.", true); return; }
-    if(password.length < 8){ showStatus("Password must be at least 8 characters.", true); return; }
-    try{
-      if(window.CV_API && await CV_API.available()){
-        await CV_API.customerRegister({name,email,mobile,password});
-      } else {
-        const users = getUsers();
-        if(users.some(u=>u.email === email)){ showStatus("Account already exists.", true); return; }
-        const user = {name,email,mobile,addresses:[],createdAt:new Date().toISOString()};
-        users.push(user); saveUsers(users); localStorage.setItem("currentUser", JSON.stringify(user));
-      }
-      location.href = returnUrl();
-    }catch(err){ showStatus(err.message || "Sign up failed.", true); }
+    if(!name || !mobile || !email || !password){ showStatus("Please fill all required fields.", true); return; }
+    if(users.some(u=>u.email === email)){ showStatus("Account already exists.", true); return; }
+    const user = {name,email,mobile,password,addresses:[],createdAt:new Date().toISOString()};
+    users.push(user);
+    saveUsers(users);
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    location.href = returnUrl();
     return;
   }
 
   if(mode === "signin"){
-    if(!validEmail(email) || !password){ showStatus("Please enter your email and password.", true); return; }
-    try{
-      if(window.CV_API && await CV_API.available()){
-        await CV_API.customerLogin(email,password);
-      } else {
-        showStatus("Online sign in is temporarily unavailable. Please try again later.", true);
-        return;
-      }
-      location.href = returnUrl();
-    }catch(err){ showStatus(err.message || "Invalid email or password.", true); }
+    const user = users.find(u=>u.email === email && u.password === password);
+    if(!user){ showStatus("Invalid email or password.", true); return; }
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    location.href = returnUrl();
     return;
   }
 
   if(mode === "forgot"){
-    if(!validEmail(email)){ showStatus("Please enter a valid email.", true); return; }
+    if(!email){ showStatus("Please enter your email.", true); return; }
     const resetRequests = JSON.parse(localStorage.getItem("passwordResetRequests") || "[]");
     resetRequests.push({id:"RESET-" + Date.now(), email, date:new Date().toISOString(), status:"New"});
     localStorage.setItem("passwordResetRequests", JSON.stringify(resetRequests));
@@ -153,126 +140,7 @@ async function submitAuth(){
     return;
   }
 }
-
-document.addEventListener("DOMContentLoaded", function(){
-  document.querySelectorAll("[data-auth-mode]").forEach(function(btn){
-    btn.addEventListener("click", function(){ showMode(btn.getAttribute("data-auth-mode")); });
-  });
-  const refreshBtn = document.getElementById("refreshCaptchaBtn");
-  if(refreshBtn) refreshBtn.addEventListener("click", generateCaptcha);
-  const submitBtn = document.getElementById("submitBtn");
-  if(submitBtn) submitBtn.addEventListener("click", submitAuth);
-});
 </script>
-
-<!-- CV_AUTH_ARABIC_ONLY_FIX_20260615 -->
-<script>
-(function(){
-  function currentLang(){
-    try{
-      var qs = new URLSearchParams(location.search);
-      return qs.get('lang') || localStorage.getItem('lang') || 'en';
-    }catch(e){ return localStorage.getItem('lang') || 'en'; }
-  }
-  function isArabic(){ return String(currentLang()).toLowerCase().startsWith('ar'); }
-  var AR = {
-    signIn:'تسجيل الدخول',
-    signUp:'إنشاء حساب',
-    forgot:'نسيت كلمة المرور',
-    createAccount:'إنشاء الحساب',
-    requestReset:'طلب إعادة تعيين كلمة المرور',
-    fullName:'الاسم الكامل',
-    mobile:'رقم الجوال',
-    email:'البريد الإلكتروني',
-    password:'كلمة المرور',
-    captchaAnswer:'إجابة التحقق',
-    refreshCaptcha:'تحديث التحقق',
-    forgotHelp:'أدخل بريدك الإلكتروني وأجب على التحقق. سيتم حفظ طلب إعادة تعيين كلمة المرور لدى خدمة العملاء.',
-    captchaIncorrect:'إجابة التحقق غير صحيحة.',
-    fillRequired:'يرجى تعبئة جميع الحقول المطلوبة مع بريد إلكتروني صحيح.',
-    passwordLength:'يجب أن تكون كلمة المرور 8 أحرف على الأقل.',
-    accountExists:'الحساب موجود مسبقاً.',
-    signupFailed:'فشل إنشاء الحساب.',
-    enterEmailPass:'يرجى إدخال البريد الإلكتروني وكلمة المرور.',
-    signinUnavailable:'تسجيل الدخول عبر الإنترنت غير متاح مؤقتاً. يرجى المحاولة لاحقاً.',
-    invalidLogin:'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
-    validEmail:'يرجى إدخال بريد إلكتروني صحيح.',
-    resetSaved:'تم حفظ طلب إعادة تعيين كلمة المرور. سيتواصل معك فريق خدمة العملاء.',
-    home:'الرئيسية',
-    contact:'تواصل معنا',
-    brand:'كرافتد فيجوال'
-  };
-  function setText(id, text){ var el=document.getElementById(id); if(el) el.textContent=text; }
-  function setPlaceholder(id, text){ var el=document.getElementById(id); if(el) el.placeholder=text; }
-  function applyAuthArabic(){
-    if(!isArabic()) return;
-    document.documentElement.lang='ar';
-    document.documentElement.dir='rtl';
-    document.title='تسجيل الدخول | كرافتد فيجوال';
-    document.querySelectorAll('.brand').forEach(function(el){ el.textContent=AR.brand; });
-    document.querySelectorAll('header.nav a').forEach(function(a){
-      var href=(a.getAttribute('href')||'').toLowerCase();
-      var txt=(a.textContent||'').trim().toLowerCase();
-      if(href.indexOf('index') !== -1 || txt==='home') a.textContent=AR.home;
-      if(href.indexOf('contact') !== -1 || txt==='contact us') a.textContent=AR.contact;
-    });
-    setText('tabSignIn', AR.signIn);
-    setText('tabSignUp', AR.signUp);
-    setText('tabForgot', AR.forgot);
-    setPlaceholder('name', AR.fullName);
-    setPlaceholder('mobile', AR.mobile);
-    setPlaceholder('email', AR.email);
-    setPlaceholder('password', AR.password);
-    setPlaceholder('captchaAnswer', AR.captchaAnswer);
-    setText('refreshCaptchaBtn', AR.refreshCaptcha);
-    var fh=document.querySelector('#forgotHelp p'); if(fh) fh.textContent=AR.forgotHelp;
-    if(typeof window.mode === 'string'){
-      setText('formTitle', window.mode === 'signin' ? AR.signIn : window.mode === 'signup' ? AR.signUp : AR.forgot);
-      setText('submitBtn', window.mode === 'signin' ? AR.signIn : window.mode === 'signup' ? AR.createAccount : AR.requestReset);
-    }else{
-      setText('formTitle', AR.signIn);
-      setText('submitBtn', AR.signIn);
-    }
-  }
-  function installAuthArabicHooks(){
-    if(!isArabic()) return;
-    var originalShowMode = window.showMode;
-    if(typeof originalShowMode === 'function' && !window.__cvAuthArabicShowModePatched){
-      window.__cvAuthArabicShowModePatched = true;
-      window.showMode = function(next){
-        originalShowMode(next);
-        setTimeout(applyAuthArabic, 0);
-      };
-    }
-    var originalShowStatus = window.showStatus;
-    if(typeof originalShowStatus === 'function' && !window.__cvAuthArabicStatusPatched){
-      window.__cvAuthArabicStatusPatched = true;
-      window.showStatus = function(msg, error){
-        var map = {
-          'Captcha is incorrect.':AR.captchaIncorrect,
-          'Please fill all required fields with a valid email.':AR.fillRequired,
-          'Password must be at least 8 characters.':AR.passwordLength,
-          'Account already exists.':AR.accountExists,
-          'Sign up failed.':AR.signupFailed,
-          'Please enter your email and password.':AR.enterEmailPass,
-          'Online sign in is temporarily unavailable. Please try again later.':AR.signinUnavailable,
-          'Invalid email or password.':AR.invalidLogin,
-          'Please enter a valid email.':AR.validEmail,
-          'Password reset request saved. Customer care will contact you.':AR.resetSaved
-        };
-        originalShowStatus(map[msg] || msg, error);
-      };
-    }
-  }
-  document.addEventListener('DOMContentLoaded', function(){
-    installAuthArabicHooks();
-    applyAuthArabic();
-    setTimeout(applyAuthArabic, 50);
-    setTimeout(applyAuthArabic, 300);
-  });
-})();
-</script>
-
 <!-- CV_STATIC_ARABIC_PATCH -->
 
 <script>
@@ -305,6 +173,5 @@ document.addEventListener("DOMContentLoaded", function(){
   <script src="analytics-tracker.js"></script>
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
-  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
 </body>
 </html>
