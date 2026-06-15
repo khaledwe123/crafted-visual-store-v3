@@ -2149,111 +2149,133 @@ openProduct = function(id){
 })();
 
 
-/* CV FRONTEND DISCOUNT RULES PATCH
-   Purpose: make backend/admin discount combinations apply on the shop frontend.
-   Scope: frontend price calculation only. Does not touch admin, auth, Arabic toggle, or backend.
-*/
+/* CV FRONTEND DISCOUNT COMBINATION PATCH - 20260615
+   Scope: frontend shop price rendering only.
+   Supports backend/admin discountRules for Product Size/Fabric/Color combinations.
+   Does not touch admin, auth, Arabic toggle, payment, or server logic. */
 (function(){
-  'use strict';
-  if(window.__cvFrontendDiscountRulesPatch) return;
-  window.__cvFrontendDiscountRulesPatch = true;
+  if(window.__cvFrontendDiscountRulesPatch20260615) return;
+  window.__cvFrontendDiscountRulesPatch20260615 = true;
 
-  function cvNum(v, fallback){
-    var n = Number(v);
-    return Number.isFinite(n) ? n : (fallback || 0);
+  function cvText(v){ return String(v == null ? '' : v).trim().toLowerCase(); }
+  function cvNum(v){ const x = Number(v || 0); return Number.isFinite(x) ? x : 0; }
+  function cvEsc(v){
+    return String(v == null ? '' : v).replace(/[&<>'"]/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[c];
+    });
   }
-  function cvClean(v){ return String(v == null ? '' : v).trim(); }
   function cvMoney(v){
-    try{ return typeof money === 'function' ? money(v) : ('SAR ' + Math.round(cvNum(v)).toLocaleString()); }
-    catch(e){ return 'SAR ' + Math.round(cvNum(v)).toLocaleString(); }
+    if(typeof money === 'function') return money(v);
+    return 'SAR ' + Math.round(Number(v || 0)).toLocaleString();
   }
-  function cvVatRate(p){
-    try{ return typeof vatRate === 'function' ? vatRate(p) : (cvNum(p && p.vatRate, 15) || 15); }
-    catch(e){ return cvNum(p && p.vatRate, 15) || 15; }
+  function cvVatRate(p){ return typeof vatRate === 'function' ? vatRate(p) : (Number(p?.vatRate || 15) || 15); }
+  function cvBeforeVat(p, sizeOpt, fabricOpt){
+    if(typeof priceBeforeVat === 'function') return priceBeforeVat(p, sizeOpt, fabricOpt);
+    return Number(p?.price || 0);
   }
-  function cvPriceBeforeVat(p, sizeOpt, fabricOpt){
-    try{ return typeof priceBeforeVat === 'function' ? priceBeforeVat(p, sizeOpt, fabricOpt) : cvNum(p && p.price); }
-    catch(e){ return cvNum(p && p.price); }
+  function cvInclVat(p, sizeOpt, fabricOpt){
+    if(typeof priceIncludingVat === 'function') return priceIncludingVat(p, sizeOpt, fabricOpt);
+    return cvBeforeVat(p, sizeOpt, fabricOpt) * (1 + cvVatRate(p) / 100);
   }
-  function cvPriceInclVat(p, sizeOpt, fabricOpt){
-    try{ return typeof priceIncludingVat === 'function' ? priceIncludingVat(p, sizeOpt, fabricOpt) : cvPriceBeforeVat(p, sizeOpt, fabricOpt) * (1 + cvVatRate(p) / 100); }
-    catch(e){ return cvPriceBeforeVat(p, sizeOpt, fabricOpt) * (1 + cvVatRate(p) / 100); }
-  }
-  function cvRuleMatches(rule, sizeOpt, fabricOpt, color){
-    if(!rule || rule.active === false || cvNum(rule.percent) <= 0) return false;
-    var scope = cvClean(rule.scope || rule.applyScope || '');
-    var size = cvClean(sizeOpt && (sizeOpt.label || sizeOpt.name || sizeOpt));
-    var fabric = cvClean(fabricOpt && (fabricOpt.label || fabricOpt.name || fabricOpt));
-    var selected = cvClean(color || (typeof selectedColor !== 'undefined' ? selectedColor : ''));
-    var ruleSize = cvClean(rule.size);
-    var ruleFabric = cvClean(rule.fabric);
-    var ruleColor = cvClean(rule.color);
+  function cvRuleScope(rule){ return cvText(rule?.scope || rule?.applyScope || rule?.type); }
+  function cvRuleActive(rule){ return rule && rule.active !== false && cvNum(rule.percent || rule.discountPercent) > 0; }
+  function cvRuleMatches(rule, sizeOpt, fabricOpt, colorName){
+    if(!cvRuleActive(rule)) return false;
+    const scope = cvRuleScope(rule);
+    const size = cvText(sizeOpt?.label || sizeOpt || '');
+    const fabric = cvText(fabricOpt?.label || fabricOpt || '');
+    const color = cvText(colorName || '');
+    const ruleSize = cvText(rule.size || rule.sizeLabel || '');
+    const ruleFabric = cvText(rule.fabric || rule.fabricLabel || '');
+    const ruleColor = cvText(rule.color || rule.colorName || '');
 
+    if(scope === 'product') return true;
     if(scope === 'size') return !!ruleSize && ruleSize === size;
     if(scope === 'fabric') return !!ruleFabric && ruleFabric === fabric;
-    if(scope === 'color') return !!ruleColor && ruleColor === selected;
+    if(scope === 'color') return !!ruleColor && ruleColor === color;
     if(scope === 'combo') return !!ruleSize && !!ruleFabric && ruleSize === size && ruleFabric === fabric;
-    if(scope === 'comboColor') return !!ruleSize && !!ruleFabric && !!ruleColor && ruleSize === size && ruleFabric === fabric && ruleColor === selected;
+    if(scope === 'combocolor' || scope === 'combo_color' || scope === 'sizefabriccolor'){
+      return !!ruleSize && !!ruleFabric && !!ruleColor && ruleSize === size && ruleFabric === fabric && ruleColor === color;
+    }
     return false;
   }
-  function cvActiveDiscountPercent(p, sizeOpt, fabricOpt, color){
-    p = p || {};
-    var best = cvNum(p.discountPercent || p.discount || 0);
-    var rules = Array.isArray(p.discountRules) ? p.discountRules : [];
-    rules.forEach(function(rule){
-      if(cvRuleMatches(rule, sizeOpt, fabricOpt, color)) best = Math.max(best, cvNum(rule.percent));
-    });
-    return best;
+  function cvVariantDiscountPercent(p, sizeOpt, fabricOpt, colorName){
+    p = typeof normalizeProduct === 'function' ? normalizeProduct(p || {}) : (p || {});
+    const productDiscount = cvNum(p.discountPercent || p.discount || 0);
+    const rules = Array.isArray(p.discountRules) ? p.discountRules : [];
+    const matchingRules = rules.filter(function(rule){ return cvRuleMatches(rule, sizeOpt, fabricOpt, colorName); });
+    const ruleDiscount = matchingRules.reduce(function(max, rule){ return Math.max(max, cvNum(rule.percent || rule.discountPercent)); }, 0);
+    return Math.max(productDiscount, ruleDiscount);
   }
-  window.cvActiveDiscountPercent = cvActiveDiscountPercent;
-
-  window.finalPrice = finalPrice = function(p, sizeOpt, fabricOpt, color){
-    var discount = cvActiveDiscountPercent(p, sizeOpt, fabricOpt, color);
-    return Math.round(cvPriceInclVat(p, sizeOpt, fabricOpt) * (1 - discount / 100));
-  };
-
+  function cvFinalForVariant(p, sizeOpt, fabricOpt, colorName){
+    const incl = cvInclVat(p, sizeOpt, fabricOpt);
+    const discount = cvVariantDiscountPercent(p, sizeOpt, fabricOpt, colorName);
+    return Math.round(incl * (1 - discount / 100));
+  }
   function cvAllVariantPrices(p){
-    p = (typeof normalizeProduct === 'function') ? normalizeProduct(p || {}) : (p || {});
-    var values = [];
-    var sizes = Array.isArray(p.sizeOptions) && p.sizeOptions.length ? p.sizeOptions : [{label:'', price:cvNum(p.price)}];
-    var fabrics = Array.isArray(p.fabricOptions) && p.fabricOptions.length ? p.fabricOptions : [{label:'', sizePrices:{}}];
-    var colors = Object.keys(p.colors || {});
-    if(!colors.length) colors = [''];
-    sizes.forEach(function(s){
-      fabrics.forEach(function(f){
-        colors.forEach(function(c){
-          var before = cvPriceBeforeVat(p, s, f);
+    p = typeof normalizeProduct === 'function' ? normalizeProduct(p || {}) : (p || {});
+    const values = [];
+    const colors = Object.keys(p.colors || {});
+    const colorList = colors.length ? colors : [''];
+    (p.sizeOptions || [{label:''}]).forEach(function(sizeOpt){
+      (p.fabricOptions || [{label:''}]).forEach(function(fabricOpt){
+        colorList.forEach(function(colorName){
+          const before = cvBeforeVat(p, sizeOpt, fabricOpt);
           if(before > 0){
             values.push({
               before: before,
-              final: finalPrice(p, s, f, c),
-              discountPercent: cvActiveDiscountPercent(p, s, f, c),
-              size: s,
-              fabric: f,
-              color: c
+              final: cvFinalForVariant(p, sizeOpt, fabricOpt, colorName),
+              discount: cvVariantDiscountPercent(p, sizeOpt, fabricOpt, colorName),
+              size: sizeOpt,
+              fabric: fabricOpt,
+              color: colorName
             });
           }
         });
       });
     });
     if(!values.length){
-      values.push({before:cvNum(p.price), final:finalPrice(p), discountPercent:cvActiveDiscountPercent(p), size:null, fabric:null, color:''});
+      values.push({before:cvNum(p.price), final:cvFinalForVariant(p,null,null,''), discount:cvVariantDiscountPercent(p,null,null,''), size:null, fabric:null, color:''});
     }
     return values;
   }
   function cvLowestVariant(p){
-    return cvAllVariantPrices(p).sort(function(a,b){ return a.final - b.final; })[0] || {before:cvNum(p && p.price), final:finalPrice(p), discountPercent:cvActiveDiscountPercent(p)};
+    return cvAllVariantPrices(p).sort(function(a,b){ return a.final - b.final; })[0];
+  }
+  function cvHasAnyDiscountRule(p){
+    return cvAllVariantPrices(p).some(function(v){ return cvNum(v.discount) > 0; });
+  }
+  function cvShopCardPriceHTML(p){
+    const low = cvLowestVariant(p);
+    const oldIncl = Math.round(low.before * (1 + cvVatRate(p) / 100));
+    if(cvNum(low.discount) > 0){
+      return '<div class="shop-price-summary">' +
+        '<small>From discounted combination</small><br>' +
+        '<span class="old-price" style="text-decoration:line-through;opacity:.65;">' + cvMoney(oldIncl) + '</span><br>' +
+        '<strong class="discount-price">' + cvMoney(low.final) + '</strong> ' +
+        '<span class="discount-badge">-' + cvNum(low.discount) + '%</span>' +
+        '</div>';
+    }
+    return '<div class="shop-price-summary"><small>From</small><br><strong>' + cvMoney(low.final) + '</strong></div>';
   }
 
-  window.priceHTML = priceHTML = function(p, sizeOpt, fabricOpt){
-    p = (typeof normalizeProduct === 'function') ? normalizeProduct(p || {}) : (p || {});
-    var color = typeof selectedColor !== 'undefined' ? selectedColor : '';
-    var before = cvPriceBeforeVat(p, sizeOpt, fabricOpt);
-    var vat = before * cvVatRate(p) / 100;
-    var incl = before + vat;
-    var fp = finalPrice(p, sizeOpt, fabricOpt, color);
-    var discount = cvActiveDiscountPercent(p, sizeOpt, fabricOpt, color);
-    var html = '<div class="price-detail">' +
+  window.cvVariantDiscountPercent = cvVariantDiscountPercent;
+  window.cvHasAnyDiscountRule = cvHasAnyDiscountRule;
+
+  window.finalPrice = finalPrice = function(p, sizeOpt, fabricOpt, colorName){
+    const selected = colorName !== undefined ? colorName : (typeof selectedColor !== 'undefined' ? selectedColor : '');
+    return cvFinalForVariant(p, sizeOpt, fabricOpt, selected);
+  };
+
+  window.priceHTML = priceHTML = function(p, sizeOpt, fabricOpt, colorName){
+    p = typeof normalizeProduct === 'function' ? normalizeProduct(p || {}) : (p || {});
+    const selected = colorName !== undefined ? colorName : (typeof selectedColor !== 'undefined' ? selectedColor : '');
+    const before = cvBeforeVat(p, sizeOpt, fabricOpt);
+    const vat = before * cvVatRate(p) / 100;
+    const incl = before + vat;
+    const discount = cvVariantDiscountPercent(p, sizeOpt, fabricOpt, selected);
+    const fp = Math.round(incl * (1 - discount / 100));
+    let html = '<div class="price-detail">' +
       '<div>Selected price before VAT: <strong>' + cvMoney(before) + '</strong></div>' +
       '<div>VAT (' + cvVatRate(p) + '%): <strong>' + cvMoney(vat) + '</strong></div>';
     if(discount > 0){
@@ -2262,73 +2284,141 @@ openProduct = function(id){
     }else{
       html += '<div>Total incl. VAT: <strong>' + cvMoney(incl) + '</strong></div>';
     }
-    return html + '</div>';
+    html += '</div>';
+    return html;
   };
 
-  function cvShopCardPriceHTML(p){
-    var low = cvLowestVariant(p);
-    var oldIncl = Math.round(low.before * (1 + cvVatRate(p) / 100));
-    if(cvNum(low.discountPercent) > 0){
-      return '<div class="shop-price-summary"><small>From</small><br>' +
-        '<span class="old-price" style="text-decoration:line-through;opacity:.65;">' + cvMoney(oldIncl) + '</span><br>' +
-        '<strong class="discount-price">' + cvMoney(low.final) + '</strong> ' +
-        '<span class="discount-badge">-' + low.discountPercent + '%</span></div>';
+  const cvOldSelectColor = typeof selectColor === 'function' ? selectColor : null;
+  window.selectColor = selectColor = function(color){
+    if(cvOldSelectColor) cvOldSelectColor(color);
+    try{
+      if(typeof currentProduct !== 'undefined' && currentProduct){
+        const el = document.getElementById('modalPrice');
+        if(el) el.innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, color);
+      }
+    }catch(e){}
+  };
+
+  const cvOldUpdateFabric = typeof updateSelectedFabric === 'function' ? updateSelectedFabric : null;
+  window.updateSelectedFabric = updateSelectedFabric = function(){
+    if(cvOldUpdateFabric) cvOldUpdateFabric();
+    try{
+      if(typeof currentProduct !== 'undefined' && currentProduct){
+        const el = document.getElementById('modalPrice');
+        if(el) el.innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
+      }
+    }catch(e){}
+  };
+
+  const cvOldUpdateSize = typeof updateSelectedSize === 'function' ? updateSelectedSize : null;
+  window.updateSelectedSize = updateSelectedSize = function(){
+    if(cvOldUpdateSize) cvOldUpdateSize();
+    try{
+      if(typeof currentProduct !== 'undefined' && currentProduct){
+        const el = document.getElementById('modalPrice');
+        if(el) el.innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
+      }
+    }catch(e){}
+  };
+
+  window.renderProducts = renderProducts = function(list){
+    const grid = document.getElementById('productGrid');
+    if(!grid) return;
+    list = (list || []).map(function(p){ return typeof normalizeProduct === 'function' ? normalizeProduct(p) : p; });
+    if(!list.length){
+      grid.innerHTML = '<div class="empty-products"><h3>No products showing yet</h3><p>No products are currently published.</p></div>';
+      return;
     }
-    return '<div class="shop-price-summary"><small>From</small><br><strong>' + cvMoney(low.final) + '</strong></div>';
-  }
+    grid.innerHTML = list.map(function(p){
+      const pid = String(p.id || p._dbId || '');
+      const img = (typeof firstImage === 'function' ? firstImage(p) : '') || 'assets/products/product_01.png';
+      const name = typeof displayName === 'function' ? displayName(p) : p.name;
+      const category = typeof displayCategory === 'function' ? displayCategory(p) : p.category;
+      const wished = typeof isWished === 'function' ? isWished(pid) : false;
+      const stars = typeof starDisplay === 'function' ? starDisplay(pid) : '';
+      const swatches = Object.entries(p.colors || {}).map(function(entry){
+        const c = entry[0], v = entry[1] || {};
+        return '<span title="' + cvEsc(c) + '" style="background:' + cvEsc(v.hex || '#ccc') + '"></span>';
+      }).join('');
+      return '<div class="card product-card" data-product-id="' + cvEsc(pid) + '">' +
+        '<div class="product-card-image-wrap" style="position:relative;">' +
+          '<img src="' + cvEsc(img) + '" alt="' + cvEsc(name) + '">' +
+          '<button type="button" class="wishlist-heart ' + (wished ? 'active' : '') + '" data-shop-action="wishlist" data-wishlist-id="' + cvEsc(pid) + '" aria-label="' + (wished ? 'Remove from wishlist' : 'Add to wishlist') + '" style="position:absolute;top:10px;right:10px;border:0;border-radius:50%;width:38px;height:38px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.12);font-size:22px;cursor:pointer;">' + (wished ? '♥' : '♡') + '</button>' +
+        '</div>' +
+        '<div class="card-body">' +
+          '<h3>' + cvEsc(name) + '</h3>' +
+          '<p>' + cvEsc(category || '') + '</p>' +
+          stars +
+          cvShopCardPriceHTML(p) +
+          '<div class="mini-swatches">' + swatches + '</div>' +
+          '<div class="cj-card-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">' +
+            '<button class="btn secondary" type="button" data-shop-action="quick" data-product-id="' + cvEsc(pid) + '">Quick View</button>' +
+            '<button class="btn primary" type="button" data-shop-action="customize" data-product-id="' + cvEsc(pid) + '">Customize</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  };
 
-  var originalRenderProducts = typeof renderProducts === 'function' ? renderProducts : null;
-  if(originalRenderProducts){
-    window.renderProducts = renderProducts = function(list){
-      originalRenderProducts.call(this, list);
-      try{
-        var normalized = (list || []).map(function(p){ return (typeof normalizeProduct === 'function') ? normalizeProduct(p) : p; });
-        document.querySelectorAll('.product-card[data-product-id]').forEach(function(card){
-          var id = card.getAttribute('data-product-id');
-          var product = normalized.find(function(p){ return String(p.id || p._dbId || '') === String(id); });
-          if(!product) return;
-          var priceBox = card.querySelector('.shop-price-summary');
-          if(priceBox) priceBox.outerHTML = cvShopCardPriceHTML(product);
+  window.applySortAndFilter = applySortAndFilter = function(){
+    products = (products || []).map(function(p){ return typeof normalizeProduct === 'function' ? normalizeProduct(p) : p; });
+    let list = products.slice();
+    const catFilter = document.getElementById('categoryFilter');
+    const sortSelect = document.getElementById('sortSelect');
+    const selectedCategory = catFilter && catFilter.value ? catFilter.value : (window.CV_CATEGORY_FILTER || activeCategory);
+    activeCategory = selectedCategory || 'All';
+    if(activeCategory !== 'All') list = list.filter(function(p){ return p.category === activeCategory; });
+    const sort = sortSelect ? sortSelect.value : 'featured';
+    if(sort === 'priceHigh') list.sort(function(a,b){ return cvLowestVariant(b).final - cvLowestVariant(a).final; });
+    else if(sort === 'priceLow') list.sort(function(a,b){ return cvLowestVariant(a).final - cvLowestVariant(b).final; });
+    else if(sort === 'discount') list.sort(function(a,b){ return cvLowestVariant(b).discount - cvLowestVariant(a).discount; });
+    else if(sort === 'rating' && typeof productRating === 'function') list.sort(function(a,b){ return productRating(b.id).avg - productRating(a.id).avg; });
+    else if(sort === 'nameAZ' && typeof displayName === 'function') list.sort(function(a,b){ return displayName(a).localeCompare(displayName(b)); });
+    const title = document.getElementById('shopPageTitle');
+    if(title && activeCategory && activeCategory !== 'All') title.textContent = activeCategory;
+    renderProducts(list);
+  };
+
+  const cvOldAddCurrentToCart = typeof addCurrentToCart === 'function' ? addCurrentToCart : null;
+  window.addCurrentToCart = addCurrentToCart = function(){
+    try{
+      if(typeof currentProduct !== 'undefined' && currentProduct){
+        const colorObj = currentProduct.colors?.[selectedColor] || {};
+        const discount = cvVariantDiscountPercent(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
+        const item = lightweightCartItem({
+          id: currentProduct.id,
+          name: typeof displayName === 'function' ? displayName(currentProduct) : currentProduct.name,
+          price: cvFinalForVariant(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor),
+          originalPrice: cvInclVat(currentProduct, selectedSizeOption, selectedFabricOption),
+          priceBeforeVat: cvBeforeVat(currentProduct, selectedSizeOption, selectedFabricOption),
+          costPrice: typeof variantCost === 'function' ? variantCost(currentProduct, selectedSizeOption, selectedFabricOption) : cvNum(currentProduct.costPrice),
+          discountPercent: discount,
+          vatRate: cvVatRate(currentProduct),
+          color: selectedColor,
+          colorCode: colorObj.code || '',
+          fabric: selectedFabricOption?.label || '',
+          size: selectedSizeOption?.label || '',
+          qty: 1
         });
-      }catch(e){ console.warn('Discount card price patch skipped:', e); }
-    };
-  }
-
-  var originalApplySortAndFilter = typeof applySortAndFilter === 'function' ? applySortAndFilter : null;
-  if(originalApplySortAndFilter){
-    window.applySortAndFilter = applySortAndFilter = function(){
-      if(Array.isArray(products)){
-        products = products.map(function(p){ return (typeof normalizeProduct === 'function') ? normalizeProduct(p) : p; });
-        var sortSelect = document.getElementById('sortSelect');
-        if(sortSelect && sortSelect.value === 'discount'){
-          var oldRender = renderProducts;
-          try{
-            var list = products.slice();
-            var catFilter = document.getElementById('categoryFilter');
-            var selectedCategory = catFilter && catFilter.value ? catFilter.value : (window.CV_CATEGORY_FILTER || activeCategory);
-            activeCategory = selectedCategory || 'All';
-            if(activeCategory !== 'All') list = list.filter(function(p){ return p.category === activeCategory; });
-            list.sort(function(a,b){ return cvNum(cvLowestVariant(b).discountPercent) - cvNum(cvLowestVariant(a).discountPercent); });
-            renderProducts(list);
-            return;
-          }catch(e){ renderProducts = oldRender; }
-        }
+        cart.push(item);
+        if(typeof saveCartSafe === 'function' && !saveCartSafe()){ cart.pop(); return; }
+        if(typeof updateCartCount === 'function') updateCartCount();
+        try{ if(typeof trackEvent === 'function') trackEvent('add_to_cart', {item_id:item.id, item_name:item.name, value:item.price, size:item.size, fabric:item.fabric, color:item.color, discount:discount}); }catch(e){}
+        try{ if(typeof saveCRMActivity === 'function') saveCRMActivity('Add to Cart', item); }catch(e){}
+        if(typeof showToast === 'function') showToast((item.name || 'Product') + ' added to cart');
+        else alert('Added to cart');
+        return;
       }
-      return originalApplySortAndFilter.apply(this, arguments);
-    };
-  }
-
-  var originalAddCurrentToCart = typeof addCurrentToCart === 'function' ? addCurrentToCart : null;
-  if(originalAddCurrentToCart){
-    window.addCurrentToCart = addCurrentToCart = function(){
-      if(currentProduct){
-        currentProduct.discountPercent = cvActiveDiscountPercent(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
-      }
-      return originalAddCurrentToCart.apply(this, arguments);
-    };
-  }
+    }catch(e){ console.warn('Discount-aware cart failed, using original cart flow', e); }
+    if(cvOldAddCurrentToCart) return cvOldAddCurrentToCart();
+  };
 
   setTimeout(function(){
     try{ if(document.getElementById('productGrid') && typeof applySortAndFilter === 'function') applySortAndFilter(); }catch(e){}
-  }, 500);
+    try{
+      if(typeof currentProduct !== 'undefined' && currentProduct && document.getElementById('modalPrice')){
+        document.getElementById('modalPrice').innerHTML = window.priceHTML(currentProduct, selectedSizeOption, selectedFabricOption, selectedColor);
+      }
+    }catch(e){}
+  }, 250);
 })();
