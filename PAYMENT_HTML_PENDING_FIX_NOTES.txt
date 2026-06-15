@@ -1,0 +1,22 @@
+PAYMENT HTML SAFE FIX
+
+Changed file: payment.html only.
+
+Purpose:
+- Prevents unpaid orders from being marked as Paid while the real payment gateway is not configured.
+
+Changes made:
+- Button text changed from Pay Now to Submit Order.
+- paymentStatus now saves as Pending Payment instead of Paid.
+- orderStatus now saves as Awaiting Payment Verification instead of Paid.
+- paidAt replaced with paymentSubmittedAt.
+- customer message/email wording changed from Payment Confirmation to Order Received / Payment Pending.
+
+Not touched:
+- server.js
+- admin files
+- Arabic toggle files
+- discount files
+- product files
+- shop files
+- CSS files
