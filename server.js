@@ -103,7 +103,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
 }));
 
 app.use(helmet({
@@ -342,15 +342,57 @@ function parseCookies(req){
     return i === -1 ? [v, ''] : [decodeURIComponent(v.slice(0,i)), decodeURIComponent(v.slice(i+1))];
   }));
 }
+function appendCookie(res, cookieValue){
+  if (res.append) return res.append('Set-Cookie', cookieValue);
+  const existing = res.getHeader && res.getHeader('Set-Cookie');
+  if (!existing) return res.setHeader('Set-Cookie', cookieValue);
+  const next = Array.isArray(existing) ? existing.concat(cookieValue) : [existing, cookieValue];
+  return res.setHeader('Set-Cookie', next);
+}
 function setAuthCookie(res, name, value){
   const parts = [`${name}=${encodeURIComponent(value)}`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=43200'];
   if (IS_PROD) parts.push('Secure');
-  res.setHeader('Set-Cookie', parts.join('; '));
+  appendCookie(res, parts.join('; '));
 }
 function clearAuthCookie(res, name){
   const parts = [`${name}=`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0'];
   if (IS_PROD) parts.push('Secure');
-  res.append ? res.append('Set-Cookie', parts.join('; ')) : res.setHeader('Set-Cookie', parts.join('; '));
+  appendCookie(res, parts.join('; '));
+}
+const CSRF_COOKIE_NAME = 'cv_csrf_token';
+const CSRF_HEADER_NAME = 'x-csrf-token';
+function isUnsafeHttpMethod(method=''){
+  return ['POST','PUT','PATCH','DELETE'].includes(String(method || '').toUpperCase());
+}
+function hasSessionCookie(req){
+  const cookies = parseCookies(req);
+  return !!(cookies.cv_admin_auth || cookies.cv_customer_auth);
+}
+function makeCsrfToken(){
+  return crypto.randomBytes(32).toString('hex');
+}
+function setCsrfCookie(res, tokenValue){
+  const parts = [`${CSRF_COOKIE_NAME}=${encodeURIComponent(tokenValue)}`, 'SameSite=Lax', 'Path=/', 'Max-Age=43200'];
+  if (IS_PROD) parts.push('Secure');
+  appendCookie(res, parts.join('; '));
+}
+function ensureCsrfCookie(req, res){
+  const cookies = parseCookies(req);
+  const existing = cookies[CSRF_COOKIE_NAME];
+  if(existing && /^[a-f0-9]{64}$/i.test(existing)) return existing;
+  const tokenValue = makeCsrfToken();
+  setCsrfCookie(res, tokenValue);
+  return tokenValue;
+}
+function csrfProtection(req, res, next){
+  ensureCsrfCookie(req, res);
+  if(!req.path.startsWith('/api/') || !isUnsafeHttpMethod(req.method)) return next();
+  if(!hasSessionCookie(req)) return next();
+  const cookies = parseCookies(req);
+  const cookieToken = cookies[CSRF_COOKIE_NAME] || '';
+  const submittedToken = String(req.headers[CSRF_HEADER_NAME] || req.body?._csrf || '');
+  if(cookieToken && submittedToken && cookieToken === submittedToken) return next();
+  return res.status(403).json({error:'Invalid or missing CSRF token'});
 }
 function bearerOrCookieToken(req){
   const h = req.headers.authorization || '';
@@ -552,6 +594,7 @@ function seedDefaults(){
 }
 
 seedDefaults();
+app.use(csrfProtection);
 app.get('/api/health',(req,res)=>res.json({ok:true, platform:'Crafted Visual DB Ecommerce', time:new Date().toISOString()}));
 
 
@@ -835,6 +878,13 @@ app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
   db.prepare('INSERT INTO crm_activities(customer_id,type,channel,subject,body,status,metadata_json) VALUES(?,?,?,?,?,?,?)')
     .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
   res.json({ok:true, message:'If this email exists, customer care will contact you.'});
+});
+app.get('/api/admin/me', auth, (req,res)=>{
+  if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
+  const u=db.prepare('SELECT id,name,email,role,permissions_json,active FROM admin_users WHERE id=? AND active=1').get(req.user.id);
+  if(!u) return res.status(404).json({error:'Admin not found'});
+  const role=String(u.role||'').toLowerCase();
+  res.json({user:{id:u.id,name:u.name,email:u.email,role:u.role,permissions:(role==='superadmin'||isDefaultSuperAdminEmail(u.email))?fullPermissions():json(u.permissions_json,{})}});
 });
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
@@ -1138,113 +1188,19 @@ function htmlFileForRequest(req){
   if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
-function htmlEscape(v=''){
-  return String(v || '').replace(/[<>&'\"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]));
-}
-function jsonLdSafe(data){
-  return JSON.stringify(data).replace(/<\/script/gi, '<\\/script');
-}
-function seoPageKeyForRequest(req){
-  const file = (req.path === '/' ? 'index.html' : path.basename(req.path || '')).toLowerCase();
-  if(file === 'index.html' || file === '') return 'home';
-  if(file === 'shop.html') return req.query && req.query.product ? 'product' : 'shop';
-  if(file === 'discounted-items.html') return 'shop';
-  if(file === 'contact.html') return 'contact';
-  if(file === 'track-order.html') return 'track';
-  if(file === 'account.html' || file === 'auth.html') return 'account';
-  return 'product';
-}
-function seoField(pageSeo, field, lang='en'){
-  return pageSeo?.[`${field}_${lang}`] || pageSeo?.[field] || pageSeo?.[`${field}_en`] || '';
-}
-function canonicalForRequest(req){
-  const url = new URL(req.originalUrl || req.path || '/', 'https://example.com');
-  url.searchParams.delete('lang');
-  const pathWithQuery = (url.pathname || '/').replace(/^\//,'') + (url.search || '');
-  return absoluteUrl(req, pathWithQuery);
-}
-function productSeoOverride(req){
-  const wanted = req.query && (req.query.product || req.query.id);
-  if(!wanted) return null;
-  try{
-    const bySku = db.prepare('SELECT * FROM products WHERE sku=? AND active=1 LIMIT 1').get(String(wanted));
-    const row = bySku || (String(Number(wanted)) === String(wanted) ? db.prepare('SELECT * FROM products WHERE id=? AND active=1 LIMIT 1').get(Number(wanted)) : null);
-    if(!row) return null;
-    let images = [];
-    try{ images = JSON.parse(row.images_json || row.images || '[]'); }catch(_e){}
-    return {
-      name: row.name_en || row.name || row.name_ar || '',
-      description: row.description_en || row.description || row.description_ar || '',
-      image: images[0] || row.image_url || row.image || ''
-    };
-  }catch(_e){ return null; }
-}
-function buildServerSeoTags(req){
-  const settings = getSettingObject();
-  const seoPages = Object.assign({}, DEFAULT_SEO_PAGES, settings.seo_pages || {});
-  const lang = req.query && req.query.lang === 'ar' ? 'ar' : 'en';
-  const key = seoPageKeyForRequest(req);
-  const pageSeo = seoPages[key] || seoPages.home || {};
-  const product = key === 'product' ? productSeoOverride(req) : null;
-  const brandName = lang === 'ar' ? (settings.brand_ar || settings.seo_store_name_ar || 'كرافتد فيزوال') : (settings.brand_en || settings.seo_store_name_en || 'Crafted Visual');
-  let title = seoField(pageSeo, 'title', lang) || `${brandName}`;
-  let description = seoField(pageSeo, 'description', lang);
-  let image = settings.seo_default_image || settings.hero_image || (Array.isArray(settings.hero_banners) && settings.hero_banners[0]) || '';
-  if(product){
-    if(product.name) title = `${product.name} | ${brandName}`;
-    if(product.description) description = product.description;
-    if(product.image) image = product.image;
-  }
-  const canonical = canonicalForRequest(req);
-  const imageUrl = image ? (String(image).startsWith('http') ? image : absoluteUrl(req, String(image).replace(/^\//,''))) : '';
-  const keywords = Array.isArray(pageSeo.keywords) ? pageSeo.keywords.join(', ') : (pageSeo.keywords || '');
-  const schema = {
-    '@context':'https://schema.org', '@type':'FurnitureStore', name:brandName, url:absoluteUrl(req,''), image:imageUrl || undefined,
-    telephone:settings.footer_phone || settings.whatsapp_number || '', email:settings.footer_email || settings.customer_care_email || '',
-    address:{'@type':'PostalAddress', addressLocality:'Riyadh', addressCountry:'SA'},
-    sameAs:[settings.instagram_url,settings.tiktok_url,settings.facebook_url,settings.linkedin_url].filter(Boolean)
-  };
-  return `
-  <title>${htmlEscape(title)}</title>
-  <meta name="description" content="${htmlEscape(description)}">
-  ${keywords ? `<meta name="keywords" content="${htmlEscape(keywords)}">` : ''}
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="author" content="${htmlEscape(brandName)}">
-  <link rel="canonical" href="${htmlEscape(canonical)}">
-  <meta property="og:title" content="${htmlEscape(title)}">
-  <meta property="og:description" content="${htmlEscape(description)}">
-  <meta property="og:type" content="${product ? 'product' : 'website'}">
-  <meta property="og:url" content="${htmlEscape(canonical)}">
-  ${imageUrl ? `<meta property="og:image" content="${htmlEscape(imageUrl)}">` : ''}
-  <meta property="og:locale" content="${lang === 'ar' ? 'ar_SA' : 'en_US'}">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${htmlEscape(title)}">
-  <meta name="twitter:description" content="${htmlEscape(description)}">
-  ${imageUrl ? `<meta name="twitter:image" content="${htmlEscape(imageUrl)}">` : ''}
-  <script type="application/ld+json" id="cv-store-schema">${jsonLdSafe(schema)}</script>`;
-}
-function applyServerSeoTransforms(html, req){
+function applyHtmlSecurityTransforms(html, nonce){
   let out = html;
-  out = out.replace(/<title[^>]*>[\s\S]*?<\/title>/ig, '');
-  out = out.replace(/<meta\s+(?:name|property)=["'](?:description|keywords|robots|author|language|og:title|og:description|og:type|og:url|og:image|og:locale|twitter:card|twitter:title|twitter:description|twitter:image)["'][^>]*>\s*/ig, '');
-  out = out.replace(/<link\s+rel=["'](?:canonical|alternate)["'][^>]*>\s*/ig, '');
-  out = out.replace(/<script[^>]*id=["']cv-store-schema["'][^>]*>[\s\S]*?<\/script>\s*/ig, '');
-  if(/<head([^>]*)>/i.test(out)){
-    return out.replace(/<head([^>]*)>/i, `<head$1>${buildServerSeoTags(req)}
-`);
+  if(!out.includes('cv-csrf-fetch-bridge')){
+    out = out.replace(/<head([^>]*)>/i, `<head$1>
+  <script nonce="${nonce}" id="cv-csrf-fetch-bridge">(function(){if(window.__cvCsrfFetchPatched)return;window.__cvCsrfFetchPatched=true;function token(){return(document.cookie.split('; ').find(function(v){return v.indexOf('cv_csrf_token=')===0;})||'').split('=').slice(1).join('=');}var originalFetch=window.fetch;window.fetch=function(input,init){init=init||{};var method=String(init.method||(input&&input.method)||'GET').toUpperCase();var url=String((input&&input.url)||input||'');var sameOrigin=!/^https?:\/\//i.test(url)||url.indexOf(location.origin)===0;if(sameOrigin&&['POST','PUT','PATCH','DELETE'].indexOf(method)!==-1){var headers=new Headers(init.headers||(input&&input.headers)||{});if(!headers.has('X-CSRF-Token'))headers.set('X-CSRF-Token',decodeURIComponent(token()||''));init.headers=headers;}return originalFetch.call(this,input,init);};})();</script>`);
   }
-  return out;
-}
-function applyHtmlSecurityTransforms(html, nonce, req){
-  let out = applyServerSeoTransforms(html, req);
   if(!out.includes('cv-csp-action-bridge.js')){
     out = out.replace(/<head([^>]*)>/i, `<head$1>
   <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
   }
-  out = out.replace(/<script(?![^>]*src=)(?![^>]*nonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+  out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
   return out;
 }
-
 // Safe frontend asset resolver: serve whitelisted CSS/JS/JSON/image assets from /public first,
 // then from project root as a Railway fallback. This prevents unstyled pages when a deploy
 // contains root-level frontend files but no populated /public folder.
@@ -1277,7 +1233,7 @@ app.get(['/', '/*.html'], (req,res,next)=>{
   if(!file) return next();
   try{
     const html = fs.readFileSync(file, 'utf8');
-    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce, req));
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
   }catch(e){ next(e); }
 });
 
