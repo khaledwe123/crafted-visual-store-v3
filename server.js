@@ -699,7 +699,7 @@ app.get('/robots.txt',(req,res)=>{
 });
 
 app.get('/sitemap.xml',(req,res)=>{
-  const basePages = ['', 'shop.html', 'contact.html', 'track-order.html', 'account.html'];
+  const basePages = ['', 'shop.html', 'contact.html', 'track-order.html', 'account.html', 'privacy-policy.html', 'terms-and-conditions.html', 'cookie-policy.html', 'help.html'];
   const products = db.prepare('SELECT id, sku, created_at FROM products WHERE active=1 ORDER BY id DESC').all();
   const urls = [];
   basePages.forEach(p => urls.push({loc:absoluteUrl(req,p), changefreq:p===''?'weekly':'monthly', priority:p===''?'1.0':'0.8'}));
@@ -1160,7 +1160,8 @@ const SAFE_HTML_FILES = new Set([
   'index.html','shop.html','admin.html','admin-login.html','auth.html','account.html',
   'contact.html','track-order.html','review.html','payment.html','thankyou.html',
   'orders.html','financial-dashboard.html','customer-journey-dashboard.html','crm.html',
-  'audit-logs.html','discounted-items.html','page.html','estimator final.html'
+  'audit-logs.html','discounted-items.html','page.html','estimator final.html',
+  'privacy-policy.html','terms-and-conditions.html','cookie-policy.html','help.html'
 ]);
 function safeInside(base, target){
   const rel = path.relative(base, target);
