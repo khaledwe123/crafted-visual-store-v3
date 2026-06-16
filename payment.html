@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment | Crafted Visual</title>
+  <title>Submit Order | Crafted Visual</title>
   <link rel="stylesheet" href="styles.css?v=20260607premium">
   <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2">
   <script src="translate-ar.js"></script>
@@ -20,8 +20,8 @@
 </header>
 
 <main class="review-page">
-  <h1>Payment</h1>
-  <p>Select your payment method to complete the order.</p>
+  <h1>Submit Order</h1>
+  <p>Select your preferred payment method. Your order will be submitted as pending payment until payment is verified.</p>
 
   <section class="review-box" id="paymentSummary"></section>
 
@@ -44,10 +44,10 @@
       <input id="expiry" placeholder="MM/YY">
       <input id="cvv" placeholder="CVV">
     </div>
-    <p class="small-note">Demo payment page. Connect a real Saudi payment gateway such as Moyasar, HyperPay, Tap, or PayTabs for live payments.</p>
+    <p class="small-note">Payment gateway is not connected yet. Your order will be submitted as Pending Payment and reviewed by Crafted Visual.</p>
   </section>
 
-  <button class="btn primary" id="payNowBtn" type="button">Pay Now</button>
+  <button class="btn primary" id="payNowBtn" type="button">Submit Order</button>
 </main>
 
 <script>
@@ -86,13 +86,13 @@ function selectPayment(method, el){
 
 async function payNow(){
   if(!document.getElementById("cardName").value || !document.getElementById("cardNumber").value){
-    alert("Please add payment details.");
+    alert("Please add your preferred payment details or reference.");
     return;
   }
   order.paymentMethod = selectedPayment;
-  order.paymentStatus = "Paid";
-  order.orderStatus = "Paid";
-  order.paidAt = new Date().toISOString();
+  order.paymentStatus = "Pending Payment";
+  order.orderStatus = "Awaiting Payment Verification";
+  order.submittedAt = new Date().toISOString();
 
   const orders = JSON.parse(localStorage.getItem("orders") || "[]");
   orders.push(order);
@@ -105,7 +105,7 @@ async function payNow(){
     to: order.customer?.email,
     from: "do-not-reply@craftedvisual.com",
     fromName: "Crafted Visual Customer Care",
-    subject: "Crafted Visual Payment Confirmation - " + order.id,
+    subject: "Crafted Visual Order Received - " + order.id,
     body: paymentMessage(order),
     customer: order.customer
   });
@@ -126,11 +126,11 @@ function paymentMessage(order){
 Thank you for your order with Crafted Visual.
 
 Order Number: ${order.id}
-Payment Status: Paid
-Order Status: ${order.orderStatus || "Paid"}
-Total Paid: SAR ${Number(order.total).toLocaleString()}
+Payment Status: Pending Payment
+Order Status: ${order.orderStatus || "Awaiting Payment Verification"}
+Total Amount: SAR ${Number(order.total).toLocaleString()}
 
-We will now start processing your order and keep you updated at every stage.
+Your order has been received and is awaiting payment verification. Our team will contact you with the next steps.
 
 Best regards,
 Crafted Visual Customer Care`;
