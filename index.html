@@ -7,47 +7,7 @@
   <link rel="stylesheet" href="styles.css?v=20260607premium" />
   <link rel="stylesheet" href="customer-journey-95.css?v=20260607v2" />
 
-  <script>
-    window.CV_ANALYTICS_READY = false;
-    async function loadCVAnalytics(){
-      try{
-        const local = localStorage.getItem("cms_settings");
-        const settings = local ? JSON.parse(local) : await fetch("settings.json").then(r=>r.json());
-
-        if(settings.google_analytics_id && settings.google_analytics_id !== "G-XXXXXXXXXX"){
-          const ga = document.createElement("script");
-          ga.async = true;
-          ga.src = "https://www.googletagmanager.com/gtag/js?id=" + settings.google_analytics_id;
-          document.head.appendChild(ga);
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          window.gtag = gtag;
-          gtag("js", new Date());
-          gtag("config", settings.google_analytics_id);
-        }
-
-        if(settings.google_tag_manager_id && settings.google_tag_manager_id !== "GTM-XXXXXXX"){
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({"gtm.start": new Date().getTime(), event:"gtm.js"});
-          const gtm = document.createElement("script");
-          gtm.async = true;
-          gtm.src = "https://www.googletagmanager.com/gtm.js?id=" + settings.google_tag_manager_id;
-          document.head.appendChild(gtm);
-        }
-
-        if(settings.meta_pixel_id){
-          !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-          n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
-          (window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', settings.meta_pixel_id); fbq('track', 'PageView');
-        }
-        window.CV_ANALYTICS_READY = true;
-      }catch(e){console.warn("Analytics not loaded", e);}
-    }
-    loadCVAnalytics();
-  </script>
+  <script src="cv-analytics-loader.js?v=20260616cspfix" defer></script>
 
   <script src="translate-ar.js"></script>
   <link rel="stylesheet" href="responsive-all-devices.css?v=20260607premium" />
@@ -142,19 +102,6 @@
   <script src="room-tools-working.js?v=20260607tools2"></script>
   <script src="public-cleanup.js?v=20260607clean4"></script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  const actionMap = {
-    'toggle-lang': function(){ if (typeof toggleLang === 'function') toggleLang(); },
-    'open-cart': function(){ if (typeof openCart === 'function') openCart(); },
-    'close-cart': function(){ if (typeof closeCart === 'function') closeCart(); },
-    'checkout': function(){ if (typeof checkout === 'function') checkout(); }
-  };
-  document.querySelectorAll('[data-action]').forEach(function(el){
-    const handler = actionMap[el.dataset.action];
-    if (handler) el.addEventListener('click', handler);
-  });
-});
-</script>
+  <script src="cv-page-actions.js?v=20260616cspfix" defer></script>
 </body>
 </html>
