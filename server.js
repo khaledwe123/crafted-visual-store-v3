@@ -879,13 +879,6 @@ app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
     .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
   res.json({ok:true, message:'If this email exists, customer care will contact you.'});
 });
-app.get('/api/admin/me', auth, (req,res)=>{
-  if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
-  const u=db.prepare('SELECT id,name,email,role,permissions_json,active FROM admin_users WHERE id=? AND active=1').get(req.user.id);
-  if(!u) return res.status(404).json({error:'Admin not found'});
-  const role=String(u.role||'').toLowerCase();
-  res.json({user:{id:u.id,name:u.name,email:u.email,role:u.role,permissions:(role==='superadmin'||isDefaultSuperAdminEmail(u.email))?fullPermissions():json(u.permissions_json,{})}});
-});
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
 
@@ -1188,8 +1181,84 @@ function htmlFileForRequest(req){
   if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
-function applyHtmlSecurityTransforms(html, nonce){
-  let out = html;
+
+function escapeHtml(value=''){
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function seoKeyForRequest(req){
+  const pathname = String((req && req.path) || '/').replace(/^\/+/, '') || 'index.html';
+  const file = pathname.toLowerCase();
+  if(file === 'index.html') return 'home';
+  if(file === 'shop.html' || file === 'discounted-items.html') return 'shop';
+  if(file === 'contact.html') return 'contact';
+  if(file === 'account.html' || file === 'auth.html') return 'account';
+  if(file === 'track-order.html') return 'track';
+  if(file === 'page.html' || file === 'review.html' || file === 'payment.html' || file === 'thankyou.html') return 'product';
+  return 'home';
+}
+function firstSetting(settings, keys, fallback=''){
+  for(const key of keys){
+    const value = settings && settings[key];
+    if(value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return fallback;
+}
+function buildSeoTags(req, nonce){
+  let settings = {};
+  try{ settings = getSettingObject(); }catch(e){ settings = { seo_pages: DEFAULT_SEO_PAGES }; }
+  const pages = settings.seo_pages || DEFAULT_SEO_PAGES;
+  const page = pages[seoKeyForRequest(req)] || pages.home || DEFAULT_SEO_PAGES.home;
+  const title = page.title_en || page.title || DEFAULT_SEO_PAGES.home.title_en;
+  const description = page.description_en || page.description || DEFAULT_SEO_PAGES.home.description_en;
+  const keywords = Array.isArray(page.keywords) ? page.keywords.join(', ') : String(page.keywords || 'custom furniture Saudi Arabia, premium furniture Riyadh');
+  const canonical = absoluteUrl(req, req.path === '/' ? '' : req.path.replace(/^\//,''));
+  const storeName = firstSetting(settings, ['seo_store_name_en','store_name_en','brand_name_en'], 'Crafted Visual');
+  const imageValue = firstSetting(settings, ['seo_default_image','hero_image','logo_url'], 'assets/products/product_01.png');
+  const imageUrl = /^https?:\/\//i.test(imageValue) ? imageValue : absoluteUrl(req, imageValue);
+  const schema = {
+    '@context':'https://schema.org',
+    '@type':'FurnitureStore',
+    name: storeName,
+    url: absoluteUrl(req, ''),
+    image: imageUrl,
+    telephone: firstSetting(settings, ['phone','contact_phone','whatsapp'], '0565566699'),
+    email: firstSetting(settings, ['email','contact_email'], 'khaled.wehbi@gmail.com'),
+    address:{'@type':'PostalAddress', addressLocality:firstSetting(settings, ['city'], 'Riyadh'), addressCountry:'SA'},
+    sameAs: Array.isArray(settings.same_as) ? settings.same_as : []
+  };
+  return `
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="keywords" content="${escapeHtml(keywords)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="author" content="${escapeHtml(storeName)}">
+  <link rel="canonical" href="${escapeHtml(canonical)}">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${escapeHtml(canonical)}">
+  <meta property="og:image" content="${escapeHtml(imageUrl)}">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${escapeHtml(imageUrl)}">
+  <script nonce="${nonce}" type="application/ld+json" id="cv-store-schema">${JSON.stringify(schema).replace(/</g,'\\u003c')}</script>`;
+}
+function applyServerSeoTags(html, req, nonce){
+  let out = String(html || '');
+  out = out.replace(/<title[\s\S]*?<\/title>/gi, '');
+  out = out.replace(/<meta\s+name=["'](?:description|keywords|robots|author|twitter:card|twitter:title|twitter:description|twitter:image)["'][^>]*>/gi, '');
+  out = out.replace(/<meta\s+property=["']og:(?:title|description|type|url|image|locale)["'][^>]*>/gi, '');
+  out = out.replace(/<link\s+rel=["']canonical["'][^>]*>/gi, '');
+  out = out.replace(/<script[^>]*id=["']cv-store-schema["'][\s\S]*?<\/script>/gi, '');
+  const tags = buildSeoTags(req, nonce);
+  if(/<head[^>]*>/i.test(out)) return out.replace(/<head([^>]*)>/i, `<head$1>${tags}`);
+  return tags + out;
+}
+
+function applyHtmlSecurityTransforms(html, nonce, req){
+  let out = applyServerSeoTags(html, req, nonce);
   if(!out.includes('cv-csrf-fetch-bridge')){
     out = out.replace(/<head([^>]*)>/i, `<head$1>
   <script nonce="${nonce}" id="cv-csrf-fetch-bridge">(function(){if(window.__cvCsrfFetchPatched)return;window.__cvCsrfFetchPatched=true;function token(){return(document.cookie.split('; ').find(function(v){return v.indexOf('cv_csrf_token=')===0;})||'').split('=').slice(1).join('=');}var originalFetch=window.fetch;window.fetch=function(input,init){init=init||{};var method=String(init.method||(input&&input.method)||'GET').toUpperCase();var url=String((input&&input.url)||input||'');var sameOrigin=!/^https?:\/\//i.test(url)||url.indexOf(location.origin)===0;if(sameOrigin&&['POST','PUT','PATCH','DELETE'].indexOf(method)!==-1){var headers=new Headers(init.headers||(input&&input.headers)||{});if(!headers.has('X-CSRF-Token'))headers.set('X-CSRF-Token',decodeURIComponent(token()||''));init.headers=headers;}return originalFetch.call(this,input,init);};})();</script>`);
@@ -1233,7 +1302,7 @@ app.get(['/', '/*.html'], (req,res,next)=>{
   if(!file) return next();
   try{
     const html = fs.readFileSync(file, 'utf8');
-    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce, req));
   }catch(e){ next(e); }
 });
 
