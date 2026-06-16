@@ -7099,3 +7099,120 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     setTimeout(function(){ ensureColorControl(); ensureScopeOptions(); if(typeof window.renderDiscountTargets === 'function') window.renderDiscountTargets(); if(typeof window.renderDiscountList === 'function') window.renderDiscountList(); }, 700);
   });
 })();
+
+
+/* ===== Policies & Legal admin-only editor (Phase 1) =====
+   Saves editable legal/help content to settings. It intentionally does not
+   inject or modify any public page content, footer, shop, discount, payment,
+   Arabic toggle, or SEO logic. */
+(function(){
+  const DEFAULT_POLICIES_LEGAL = {
+    privacy: {
+      title_en: 'Privacy Policy',
+      title_ar: 'سياسة الخصوصية',
+      body_en: 'Crafted Visual respects your privacy. This policy explains how customer information is collected and used for inquiries, orders, delivery, customer support, analytics, and future payment processing.',
+      body_ar: 'تحترم كرافتد فيزوال خصوصيتك. توضح هذه السياسة كيفية جمع معلومات العملاء واستخدامها للاستفسارات والطلبات والتوصيل وخدمة العملاء والتحليلات ومعالجة المدفوعات مستقبلاً.'
+    },
+    terms: {
+      title_en: 'Terms & Conditions',
+      title_ar: 'الشروط والأحكام',
+      body_en: 'These terms govern use of the Crafted Visual website and purchases of furniture products, including standard and made-to-order items. Customized or made-to-order products cannot be cancelled, returned, or exchanged once production has commenced except for manufacturing defects or where required by applicable law.',
+      body_ar: 'تنظم هذه الشروط استخدام موقع كرافتد فيزوال وشراء منتجات الأثاث، بما في ذلك المنتجات الجاهزة والمصنعة حسب الطلب. لا يمكن إلغاء أو إرجاع أو استبدال المنتجات المخصصة أو المصنعة حسب الطلب بعد بدء الإنتاج إلا في حالات عيوب التصنيع أو إذا تطلب النظام خلاف ذلك.'
+    },
+    cookie: {
+      title_en: 'Cookie Policy',
+      title_ar: 'سياسة ملفات تعريف الارتباط',
+      body_en: 'Crafted Visual may use essential, preference, analytics, and future marketing cookies to operate the website, improve user experience, and understand website performance.',
+      body_ar: 'قد تستخدم كرافتد فيزوال ملفات تعريف الارتباط الأساسية وملفات التفضيلات والتحليلات وملفات التسويق المستقبلية لتشغيل الموقع وتحسين تجربة المستخدم وفهم أداء الموقع.'
+    },
+    help: {
+      title_en: 'Help Center',
+      title_ar: 'مركز المساعدة',
+      returns_en: 'Return requests for eligible standard products should be submitted within 7 days of delivery. Products must be unused and in original condition. Customized or made-to-order products are not returnable once production has commenced except for manufacturing defects or where required by applicable law.',
+      returns_ar: 'يجب تقديم طلبات إرجاع المنتجات الجاهزة المؤهلة خلال 7 أيام من تاريخ التسليم، ويجب أن تكون المنتجات غير مستخدمة وبحالتها الأصلية. لا يمكن إرجاع المنتجات المخصصة أو المصنعة حسب الطلب بعد بدء الإنتاج إلا في حالات عيوب التصنيع أو إذا تطلب النظام خلاف ذلك.',
+      warranty_en: 'Crafted Visual provides a limited warranty against manufacturing defects. Warranty coverage excludes normal wear and tear, misuse, improper cleaning, commercial use unless agreed, and unauthorized modifications.',
+      warranty_ar: 'تقدم كرافتد فيزوال ضماناً محدوداً ضد عيوب التصنيع. لا يشمل الضمان التلف الناتج عن الاستخدام العادي أو سوء الاستخدام أو التنظيف غير الصحيح أو الاستخدام التجاري ما لم يتم الاتفاق عليه أو التعديلات غير المصرح بها.',
+      delivery_en: 'Delivery is available within Saudi Arabia. Made-to-order products typically require 15–20 working days, subject to material availability, production complexity, and delivery location.',
+      delivery_ar: 'التوصيل متاح داخل المملكة العربية السعودية. تستغرق المنتجات المصنعة حسب الطلب عادةً من 15 إلى 20 يوم عمل، وذلك حسب توفر المواد وتعقيد الإنتاج وموقع التسليم.'
+    }
+  };
+  const fieldMap = {
+    legalPrivacyTitleEn:['privacy','title_en'], legalPrivacyTitleAr:['privacy','title_ar'], legalPrivacyBodyEn:['privacy','body_en'], legalPrivacyBodyAr:['privacy','body_ar'],
+    legalTermsTitleEn:['terms','title_en'], legalTermsTitleAr:['terms','title_ar'], legalTermsBodyEn:['terms','body_en'], legalTermsBodyAr:['terms','body_ar'],
+    legalCookieTitleEn:['cookie','title_en'], legalCookieTitleAr:['cookie','title_ar'], legalCookieBodyEn:['cookie','body_en'], legalCookieBodyAr:['cookie','body_ar'],
+    legalHelpTitleEn:['help','title_en'], legalHelpTitleAr:['help','title_ar'], legalReturnsBodyEn:['help','returns_en'], legalReturnsBodyAr:['help','returns_ar'], legalWarrantyBodyEn:['help','warranty_en'], legalWarrantyBodyAr:['help','warranty_ar'], legalDeliveryBodyEn:['help','delivery_en'], legalDeliveryBodyAr:['help','delivery_ar']
+  };
+  function deepMerge(base, extra){
+    const out = JSON.parse(JSON.stringify(base || {}));
+    Object.keys(extra || {}).forEach(k=>{
+      if(extra[k] && typeof extra[k] === 'object' && !Array.isArray(extra[k])) out[k] = deepMerge(out[k] || {}, extra[k]);
+      else out[k] = extra[k];
+    });
+    return out;
+  }
+  function setStatus(message, isError){
+    const box = document.getElementById('policiesLegalStatus');
+    if(!box) return;
+    box.textContent = message || '';
+    box.style.color = isError ? '#b42318' : '#134e4a';
+  }
+  function getByPath(obj, path){ return path.reduce((acc,key)=>acc && acc[key], obj); }
+  function setByPath(obj, path, value){
+    let cur = obj;
+    path.slice(0,-1).forEach(k=>{ cur[k] = cur[k] || {}; cur = cur[k]; });
+    cur[path[path.length-1]] = value;
+  }
+  async function readSettings(){
+    const res = await fetch('/api/settings', {cache:'no-store', credentials:'same-origin'});
+    if(!res.ok) throw new Error('Could not load settings');
+    return await res.json();
+  }
+  async function writeSettings(next){
+    if(typeof cvPublishSettingsPatch === 'function'){
+      return await cvPublishSettingsPatch(next);
+    }
+    if(typeof cvAdminFetch === 'function'){
+      return await cvAdminFetch('/api/settings', {method:'PUT', body:next});
+    }
+    const token = (typeof cvAdminToken === 'function' ? cvAdminToken() : '') || localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
+    const headers = {'Content-Type':'application/json'};
+    if(token) headers.Authorization = 'Bearer ' + token;
+    const res = await fetch('/api/settings', {method:'PUT', credentials:'same-origin', headers, body:JSON.stringify(next)});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || 'Could not save policies and legal content');
+    return data;
+  }
+  async function loadPoliciesLegal(){
+    const settingsObj = await readSettings().catch(()=>({}));
+    const content = deepMerge(DEFAULT_POLICIES_LEGAL, settingsObj.policies_legal || {});
+    Object.entries(fieldMap).forEach(([id,path])=>{
+      const el = document.getElementById(id);
+      if(el) el.value = getByPath(content, path) || '';
+    });
+    setStatus('Policies & Legal content loaded.');
+  }
+  async function savePoliciesLegal(){
+    try{
+      setStatus('Saving Policies & Legal content...');
+      const current = await readSettings().catch(()=>({}));
+      const content = deepMerge(DEFAULT_POLICIES_LEGAL, current.policies_legal || {});
+      Object.entries(fieldMap).forEach(([id,path])=>{
+        const el = document.getElementById(id);
+        if(el) setByPath(content, path, el.value || '');
+      });
+      await writeSettings(Object.assign({}, current, {policies_legal: content}));
+      setStatus('Policies & Legal content saved successfully.');
+    }catch(err){
+      setStatus('Could not save Policies & Legal content: ' + (err.message || err), true);
+    }
+  }
+  window.loadPoliciesLegal = loadPoliciesLegal;
+  window.savePoliciesLegal = savePoliciesLegal;
+  document.addEventListener('DOMContentLoaded', function(){
+    const saveBtn = document.getElementById('savePoliciesLegalBtn');
+    const reloadBtn = document.getElementById('reloadPoliciesLegalBtn');
+    if(saveBtn) saveBtn.addEventListener('click', savePoliciesLegal);
+    if(reloadBtn) reloadBtn.addEventListener('click', loadPoliciesLegal);
+    if(document.getElementById('policiesLegalControl')) loadPoliciesLegal().catch(()=>{});
+  });
+})();

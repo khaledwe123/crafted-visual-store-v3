@@ -44,6 +44,7 @@
     <button type="button" data-tab="analyticsControl">Analytics Center</button>
     <button type="button" data-tab="discountControl">Discount Page</button>
     <button type="button" data-tab="mediaControl">Media Library</button>
+    <button type="button" data-tab="policiesLegalControl">Policies & Legal</button>
     <button type="button" data-tab="usersControl">Admin Users</button>
   </div>
 
@@ -457,6 +458,56 @@
         <button class="btn primary" type="button" data-media-upload="true">Upload Image</button>
       </div>
       <div id="mediaGrid" class="media-grid" style="margin-top:14px;"></div>
+    </div>
+  </section>
+
+
+  <section id="policiesLegalControl" class="cms-section">
+    <div class="admin-panel">
+      <h2>Policies & Legal</h2>
+      <div class="admin-note">Phase 1 admin control only: edit and save legal/help content here. This section does not change the live legal pages until you explicitly connect them later.</div>
+
+      <h3>Privacy Policy</h3>
+      <div class="admin-grid-3">
+        <input id="legalPrivacyTitleEn" placeholder="Privacy Policy Title English">
+        <input id="legalPrivacyTitleAr" placeholder="Privacy Policy Title Arabic">
+      </div>
+      <textarea id="legalPrivacyBodyEn" rows="8" placeholder="Privacy Policy content English"></textarea>
+      <textarea id="legalPrivacyBodyAr" rows="8" dir="rtl" placeholder="محتوى سياسة الخصوصية بالعربية"></textarea>
+
+      <h3>Terms & Conditions</h3>
+      <div class="admin-grid-3">
+        <input id="legalTermsTitleEn" placeholder="Terms & Conditions Title English">
+        <input id="legalTermsTitleAr" placeholder="Terms & Conditions Title Arabic">
+      </div>
+      <textarea id="legalTermsBodyEn" rows="8" placeholder="Terms & Conditions content English"></textarea>
+      <textarea id="legalTermsBodyAr" rows="8" dir="rtl" placeholder="محتوى الشروط والأحكام بالعربية"></textarea>
+
+      <h3>Cookie Policy</h3>
+      <div class="admin-grid-3">
+        <input id="legalCookieTitleEn" placeholder="Cookie Policy Title English">
+        <input id="legalCookieTitleAr" placeholder="Cookie Policy Title Arabic">
+      </div>
+      <textarea id="legalCookieBodyEn" rows="8" placeholder="Cookie Policy content English"></textarea>
+      <textarea id="legalCookieBodyAr" rows="8" dir="rtl" placeholder="محتوى سياسة ملفات تعريف الارتباط بالعربية"></textarea>
+
+      <h3>Help Center</h3>
+      <div class="admin-grid-3">
+        <input id="legalHelpTitleEn" placeholder="Help Center Title English">
+        <input id="legalHelpTitleAr" placeholder="Help Center Title Arabic">
+      </div>
+      <textarea id="legalReturnsBodyEn" rows="6" placeholder="Returns process and return policy English"></textarea>
+      <textarea id="legalReturnsBodyAr" rows="6" dir="rtl" placeholder="إجراءات وسياسة الإرجاع بالعربية"></textarea>
+      <textarea id="legalWarrantyBodyEn" rows="6" placeholder="Warranty policy English"></textarea>
+      <textarea id="legalWarrantyBodyAr" rows="6" dir="rtl" placeholder="سياسة الضمان بالعربية"></textarea>
+      <textarea id="legalDeliveryBodyEn" rows="6" placeholder="Delivery information English"></textarea>
+      <textarea id="legalDeliveryBodyAr" rows="6" dir="rtl" placeholder="معلومات التوصيل بالعربية"></textarea>
+
+      <div class="admin-grid-3">
+        <button id="savePoliciesLegalBtn" class="btn primary" type="button">Save Policies & Legal</button>
+        <button id="reloadPoliciesLegalBtn" class="btn secondary" type="button">Reload Saved Content</button>
+      </div>
+      <div id="policiesLegalStatus" class="admin-save-status"></div>
     </div>
   </section>
 
