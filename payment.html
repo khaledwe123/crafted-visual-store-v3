@@ -28,11 +28,11 @@
   <section class="review-box">
     <h2>Accepted Payment Methods</h2>
     <div class="payment-grid">
-      <button class="payment-card selected" onclick="selectPayment('Mada', this)"><span class="pay-logo mada">mada</span><strong>Mada</strong></button>
-      <button class="payment-card" onclick="selectPayment('Visa', this)"><span class="pay-logo visa">VISA</span><strong>Visa</strong></button>
-      <button class="payment-card" onclick="selectPayment('Mastercard', this)"><span class="pay-logo mastercard"><i></i><b></b></span><strong>Mastercard</strong></button>
-      <button class="payment-card" onclick="selectPayment('Apple Pay', this)"><span class="pay-logo apple"> Pay</span><strong>Apple Pay</strong></button>
-      <button class="payment-card" onclick="selectPayment('Samsung Pay', this)"><span class="pay-logo samsung">SAMSUNG Pay</span><strong>Samsung Pay</strong></button>
+      <button class="payment-card selected" data-payment-method="Mada"><span class="pay-logo mada">mada</span><strong>Mada</strong></button>
+      <button class="payment-card" data-payment-method="Visa"><span class="pay-logo visa">VISA</span><strong>Visa</strong></button>
+      <button class="payment-card" data-payment-method="Mastercard"><span class="pay-logo mastercard"><i></i><b></b></span><strong>Mastercard</strong></button>
+      <button class="payment-card" data-payment-method="Apple Pay"><span class="pay-logo apple"> Pay</span><strong>Apple Pay</strong></button>
+      <button class="payment-card" data-payment-method="Samsung Pay"><span class="pay-logo samsung">SAMSUNG Pay</span><strong>Samsung Pay</strong></button>
     </div>
   </section>
 
@@ -47,7 +47,7 @@
     <p class="small-note">Demo payment page. Connect a real Saudi payment gateway such as Moyasar, HyperPay, Tap, or PayTabs for live payments.</p>
   </section>
 
-  <button class="btn primary" onclick="payNow()">Pay Now</button>
+  <button class="btn primary" id="payNowBtn" type="button">Pay Now</button>
 </main>
 
 <script>
@@ -66,6 +66,17 @@ function render(){
   `;
 }
 render();
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".payment-card[data-payment-method]").forEach((button) => {
+    button.addEventListener("click", () => selectPayment(button.dataset.paymentMethod, button));
+  });
+
+  const payNowBtn = document.getElementById("payNowBtn");
+  if(payNowBtn){
+    payNowBtn.addEventListener("click", payNow);
+  }
+});
 
 function selectPayment(method, el){
   selectedPayment = method;
@@ -164,6 +175,6 @@ async function getSettings(){
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
-  <script src="legal-footer-links.js"></script>
+  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
 </body>
 </html>
