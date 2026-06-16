@@ -836,13 +836,6 @@ app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
     .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
   res.json({ok:true, message:'If this email exists, customer care will contact you.'});
 });
-app.get('/api/admin/me', auth, (req,res)=>{
-  if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
-  const u=db.prepare('SELECT id,name,email,role,permissions_json,active FROM admin_users WHERE id=? AND active=1').get(req.user.id);
-  if(!u) return res.status(404).json({error:'Admin not found'});
-  const role=String(u.role||'').toLowerCase();
-  res.json({user:{id:u.id,name:u.name,email:u.email,role:u.role,permissions:(role==='superadmin'||isDefaultSuperAdminEmail(u.email))?fullPermissions():json(u.permissions_json,{})}});
-});
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
 

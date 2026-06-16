@@ -1,0 +1,5 @@
+Fix: Removed only the duplicate second /api/admin/me route from server.js.
+Verification:
+- Remaining app.get('/api/admin/me') route count: 1
+- node --check server.js passed
+No other files changed.
