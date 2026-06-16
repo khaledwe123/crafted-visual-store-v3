@@ -24,13 +24,18 @@
       // Do not send the non-secret cookie marker as a Bearer token. The server will read
       // the HttpOnly cookie through credentials:'same-origin'.
       if(t && t !== 'cookie-auth' && t !== 'cv-cookie-auth') headers.Authorization = 'Bearer ' + t;
+      const method = String(options.method || (options.body !== undefined ? 'POST' : 'GET')).toUpperCase();
+      if(['POST','PUT','PATCH','DELETE'].includes(method) && !headers['X-CSRF-Token'] && !headers['x-csrf-token']){
+        const csrfCookie = (document.cookie.split('; ').find(v => v.indexOf('cv_csrf_token=') === 0) || '').split('=').slice(1).join('=');
+        if(csrfCookie) headers['X-CSRF-Token'] = decodeURIComponent(csrfCookie);
+      }
       let body = options.body;
       if(body !== undefined && !(body instanceof FormData)){
         headers['Content-Type'] = headers['Content-Type'] || 'application/json';
         if(typeof body !== 'string') body = JSON.stringify(body);
       }
       const res = await fetch(url, {
-        method: options.method || (body !== undefined ? 'POST' : 'GET'),
+        method,
         credentials: 'same-origin',
         cache: options.cache || 'no-store',
         headers,
