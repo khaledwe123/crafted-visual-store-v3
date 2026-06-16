@@ -1138,12 +1138,110 @@ function htmlFileForRequest(req){
   if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
-function applyHtmlSecurityTransforms(html, nonce){
-  let out = html;
-  if(!out.includes('cv-csp-action-bridge.js')){
-    out = out.replace(/<head([^>]*)>/i, `<head$1>\n  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
+function htmlEscape(v=''){
+  return String(v || '').replace(/[<>&'\"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]));
+}
+function jsonLdSafe(data){
+  return JSON.stringify(data).replace(/<\/script/gi, '<\\/script');
+}
+function seoPageKeyForRequest(req){
+  const file = (req.path === '/' ? 'index.html' : path.basename(req.path || '')).toLowerCase();
+  if(file === 'index.html' || file === '') return 'home';
+  if(file === 'shop.html') return req.query && req.query.product ? 'product' : 'shop';
+  if(file === 'discounted-items.html') return 'shop';
+  if(file === 'contact.html') return 'contact';
+  if(file === 'track-order.html') return 'track';
+  if(file === 'account.html' || file === 'auth.html') return 'account';
+  return 'product';
+}
+function seoField(pageSeo, field, lang='en'){
+  return pageSeo?.[`${field}_${lang}`] || pageSeo?.[field] || pageSeo?.[`${field}_en`] || '';
+}
+function canonicalForRequest(req){
+  const url = new URL(req.originalUrl || req.path || '/', 'https://example.com');
+  url.searchParams.delete('lang');
+  const pathWithQuery = (url.pathname || '/').replace(/^\//,'') + (url.search || '');
+  return absoluteUrl(req, pathWithQuery);
+}
+function productSeoOverride(req){
+  const wanted = req.query && (req.query.product || req.query.id);
+  if(!wanted) return null;
+  try{
+    const bySku = db.prepare('SELECT * FROM products WHERE sku=? AND active=1 LIMIT 1').get(String(wanted));
+    const row = bySku || (String(Number(wanted)) === String(wanted) ? db.prepare('SELECT * FROM products WHERE id=? AND active=1 LIMIT 1').get(Number(wanted)) : null);
+    if(!row) return null;
+    let images = [];
+    try{ images = JSON.parse(row.images_json || row.images || '[]'); }catch(_e){}
+    return {
+      name: row.name_en || row.name || row.name_ar || '',
+      description: row.description_en || row.description || row.description_ar || '',
+      image: images[0] || row.image_url || row.image || ''
+    };
+  }catch(_e){ return null; }
+}
+function buildServerSeoTags(req){
+  const settings = getSettingObject();
+  const seoPages = Object.assign({}, DEFAULT_SEO_PAGES, settings.seo_pages || {});
+  const lang = req.query && req.query.lang === 'ar' ? 'ar' : 'en';
+  const key = seoPageKeyForRequest(req);
+  const pageSeo = seoPages[key] || seoPages.home || {};
+  const product = key === 'product' ? productSeoOverride(req) : null;
+  const brandName = lang === 'ar' ? (settings.brand_ar || settings.seo_store_name_ar || 'كرافتد فيزوال') : (settings.brand_en || settings.seo_store_name_en || 'Crafted Visual');
+  let title = seoField(pageSeo, 'title', lang) || `${brandName}`;
+  let description = seoField(pageSeo, 'description', lang);
+  let image = settings.seo_default_image || settings.hero_image || (Array.isArray(settings.hero_banners) && settings.hero_banners[0]) || '';
+  if(product){
+    if(product.name) title = `${product.name} | ${brandName}`;
+    if(product.description) description = product.description;
+    if(product.image) image = product.image;
   }
-  out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+  const canonical = canonicalForRequest(req);
+  const imageUrl = image ? (String(image).startsWith('http') ? image : absoluteUrl(req, String(image).replace(/^\//,''))) : '';
+  const keywords = Array.isArray(pageSeo.keywords) ? pageSeo.keywords.join(', ') : (pageSeo.keywords || '');
+  const schema = {
+    '@context':'https://schema.org', '@type':'FurnitureStore', name:brandName, url:absoluteUrl(req,''), image:imageUrl || undefined,
+    telephone:settings.footer_phone || settings.whatsapp_number || '', email:settings.footer_email || settings.customer_care_email || '',
+    address:{'@type':'PostalAddress', addressLocality:'Riyadh', addressCountry:'SA'},
+    sameAs:[settings.instagram_url,settings.tiktok_url,settings.facebook_url,settings.linkedin_url].filter(Boolean)
+  };
+  return `
+  <title>${htmlEscape(title)}</title>
+  <meta name="description" content="${htmlEscape(description)}">
+  ${keywords ? `<meta name="keywords" content="${htmlEscape(keywords)}">` : ''}
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="author" content="${htmlEscape(brandName)}">
+  <link rel="canonical" href="${htmlEscape(canonical)}">
+  <meta property="og:title" content="${htmlEscape(title)}">
+  <meta property="og:description" content="${htmlEscape(description)}">
+  <meta property="og:type" content="${product ? 'product' : 'website'}">
+  <meta property="og:url" content="${htmlEscape(canonical)}">
+  ${imageUrl ? `<meta property="og:image" content="${htmlEscape(imageUrl)}">` : ''}
+  <meta property="og:locale" content="${lang === 'ar' ? 'ar_SA' : 'en_US'}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${htmlEscape(title)}">
+  <meta name="twitter:description" content="${htmlEscape(description)}">
+  ${imageUrl ? `<meta name="twitter:image" content="${htmlEscape(imageUrl)}">` : ''}
+  <script type="application/ld+json" id="cv-store-schema">${jsonLdSafe(schema)}</script>`;
+}
+function applyServerSeoTransforms(html, req){
+  let out = html;
+  out = out.replace(/<title[^>]*>[\s\S]*?<\/title>/ig, '');
+  out = out.replace(/<meta\s+(?:name|property)=["'](?:description|keywords|robots|author|language|og:title|og:description|og:type|og:url|og:image|og:locale|twitter:card|twitter:title|twitter:description|twitter:image)["'][^>]*>\s*/ig, '');
+  out = out.replace(/<link\s+rel=["'](?:canonical|alternate)["'][^>]*>\s*/ig, '');
+  out = out.replace(/<script[^>]*id=["']cv-store-schema["'][^>]*>[\s\S]*?<\/script>\s*/ig, '');
+  if(/<head([^>]*)>/i.test(out)){
+    return out.replace(/<head([^>]*)>/i, `<head$1>${buildServerSeoTags(req)}
+`);
+  }
+  return out;
+}
+function applyHtmlSecurityTransforms(html, nonce, req){
+  let out = applyServerSeoTransforms(html, req);
+  if(!out.includes('cv-csp-action-bridge.js')){
+    out = out.replace(/<head([^>]*)>/i, `<head$1>
+  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
+  }
+  out = out.replace(/<script(?![^>]*src=)(?![^>]*nonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
   return out;
 }
 
@@ -1179,7 +1277,7 @@ app.get(['/', '/*.html'], (req,res,next)=>{
   if(!file) return next();
   try{
     const html = fs.readFileSync(file, 'utf8');
-    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce, req));
   }catch(e){ next(e); }
 });
 
