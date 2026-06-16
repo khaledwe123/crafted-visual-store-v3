@@ -36,8 +36,16 @@
       content:attr.content,
       metadata:metadata||{}
     }, metadata&&metadata.product_id?{product_id:metadata.product_id, product_name:metadata.product_name||''}:{});
-    try{ navigator.sendBeacon && navigator.sendBeacon('/api/journey', new Blob([JSON.stringify(body)],{type:'application/json'})); }
-    catch(e){ fetch('/api/journey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{}); }
+    try{
+      const csrf = (document.cookie.split('; ').find(function(v){ return v.indexOf('cv_csrf_token=') === 0; }) || '').split('=').slice(1).join('=');
+      fetch('/api/journey',{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json','X-CSRF-Token':decodeURIComponent(csrf || '')},
+        body:JSON.stringify(body),
+        keepalive:true
+      }).catch(()=>{});
+    }catch(e){}
   }
   window.CVTrack={event:send, sessionId:sid, attribution:attr};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();

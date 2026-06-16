@@ -386,6 +386,7 @@ function ensureCsrfCookie(req, res){
 }
 function csrfProtection(req, res, next){
   ensureCsrfCookie(req, res);
+  if(req.path === '/api/journey') return next();
   if(!req.path.startsWith('/api/') || !isUnsafeHttpMethod(req.method)) return next();
   if(!hasSessionCookie(req)) return next();
   const cookies = parseCookies(req);
@@ -1289,7 +1290,7 @@ function applyHtmlSecurityTransforms(html, nonce, req){
     out = out.replace(/<head([^>]*)>/i, `<head$1>
   <script nonce="${nonce}" id="cv-csrf-fetch-bridge">(function(){if(window.__cvCsrfFetchPatched)return;window.__cvCsrfFetchPatched=true;function token(){return(document.cookie.split('; ').find(function(v){return v.indexOf('cv_csrf_token=')===0;})||'').split('=').slice(1).join('=');}var originalFetch=window.fetch;window.fetch=function(input,init){init=init||{};var method=String(init.method||(input&&input.method)||'GET').toUpperCase();var url=String((input&&input.url)||input||'');var sameOrigin=!/^https?:\/\//i.test(url)||url.indexOf(location.origin)===0;if(sameOrigin&&['POST','PUT','PATCH','DELETE'].indexOf(method)!==-1){var headers=new Headers(init.headers||(input&&input.headers)||{});if(!headers.has('X-CSRF-Token'))headers.set('X-CSRF-Token',decodeURIComponent(token()||''));init.headers=headers;}return originalFetch.call(this,input,init);};})();</script>`);
   }
-  out = out.replace(/<script(?![^>]*src=)(?![^>]*nonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+  out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
   return out;
 }
 

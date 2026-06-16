@@ -1,16 +1,25 @@
-/* Crafted Visual analytics loader
-   Externalized from index.html so strict CSP does not block page scripts. */
 (function(){
-  'use strict';
   window.CV_ANALYTICS_READY = false;
-
+  async function getSettings(){
+    try{
+      const local = localStorage.getItem('cms_settings');
+      if(local) return JSON.parse(local);
+    }catch(_e){}
+    try{
+      const res = await fetch('/api/settings', { credentials: 'same-origin' });
+      if(res.ok) return await res.json();
+    }catch(_e){}
+    try{
+      const res = await fetch('settings.json', { credentials: 'same-origin' });
+      if(res.ok) return await res.json();
+    }catch(_e){}
+    return {};
+  }
   async function loadCVAnalytics(){
     try{
-      var local = localStorage.getItem('cms_settings');
-      var settings = local ? JSON.parse(local) : await fetch('settings.json').then(function(r){ return r.json(); });
-
+      const settings = await getSettings();
       if(settings.google_analytics_id && settings.google_analytics_id !== 'G-XXXXXXXXXX'){
-        var ga = document.createElement('script');
+        const ga = document.createElement('script');
         ga.async = true;
         ga.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(settings.google_analytics_id);
         document.head.appendChild(ga);
@@ -19,16 +28,14 @@
         window.gtag('js', new Date());
         window.gtag('config', settings.google_analytics_id);
       }
-
       if(settings.google_tag_manager_id && settings.google_tag_manager_id !== 'GTM-XXXXXXX'){
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({'gtm.start': new Date().getTime(), event:'gtm.js'});
-        var gtm = document.createElement('script');
+        const gtm = document.createElement('script');
         gtm.async = true;
         gtm.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(settings.google_tag_manager_id);
         document.head.appendChild(gtm);
       }
-
       if(settings.meta_pixel_id){
         (function(f,b,e,v,n,t,s){
           if(f.fbq) return;
@@ -41,13 +48,9 @@
         window.fbq('init', settings.meta_pixel_id);
         window.fbq('track', 'PageView');
       }
-
       window.CV_ANALYTICS_READY = true;
-    }catch(e){
-      console.warn('Analytics not loaded', e);
-    }
+    }catch(e){ console.warn('Analytics not loaded', e); }
   }
-
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCVAnalytics);
   else loadCVAnalytics();
 })();
