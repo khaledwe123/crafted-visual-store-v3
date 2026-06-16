@@ -1,7 +1,4 @@
-/*
-  Crafted Visual Admin Workflow Fix v26
-  Focus: product edit/preview CSP action bridge, full table view, fabric dropdown sync, and product media controls only.
-*/
+/* Crafted Visual Admin Workflow v34 - safe cleanup: removed comments/blank lines only; behavior preserved. */
 (function(){
   'use strict';
 
@@ -66,7 +63,6 @@
       const raw = el.getAttribute('onclick') || '';
       const m = raw.trim().match(/^([A-Za-z_$][\w$]*)\((.*)\);?$/s);
       if(!m || typeof window[m[1]] !== 'function') return;
-      // The browser CSP may block inline handlers before they execute; run safe known admin handlers ourselves.
       const safe = /^(addMenuItem|toggleMenu|removeMenu|resetMenu|addCategory|toggleCategory|removeCategory|addManualSize|addManualFabric|buildSizeFabricPriceTable|addColorSet|clearForm|saveMenu|saveSettings|saveCategories|saveSeoPage|loadAnalyticsCenter|uploadMedia|loadMedia|saveMediaAlt|deleteMedia|openAssignMedia|assignMedia|editProduct|duplicateProduct|deleteProduct|exportProducts|downloadPrototypeProductsJson|openRealShop|openPrototypeShopPreview|closeInlineShopPreview|openPrototypeDetailByIndex|cvFinalClosePreview|cvFinalOpenDetails|cvFinalSelectImage|cvFinalChooseOption|cvFinalAddToCart|saveCustomPage|clearCustomPageForm|editCustomPage|deleteCustomPage|toggleCustomPage|renderCustomPageList)$/.test(m[1]);
       if(!safe) return;
       e.preventDefault(); e.stopPropagation();
@@ -91,8 +87,6 @@
   window.cvFullPermissions = fullPermissions;
 
   function getManualFabricsSource(){
-    // The original admin.js may keep manualFabrics as a global lexical variable, not window.manualFabrics.
-    // This helper reads both safely so the Colors & Product Photos fabric dropdown always reflects Manual Fabrics.
     try{
       if(Array.isArray(window.manualFabrics) && window.manualFabrics.length) return window.manualFabrics;
     }catch(e){}
@@ -312,7 +306,6 @@
     status('Product form cleared.');
   };
 
-
   function getMenuItems(){
     try{
       if(typeof menu !== 'undefined' && Array.isArray(menu)) return menu;
@@ -438,7 +431,6 @@
     if(!window.hasAdminPermission('pictures','write') && !window.hasAdminPermission('settings','write')) return status('You have read-only access for settings/pictures.', true);
     try{
       if(typeof settings === 'undefined') window.settings = {};
-      // Upload banner file inputs to Media Library first, then save only /uploads URLs.
       for(let i=1;i<=5;i++){
         const fileInput = q('heroBannerFile'+i);
         if(fileInput && fileInput.files && fileInput.files[0]){
@@ -456,7 +448,6 @@
       status('Website settings and banners published permanently.');
     }catch(e){ status('Saved locally only. Backend publish failed: '+e.message, true); }
   };
-
 
   window.loadMedia = async function(){
     const grid = q('mediaGrid');
@@ -605,10 +596,7 @@
     }
   }
 
-
-
   function installProductWorkflowV26Fixes(){
-    // Make the price matrix usable on laptop screens without hiding columns.
     if(!document.getElementById('cvProductTableV26Style')){
       const style = document.createElement('style');
       style.id = 'cvProductTableV26Style';
@@ -623,10 +611,8 @@
       document.head.appendChild(style);
     }
 
-    // Force the Colors & Product Photos fabric control to be a dropdown loaded from Manual Fabrics.
     window.refreshFabricDropdowns();
 
-    // Patch original editProduct so edited products reload Manual Fabrics into the dropdown after the original form fill.
     if(!window.__cvV26EditProductPatched && typeof window.editProduct === 'function'){
       const originalEditProduct = window.editProduct;
       window.editProduct = function(pid){
@@ -640,7 +626,6 @@
       window.__cvV26EditProductPatched = true;
     }
 
-    // Keep the preview/open buttons working under CSP by wiring them without inline execution.
     document.querySelectorAll('button[onclick*="openRealShop"],button[onclick*="openPrototypeShopPreview"]').forEach(btn=>{
       if(btn.dataset.cvV26PreviewBound) return;
       btn.dataset.cvV26PreviewBound = '1';
@@ -888,8 +873,6 @@
     window[fnName].apply(window, args);
   }, true);
 
-
-
   /* === v28 focused product editor fix ===
      Fixes only:
      - product picture remove under CSP
@@ -1064,7 +1047,6 @@
   }
   document.addEventListener('DOMContentLoaded', function(){ cv28Css(); setTimeout(()=>{ window.renderManualSizeTable(); window.renderManualFabricTable(); window.buildSizeFabricPriceTable(); if(typeof window.refreshFabricDropdowns==='function') window.refreshFabricDropdowns(); window.renderColorSets(); },350); });
   setTimeout(()=>{ cv28Css(); try{ window.renderManualSizeTable(); window.renderManualFabricTable(); window.buildSizeFabricPriceTable(); window.renderColorSets(); }catch(e){} },900);
-
 
 /* CRAFTED-VISUAL-PRODUCT-SIZE-NAME-FIX-20260609-29
    Focus only: product manual size add/edit/remove and size table display.
@@ -1357,7 +1339,6 @@
 })();
 
 })();
-
 
 /* CRAFTED-VISUAL-PRODUCT-COLOR-PUBLISH-SHOP-SYNC-FIX-20260609-30
    Focus only:
@@ -1858,7 +1839,6 @@
   setTimeout(function(){ refreshCategoryUI(); }, 900);
 })();
 
-
 /* CRAFTED-VISUAL-CATEGORY-PERSISTENCE-REFRESH-FIX-20260609-32
    Focus only: Product Category persistence after backend refresh.
    Keeps v31 category add/publish and all previous product/media fixes intact.
@@ -1974,7 +1954,7 @@
       }
 
       const t = token();
-      
+
       const settings = await fetchJson('/api/settings');
       await fetchJson('/api/settings', {
         method:'PUT',
@@ -2009,7 +1989,6 @@
   });
   setTimeout(function(){ window.cvLoadCategoriesFromBackend(); }, 1200);
 })();
-
 
 /* CRAFTED-VISUAL-CATEGORY-DELETE-PERSISTENCE-FIX-20260609-33
    Focus only: keep deleted categories deleted after Save/Refresh.
@@ -2106,7 +2085,7 @@
   async function getSettings(){ try{ return await fetchJson('/api/settings'); }catch(e){ return {}; } }
   async function putSettings(patch){
     const t = token();
-    
+
     const current = await getSettings();
     return fetchJson('/api/settings', {
       method:'PUT',
@@ -2195,7 +2174,6 @@
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(window.cvLoadCategoriesFromBackend, 500); });
   setTimeout(window.cvLoadCategoriesFromBackend, 1400);
 })();
-
 
 /* CRAFTED-VISUAL-DISCOUNT-PAGE-FIX-20260609-34
    Focus only: Discount Page buttons, bulk discounts, save, and discount codes.
@@ -2360,7 +2338,6 @@
     return [...new Set(out.map(x=>String(x || '').trim()).filter(Boolean))];
   }
 
-
   function getProductColorsForDiscount(p){
     const out = [];
     const add = (v) => {
@@ -2466,7 +2443,6 @@
     const oldScopeEl = q('discountScope');
     const oldTargetEl = q('discountTarget');
 
-    // Backward compatibility if an older cached admin.html is still open.
     if(oldScopeEl && oldTargetEl && !q('discountTargetType')){
       const scope = val('discountScope') || 'product';
       const products = await loadProductsForDiscount();
@@ -2922,7 +2898,6 @@
 
 })();
 
-
 /* CRAFTED-VISUAL-PRODUCT-EDIT-STANDARD-SIZE-FABRIC-FIX-20260609-37
    Front/admin product form only: keep photos/sizes/fabrics when editing,
    and add standard dropdown choices while still allowing custom additions.
@@ -3065,7 +3040,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   setTimeout(boot, 500);
 })();
-
 
 /* === CV PAGE BUILDER + PAGE CONNECTION CONTROL ONLY ===
    Adds admin control for custom pages, menu/page connections, and publish page choices.
@@ -3474,7 +3448,6 @@
 
   window.renderCustomPageList = renderCustomPageList;
 
-
   function bindPageBuilderButtons(){
     const saveBtn = Array.from(document.querySelectorAll('button')).find(btn => (btn.getAttribute('onclick') || '').includes('saveCustomPage'));
     if(saveBtn && !saveBtn.dataset.cvPageSaveBound){
@@ -3494,7 +3467,6 @@
     setTimeout(function(){ renderCustomPageList(); renderPublishBoxes(); }, 500);
   });
   setTimeout(function(){ bindPageBuilderButtons(); renderCustomPageList(); renderPublishBoxes(); }, 1000);
-
 
   /* === CV MENU EDIT BUTTON SAFE PATCH ===
      Adds Edit capability without replacing the existing menu renderer.
