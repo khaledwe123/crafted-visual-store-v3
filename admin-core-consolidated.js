@@ -1,14 +1,3 @@
-/* Crafted Visual consolidated admin bundle
-   Generated 2026-06-11.
-   Purpose: remove legacy admin patch layering from admin.html while preserving behavior.
-   Source order: admin.js -> admin-menu-compat.js -> admin-workflow-fix-v34.js -> admin-stable-final-fix.js -> admin-authority-final.js.
-*/
-
-
-
-/* ===== BEGIN admin.js ===== */
-
-
 const DEFAULT_MENU = [
   {
     "label_en": "Home",
@@ -60,10 +49,6 @@ const DEFAULT_CATEGORIES = [
   {label_en:"Single Chairs", label_ar:"كراسي مفردة", visible:true}
 ];
 
-/* ===== Super Admin session helpers =====
-   These were referenced throughout admin.js but never defined, which made currentAdmin()
-   throw and return null on every call — silently blocking the logged-in super admin from
-   creating/managing users. Defined here once as the single source of truth. */
 const CV_OWNER_EMAIL = 'admin@craftedvisual.com';
 const CV_ADMIN_SECTIONS = ['menu','pictures','products','categories','seo','discounts','orders','finance','crm','users','analytics','security','inventory','media'];
 function cloneFullAdminPermissions(){
@@ -97,7 +82,6 @@ function persistAdminUsers(list){
   try{ localStorage.setItem('cvAdminUsers', JSON.stringify(list || [])); }catch(e){}
 }
 
-
 function normalizeMenuRoutes(items){
   return (items || []).filter(item => item && item.url !== "about.html" && item.label_en !== "About Us").map(item => {
     const m = {...item};
@@ -127,7 +111,6 @@ function cleanupBlockedCategoriesAdmin(){
     sessionStorage.setItem("cms_categories", JSON.stringify(categories));
   }catch(e){}
 }
-
 
 function showAdminStatus(message, isError=false){
   const box = document.getElementById("adminSaveStatus");
@@ -181,7 +164,6 @@ function prototypeProductsWrite(list){
   sessionStorage.setItem('cvPrototypeProducts', data);
   sessionStorage.setItem('adminProducts', data);
 }
-
 
 function safeJsonForHtml(data){
   return encodeURIComponent(JSON.stringify(data || []));
@@ -268,7 +250,7 @@ function downloadPrototypeProductsJson(){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 async function loadProductsDataAdmin(){
-  // In live Railway mode, Super Admin should load the same products shown on the Shop page.
+
   if(typeof CV_API !== 'undefined'){
     try{
       const hasApi = await CV_API.available();
@@ -463,8 +445,7 @@ function renderAll(){
   if(typeof cvIsSuperAdmin === "function" && cvIsSuperAdmin() || (typeof hasAdminPermission === "function" && hasAdminPermission("users","read"))){
     refreshAdminUsers();
   }
-  // Media Library is intentionally lazy-loaded only when the Media Library tab opens.
-  // This prevents stale browser sessions from showing an Unauthorized banner while using unrelated admin sections.
+
   if(typeof loadDiscountCodesFromBackend === "function" && (typeof cvIsSuperAdmin === "function" && cvIsSuperAdmin() || (typeof hasAdminPermission === "function" && hasAdminPermission("discounts","read")))){
     loadDiscountCodesFromBackend();
   }
@@ -591,9 +572,9 @@ function addMenuItem(){
 function toggleMenu(i){ menu[i].visible = menu[i].visible === false ? true : false; renderMenu(); }
 function removeMenu(i){ menu.splice(i,1); renderMenu(); }
 function saveMenu(){
-  if(typeof hasAdminPermission === "function" && !hasAdminPermission("menu","write")){ showAdminStatus("You have read-only access for this section.", true); return; } 
+  if(typeof hasAdminPermission === "function" && !hasAdminPermission("menu","write")){ showAdminStatus("You have read-only access for this section.", true); return; }
   try{
-    localStorage.setItem("cms_menu", JSON.stringify(menu)); 
+    localStorage.setItem("cms_menu", JSON.stringify(menu));
     showAdminStatus("Menu saved successfully. Refresh website page to see it.");
   }catch(e){ showAdminStatus("Could not save menu.", true); }
 }
@@ -625,9 +606,9 @@ function toggleCategory(i){
   if(typeof hasAdminPermission === "function" && !hasAdminPermission("categories","write")){ showAdminStatus("You have read-only access for this section.", true); return; } categories[i].visible = categories[i].visible === false ? true : false; renderCategories(); renderCategorySelect(); saveCategories(); }
 function removeCategory(i){
   if(typeof hasAdminPermission === "function" && !hasAdminPermission("categories","write")){ showAdminStatus("You have read-only access for this section.", true); return; } categories.splice(i,1); renderCategories(); renderCategorySelect(); renderDiscountTargets(); syncCategoryArabic(); saveCategories(); saveCategories(); }
-function saveCategories(){ 
+function saveCategories(){
   try{
-    localStorage.setItem("cms_categories", JSON.stringify(categories)); 
+    localStorage.setItem("cms_categories", JSON.stringify(categories));
     sessionStorage.setItem("cms_categories", JSON.stringify(categories));
     showAdminStatus("Categories saved successfully. Refresh website page to see them.");
   }catch(e){ showAdminStatus("Could not save categories.", true); }
@@ -679,7 +660,6 @@ function setSizeOptionsInForm(sizeOptions){
   `).join("");
 }
 
-
 function addManualSize(){
   const label = document.getElementById("sizeNameInput").value.trim();
   const width = document.getElementById("sizeWidthInput").value.trim();
@@ -694,11 +674,11 @@ function addManualSize(){
   buildSizeFabricPriceTable();
   showAdminStatus("Size added with dimensions: " + label + " - " + [width||"-", depth||"-", height||"-"].join(" × ") + " cm", false);
 }
-function deleteManualSize(i){ 
+function deleteManualSize(i){
   const removed = manualSizes[i]?.label;
-  manualSizes.splice(i,1); 
+  manualSizes.splice(i,1);
   if(removed) delete sizeFabricPrices[removed];
-  renderManualSizeTable(); 
+  renderManualSizeTable();
   buildSizeFabricPriceTable();
 }
 function renderManualSizeTable(){
@@ -719,15 +699,15 @@ function addManualFabric(){
   renderManualFabricTable();
   buildSizeFabricPriceTable();
 }
-function deleteManualFabric(i){ 
+function deleteManualFabric(i){
   const removed = manualFabrics[i]?.label;
-  manualFabrics.splice(i,1); 
+  manualFabrics.splice(i,1);
   if(removed){
     Object.keys(sizeFabricPrices).forEach(sizeLabel=>{
       if(sizeFabricPrices[sizeLabel]) delete sizeFabricPrices[sizeLabel][removed];
     });
   }
-  renderManualFabricTable(); 
+  renderManualFabricTable();
   buildSizeFabricPriceTable();
 }
 function renderManualFabricTable(){
@@ -1036,7 +1016,6 @@ function clearForm(){
 }
 function exportProducts(){ document.getElementById("exportBox").value = JSON.stringify(products, null, 2); }
 
-
 const DEFAULT_SEO_PAGES = {
   home:{title:"Custom Furniture Saudi Arabia | Crafted Visual",description:"Shop premium custom furniture in Saudi Arabia including sofas, beds, chairs, luxury fabrics, custom sizes, and Riyadh delivery by Crafted Visual.",keywords:["custom furniture Saudi Arabia","premium furniture Riyadh","sofas Riyadh","beds Saudi Arabia","single chairs","luxury furniture","custom sofas","furniture delivery Riyadh"]},
   shop:{title:"Shop Custom Sofas, Beds & Chairs | Crafted Visual",description:"Browse Crafted Visual furniture collections with custom sizes, fabrics, colors, prices, and delivery options across Saudi Arabia.",keywords:["shop furniture Saudi Arabia","buy sofa Riyadh","custom beds Riyadh","custom chairs Saudi","furniture ecommerce Saudi Arabia"]},
@@ -1118,7 +1097,7 @@ async function saveSeoPage(){
   const descValue = document.getElementById("seoDescription")?.value.trim() || "";
   settings.seo_pages[key].title = titleValue;
   settings.seo_pages[key].description = descValue;
-  // Also store English fields for the upgraded frontend SEO engine.
+
   settings.seo_pages[key].title_en = settings.seo_pages[key].title_en || titleValue;
   settings.seo_pages[key].description_en = settings.seo_pages[key].description_en || descValue;
   try{
@@ -1318,7 +1297,6 @@ function renderDiscountList(){
   el.innerHTML = rows.length ? rows.join('') : '<p>No active discounts.</p>';
 }
 
-
 function currentAdmin(){
   try{
     const session = JSON.parse(sessionStorage.getItem("cvAdminSession") || localStorage.getItem("cvAdminSession") || "null");
@@ -1348,8 +1326,6 @@ function adminLogout(){
   location.href = "admin-login.html";
 }
 
-/* Admin users are now sourced from the backend (the real authority for access control)
-   instead of localStorage, so the UI and enforced permissions can never diverge. */
 let cvAdminUsersCache = [];
 
 async function loadAdminUsersFromBackend(){
@@ -1430,8 +1406,6 @@ async function deleteAdminUser(id){
   }
 }
 
-
-/* Discount codes: backend-backed. localStorage used as offline fallback only. */
 let cvDiscountCodesCache = [];
 function getDiscountCodes(){
   return cvDiscountCodesCache.length ? cvDiscountCodesCache : JSON.parse(localStorage.getItem("discountCodes") || "[]");
@@ -1682,7 +1656,6 @@ function permissionText(perms){
   return Object.entries(perms).map(([k,v])=>`${k}: ${v.read ? "R" : "-"}${v.write ? "/W" : ""}`).join(" | ");
 }
 
-
 function isAutoArabicEnabled(){
   const el = document.getElementById("auto_translate_arabic");
   return el ? el.checked : true;
@@ -1710,15 +1683,10 @@ function autoFillProductArabic(){
     const ar = document.getElementById(arId);
     if(en && ar && !ar.value.trim()) ar.value = autoTranslateToArabic(en.value);
   });
-  // category Arabic auto sync is already linked to category control
+
   showAdminStatus("Product Arabic fields auto-filled.");
 }
 
-
-/* === Prototype preview reliability fix ===
-   This block intentionally overrides earlier prototype preview helpers.
-   It does not require a database and does not depend on localStorage for showing the preview.
-*/
 function cvGetProductImagesForPreview(p){
   const imgs = [];
   const colors = p && p.colors ? p.colors : {};
@@ -1743,7 +1711,7 @@ function cvPreviewEsc(value){
   return String(value || '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 function prototypeProductsWrite(list){
-  // Save a light version for normal shop.html, but never allow storage quota to break the admin preview.
+
   try{
     const light = (list || []).map(p => ({...p, colors:p.colors || {}, gallery:p.gallery || []}));
     const data = JSON.stringify(light);
@@ -1814,7 +1782,7 @@ function closePrototypeDetail(){
   if(modal) modal.classList.add('hidden');
 }
 function openPrototypeShopPreview(){
-  // This is the reliable prototype path: show preview inside Super Admin from the current products array.
+
   products = (products || []).map(normalizeProduct);
   prototypeProductsWrite(products);
   renderInlineShopPreview();
@@ -1825,10 +1793,6 @@ function openPrototypeShopPreview(){
   }
 }
 
-/* === FINAL LOCAL PROTOTYPE FIX 2026-06-06 ===
-   Fully local preview: creates a visible full-screen overlay from the current Super Admin products array.
-   It does not rely on shop.html, a backend, popups, or localStorage.
-*/
 function cvFinalEsc(value){
   return String(value == null ? '' : value).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
 }
@@ -1868,7 +1832,7 @@ function cvFinalNormalizeList(){
   }).filter(function(p){ return p && (p.name || p.id); });
 }
 function prototypeProductsWrite(list){
-  // Safe small storage copy; preview itself does not depend on this.
+
   try{
     const safe = (list || []).map(function(p){
       return {
@@ -2054,15 +2018,12 @@ function openPrototypeShopPreview(){
   }
 }
 
-/* === CV FINAL LIVE SHOP + FABRIC PHOTO PATCH === */
 function openRealShop(){
   window.location.href = 'shop.html';
 }
 
-// Override old prototype preview button behavior: users now view the real Shop page directly.
 window.openPrototypeShopPreview = openRealShop;
 
-// Re-define Add Color Photos to keep the fabric name attached to every uploaded picture.
 async function addColorSet(){
   const nameEl = document.getElementById('colorName');
   const codeEl = document.getElementById('colorCode');
@@ -2094,7 +2055,6 @@ async function addColorSet(){
   renderColorSets();
 }
 
-// Re-render color sets with fabric labels under each picture.
 function renderColorSets(){
   const wrap = document.getElementById('colorSetsPreview');
   if(!wrap) return;
@@ -2111,7 +2071,6 @@ function renderColorSets(){
   }).join('');
 }
 
-// Ensure remove keeps image metadata aligned.
 function removeColorImage(name,idx){
   if(!colorSets[name]) return;
   if(Array.isArray(colorSets[name].images)) colorSets[name].images.splice(idx,1);
@@ -2119,8 +2078,6 @@ function removeColorImage(name,idx){
   renderColorSets();
 }
 
-
-/* === Analytics Center inside Admin === */
 function analyticsSafe(v){
   return String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 }
@@ -2178,8 +2135,6 @@ async function loadAnalyticsCenter(){
   }
 }
 
-
-/* === PERMANENT GODMODE PERMISSION UI PATCH === */
 function activateGodModePermissionMatrix(){
   const u = currentAdmin();
   if(!isOwnerSuperAdminUser(u)) return;
@@ -2208,11 +2163,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   }, 150);
 });
 
-
-/* === SUPERADMIN FULL ACTIONS FIX v17 ===
-   Permanent frontend action fix: use the real admin JWT for backend writes,
-   publish menu/categories/SEO/settings through /api/settings, and delegate
-   tab clicks so dynamically-added UX95 Analytics works. */
 function cvFullPermissions(){
   const all = ["menu","pictures","products","categories","seo","discounts","orders","finance","crm","users","analytics","security","inventory","media","settings"];
   const out = {};
@@ -2359,8 +2309,6 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-
-/* ===== Media Library (backend-backed) ===== */
 let cvMediaCache = [];
 
 async function loadMedia(){
@@ -2465,19 +2413,11 @@ async function assignMedia(id, targetType, targetId){
   }catch(e){ showAdminStatus('Could not assign image: ' + (e.message || e), true); }
 }
 
-
 try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdminUsers; window.renderAdminUsers = renderAdminUsers; window.renderMenu = renderMenu; } catch(e) {}
-
-/* ===== END admin.js ===== */
-
-
-
-/* ===== BEGIN admin-menu-compat.js ===== */
 
 (function(){
   'use strict';
-  // Compatibility layer for older admin workflow patches.
-  // Loaded before admin-workflow-fix-v34.js so menu enhancement functions never crash.
+
   window.getMenuItems = window.getMenuItems || function(){
     try{ if(Array.isArray(window.menu)) return window.menu; }catch(e){}
     try{ if(typeof menu !== 'undefined' && Array.isArray(menu)) return menu; }catch(e){}
@@ -2519,16 +2459,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   });
 })();
 
-/* ===== END admin-menu-compat.js ===== */
-
-
-
-/* ===== BEGIN admin-workflow-fix-v34.js ===== */
-
-/*
-  Crafted Visual Admin Workflow Fix v26
-  Focus: product edit/preview CSP action bridge, full table view, fabric dropdown sync, and product media controls only.
-*/
 (function(){
   'use strict';
 
@@ -2593,7 +2523,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       const raw = el.getAttribute('onclick') || '';
       const m = raw.trim().match(/^([A-Za-z_$][\w$]*)\((.*)\);?$/s);
       if(!m || typeof window[m[1]] !== 'function') return;
-      // The browser CSP may block inline handlers before they execute; run safe known admin handlers ourselves.
+
       const safe = /^(addMenuItem|toggleMenu|removeMenu|resetMenu|addCategory|toggleCategory|removeCategory|addManualSize|addManualFabric|buildSizeFabricPriceTable|addColorSet|clearForm|saveMenu|saveSettings|saveCategories|saveSeoPage|loadAnalyticsCenter|uploadMedia|loadMedia|saveMediaAlt|deleteMedia|openAssignMedia|assignMedia|editProduct|duplicateProduct|deleteProduct|exportProducts|downloadPrototypeProductsJson|openRealShop|openPrototypeShopPreview|closeInlineShopPreview|openPrototypeDetailByIndex|cvFinalClosePreview|cvFinalOpenDetails|cvFinalSelectImage|cvFinalChooseOption|cvFinalAddToCart|saveCustomPage|clearCustomPageForm|editCustomPage|deleteCustomPage|toggleCustomPage|renderCustomPageList)$/.test(m[1]);
       if(!safe) return;
       e.preventDefault(); e.stopPropagation();
@@ -2618,8 +2548,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   window.cvFullPermissions = fullPermissions;
 
   function getManualFabricsSource(){
-    // The original admin.js may keep manualFabrics as a global lexical variable, not window.manualFabrics.
-    // This helper reads both safely so the Colors & Product Photos fabric dropdown always reflects Manual Fabrics.
+
     try{
       if(Array.isArray(window.manualFabrics) && window.manualFabrics.length) return window.manualFabrics;
     }catch(e){}
@@ -2839,7 +2768,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     status('Product form cleared.');
   };
 
-
   function getMenuItems(){
     try{
       if(typeof menu !== 'undefined' && Array.isArray(menu)) return menu;
@@ -2965,7 +2893,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     if(!window.hasAdminPermission('pictures','write') && !window.hasAdminPermission('settings','write')) return status('You have read-only access for settings/pictures.', true);
     try{
       if(typeof settings === 'undefined') window.settings = {};
-      // Upload banner file inputs to Media Library first, then save only /uploads URLs.
+
       for(let i=1;i<=5;i++){
         const fileInput = q('heroBannerFile'+i);
         if(fileInput && fileInput.files && fileInput.files[0]){
@@ -2983,7 +2911,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       status('Website settings and banners published permanently.');
     }catch(e){ status('Saved locally only. Backend publish failed: '+e.message, true); }
   };
-
 
   window.loadMedia = async function(){
     const grid = q('mediaGrid');
@@ -3132,10 +3059,8 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     }
   }
 
-
-
   function installProductWorkflowV26Fixes(){
-    // Make the price matrix usable on laptop screens without hiding columns.
+
     if(!document.getElementById('cvProductTableV26Style')){
       const style = document.createElement('style');
       style.id = 'cvProductTableV26Style';
@@ -3150,10 +3075,8 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       document.head.appendChild(style);
     }
 
-    // Force the Colors & Product Photos fabric control to be a dropdown loaded from Manual Fabrics.
     window.refreshFabricDropdowns();
 
-    // Patch original editProduct so edited products reload Manual Fabrics into the dropdown after the original form fill.
     if(!window.__cvV26EditProductPatched && typeof window.editProduct === 'function'){
       const originalEditProduct = window.editProduct;
       window.editProduct = function(pid){
@@ -3167,7 +3090,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       window.__cvV26EditProductPatched = true;
     }
 
-    // Keep the preview/open buttons working under CSP by wiring them without inline execution.
     document.querySelectorAll('button[onclick*="openRealShop"],button[onclick*="openPrototypeShopPreview"]').forEach(btn=>{
       if(btn.dataset.cvV26PreviewBound) return;
       btn.dataset.cvV26PreviewBound = '1';
@@ -3203,13 +3125,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   document.addEventListener('DOMContentLoaded', function(){ normalizeSession(); bindInlineActions(); bindMediaLibraryButtons(); installMediaButtons(); installProductWorkflowV26Fixes(); patchAnalytics(); window.loadMedia(); });
   setTimeout(function(){ normalizeSession(); installMediaButtons(); installProductWorkflowV26Fixes(); patchAnalytics(); window.loadMedia(); }, 500);
 
-  /* === v27 focused product publish + product photo removal fix ===
-     Fixes only:
-     - remove product picture under CSP
-     - remove whole color set under CSP
-     - publish new/edited products to backend reliably
-     Nothing else is changed.
-  */
   function cv27GetGlobal(name, fallback){
     try{ return (0,eval)(name); }catch(e){ return fallback; }
   }
@@ -3415,16 +3330,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     window[fnName].apply(window, args);
   }, true);
 
-
-
-  /* === v28 focused product editor fix ===
-     Fixes only:
-     - product picture remove under CSP
-     - new/edited product publish
-     - manual size remove when editing
-     - excel-style size/fabric table that fits the screen
-     Nothing outside Products is changed.
-  */
   function cv28Get(name, fallback){ try{ return (0,eval)(name); }catch(e){ return fallback; } }
   function cv28Set(name, value){ try{ window[name] = value; }catch(e){} try{ (0,eval)(name + ' = window["' + name + '"]'); }catch(e){} }
   function cv28Arr(name){ const v = cv28Get(name, window[name]); return Array.isArray(v) ? v : []; }
@@ -3592,11 +3497,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   document.addEventListener('DOMContentLoaded', function(){ cv28Css(); setTimeout(()=>{ window.renderManualSizeTable(); window.renderManualFabricTable(); window.buildSizeFabricPriceTable(); if(typeof window.refreshFabricDropdowns==='function') window.refreshFabricDropdowns(); window.renderColorSets(); },350); });
   setTimeout(()=>{ cv28Css(); try{ window.renderManualSizeTable(); window.renderManualFabricTable(); window.buildSizeFabricPriceTable(); window.renderColorSets(); }catch(e){} },900);
 
-
-/* CRAFTED-VISUAL-PRODUCT-SIZE-NAME-FIX-20260609-29
-   Focus only: product manual size add/edit/remove and size table display.
-   Keeps v28 fixes intact.
-*/
 (function(){
   'use strict';
 
@@ -3885,15 +3785,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
 
 })();
 
-
-/* CRAFTED-VISUAL-PRODUCT-COLOR-PUBLISH-SHOP-SYNC-FIX-20260609-30
-   Focus only:
-   - Add Color Photos button
-   - Remove product photos/color groups
-   - Publish edited/new products to backend
-   - Delete products reflected in Shop
-   - Keep previous v29 fixes intact
-*/
 (function(){
   'use strict';
   if(window.__cv30ProductColorPublishPatch) return;
@@ -4239,10 +4130,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   document.addEventListener('DOMContentLoaded', function(){ installCss(); window.refreshFabricDropdowns(); setTimeout(()=>{ window.renderColorSets(); refreshProductsFromBackend(); }, 400); });
   setTimeout(function(){ installCss(); try{ window.refreshFabricDropdowns(); window.renderColorSets(); }catch(e){} }, 900);
 
-/* CRAFTED-VISUAL-CATEGORY-PERSISTENCE-REFRESH-FIX-20260609-32
-   Focus only: Product Category add/show-hide/delete/save publishing.
-   Keeps all previous v30 product/media fixes intact.
-*/
 (function(){
   'use strict';
   if(window.__cv31CategoryPatch) return;
@@ -4394,11 +4281,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setTimeout(function(){ refreshCategoryUI(); }, 900);
 })();
 
-
-/* CRAFTED-VISUAL-CATEGORY-PERSISTENCE-REFRESH-FIX-20260609-32
-   Focus only: Product Category persistence after backend refresh.
-   Keeps v31 category add/publish and all previous product/media fixes intact.
-*/
 (function(){
   'use strict';
   if(window.__cv32CategoryPersistencePatch) return;
@@ -4510,7 +4392,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
       }
 
       const t = token();
-      
+
       const settings = await fetchJson('/api/settings');
       await fetchJson('/api/settings', {
         method:'PUT',
@@ -4546,11 +4428,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setTimeout(function(){ window.cvLoadCategoriesFromBackend(); }, 1200);
 })();
 
-
-/* CRAFTED-VISUAL-CATEGORY-DELETE-PERSISTENCE-FIX-20260609-33
-   Focus only: keep deleted categories deleted after Save/Refresh.
-   Keeps v32 category loading/merging and all previous product/media fixes intact.
-*/
 (function(){
   'use strict';
   if(window.__cv33CategoryDeletePersistencePatch) return;
@@ -4642,7 +4519,7 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   async function getSettings(){ try{ return await fetchJson('/api/settings'); }catch(e){ return {}; } }
   async function putSettings(patch){
     const t = token();
-    
+
     const current = await getSettings();
     return fetchJson('/api/settings', {
       method:'PUT',
@@ -4674,7 +4551,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     const settingsCats = Array.isArray(settings.categories) ? settings.categories : [];
     const dbCats = await dbCategories();
 
-    /* Important: defaults are only a fallback. They must not resurrect a deleted category. */
     const hasAnySaved = settingsCats.length || localCats.length || dbCats.length;
     const merged = mergeFiltered(settingsCats, dbCats, localCats, hasAnySaved ? [] : DEFAULT_CATEGORIES);
     store(merged);
@@ -4732,11 +4608,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setTimeout(window.cvLoadCategoriesFromBackend, 1400);
 })();
 
-
-/* CRAFTED-VISUAL-DISCOUNT-PAGE-FIX-20260609-34
-   Focus only: Discount Page buttons, bulk discounts, save, and discount codes.
-   Keeps all previous v33 category/product/media fixes intact.
-*/
 (function(){
   'use strict';
 
@@ -4974,7 +4845,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     const oldScopeEl = q('discountScope');
     const oldTargetEl = q('discountTarget');
 
-    // Backward compatibility if an older cached admin.html is still open.
     if(oldScopeEl && oldTargetEl && !q('discountTargetType')){
       const scope = val('discountScope') || 'product';
       const products = await loadProductsForDiscount();
@@ -5421,11 +5291,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
 
 })();
 
-
-/* CRAFTED-VISUAL-PRODUCT-EDIT-STANDARD-SIZE-FABRIC-FIX-20260609-37
-   Front/admin product form only: keep photos/sizes/fabrics when editing,
-   and add standard dropdown choices while still allowing custom additions.
-*/
 (function(){
   'use strict';
   if(window.__cv37ProductEditStandardPatch) return;
@@ -5565,11 +5430,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setTimeout(boot, 500);
 })();
 
-
-/* === CV PAGE BUILDER + PAGE CONNECTION CONTROL ONLY ===
-   Adds admin control for custom pages, menu/page connections, and publish page choices.
-   Does not change shop rendering.
-*/
 (function(){
   'use strict';
   if(window.__cvPageBuilderControlOnly) return;
@@ -5973,7 +5833,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
 
   window.renderCustomPageList = renderCustomPageList;
 
-
   function bindPageBuilderButtons(){
     const saveBtn = Array.from(document.querySelectorAll('button')).find(btn => (btn.getAttribute('onclick') || '').includes('saveCustomPage'));
     if(saveBtn && !saveBtn.dataset.cvPageSaveBound){
@@ -5994,11 +5853,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   });
   setTimeout(function(){ bindPageBuilderButtons(); renderCustomPageList(); renderPublishBoxes(); }, 1000);
 
-
-  /* === CV MENU EDIT BUTTON SAFE PATCH ===
-     Adds Edit capability without replacing the existing menu renderer.
-     Keeps Show/Hide and Delete buttons exactly as they were.
-  */
   let cvMenuEditIndex = -1;
 
   function cvMenuAddButton(){
@@ -6127,9 +5981,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
 
 })();
 
-/* === CV MENU EDIT BUTTON ONLY FINAL PATCH ===
-   Adds Edit button to Menu Control without changing other sections.
-*/
 (function(){
   'use strict';
   if(window.__cvMenuEditOnlyFinalPatch) return;
@@ -6306,13 +6157,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setTimeout(window.renderMenu, 800);
 })();
 
-/* ===== END admin-workflow-fix-v34.js ===== */
-
-
-
-/* ===== BEGIN admin-stable-final-fix.js ===== */
-
-/* Crafted Visual stable admin user + API compatibility patch. Loaded last on admin.html. */
 (function(){
   'use strict';
   const OWNER_EMAIL = 'admin@craftedvisual.com';
@@ -6438,14 +6282,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setInterval(bind, 1200);
 })();
 
-/* ===== END admin-stable-final-fix.js ===== */
-
-
-
-/* ===== BEGIN admin-authority-final.js ===== */
-
-/* Crafted Visual final authority manager. Loaded last on admin.html.
-   Purpose: make Admin/Super Admin creation, listing, edit, delete deterministic against the live backend. */
 (function(){
   'use strict';
   const OWNER_EMAIL = 'admin@craftedvisual.com';
@@ -6513,7 +6349,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
     return data;
   }
 
-  // Normalize/fix API helper for legacy files.
   window.CV_API = window.CV_API || {};
   window.CV_API.token = window.CV_API.token || function(admin){ return admin ? token() : (localStorage.getItem('cvApiToken') || sessionStorage.getItem('cvApiToken') || ''); };
   window.CV_API.available = window.CV_API.available || async function(){ try{ const r = await fetch('/api/health', {cache:'no-store', credentials:'same-origin'}); return r.ok; }catch(e){ return false; } };
@@ -6658,16 +6493,6 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
   setInterval(bindAdminAuthorityControls, 1000);
 })();
 
-/* ===== END admin-authority-final.js ===== */
-
-/* CRAFTED VISUAL - DISCOUNT SAVE + SIZE/FABRIC/COLOR COMBINATION FIX
-   Scope: Admin Discount Page only.
-   Fixes:
-   - Uses cookie-safe admin API requests so discounts save in Railway.
-   - Adds Color Only and Size + Fabric + Color Combination scopes.
-   - Saves, lists, edits, and deletes product/variant discount rules including color.
-   - Leaves shop/cart/checkout/page-builder/menu/reviews untouched.
-*/
 (function(){
   'use strict';
   if(window.__cvDiscountSaveColorFinalFix) return;
@@ -7097,122 +6922,5 @@ try { window.addAdminUser = addAdminUser; window.refreshAdminUsers = refreshAdmi
 
   document.addEventListener('DOMContentLoaded', function(){
     setTimeout(function(){ ensureColorControl(); ensureScopeOptions(); if(typeof window.renderDiscountTargets === 'function') window.renderDiscountTargets(); if(typeof window.renderDiscountList === 'function') window.renderDiscountList(); }, 700);
-  });
-})();
-
-
-/* ===== Policies & Legal admin-only editor (Phase 1) =====
-   Saves editable legal/help content to settings. It intentionally does not
-   inject or modify any public page content, footer, shop, discount, payment,
-   Arabic toggle, or SEO logic. */
-(function(){
-  const DEFAULT_POLICIES_LEGAL = {
-    privacy: {
-      title_en: 'Privacy Policy',
-      title_ar: 'سياسة الخصوصية',
-      body_en: 'Crafted Visual respects your privacy. This policy explains how customer information is collected and used for inquiries, orders, delivery, customer support, analytics, and future payment processing.',
-      body_ar: 'تحترم كرافتد فيزوال خصوصيتك. توضح هذه السياسة كيفية جمع معلومات العملاء واستخدامها للاستفسارات والطلبات والتوصيل وخدمة العملاء والتحليلات ومعالجة المدفوعات مستقبلاً.'
-    },
-    terms: {
-      title_en: 'Terms & Conditions',
-      title_ar: 'الشروط والأحكام',
-      body_en: 'These terms govern use of the Crafted Visual website and purchases of furniture products, including standard and made-to-order items. Customized or made-to-order products cannot be cancelled, returned, or exchanged once production has commenced except for manufacturing defects or where required by applicable law.',
-      body_ar: 'تنظم هذه الشروط استخدام موقع كرافتد فيزوال وشراء منتجات الأثاث، بما في ذلك المنتجات الجاهزة والمصنعة حسب الطلب. لا يمكن إلغاء أو إرجاع أو استبدال المنتجات المخصصة أو المصنعة حسب الطلب بعد بدء الإنتاج إلا في حالات عيوب التصنيع أو إذا تطلب النظام خلاف ذلك.'
-    },
-    cookie: {
-      title_en: 'Cookie Policy',
-      title_ar: 'سياسة ملفات تعريف الارتباط',
-      body_en: 'Crafted Visual may use essential, preference, analytics, and future marketing cookies to operate the website, improve user experience, and understand website performance.',
-      body_ar: 'قد تستخدم كرافتد فيزوال ملفات تعريف الارتباط الأساسية وملفات التفضيلات والتحليلات وملفات التسويق المستقبلية لتشغيل الموقع وتحسين تجربة المستخدم وفهم أداء الموقع.'
-    },
-    help: {
-      title_en: 'Help Center',
-      title_ar: 'مركز المساعدة',
-      returns_en: 'Return requests for eligible standard products should be submitted within 7 days of delivery. Products must be unused and in original condition. Customized or made-to-order products are not returnable once production has commenced except for manufacturing defects or where required by applicable law.',
-      returns_ar: 'يجب تقديم طلبات إرجاع المنتجات الجاهزة المؤهلة خلال 7 أيام من تاريخ التسليم، ويجب أن تكون المنتجات غير مستخدمة وبحالتها الأصلية. لا يمكن إرجاع المنتجات المخصصة أو المصنعة حسب الطلب بعد بدء الإنتاج إلا في حالات عيوب التصنيع أو إذا تطلب النظام خلاف ذلك.',
-      warranty_en: 'Crafted Visual provides a limited warranty against manufacturing defects. Warranty coverage excludes normal wear and tear, misuse, improper cleaning, commercial use unless agreed, and unauthorized modifications.',
-      warranty_ar: 'تقدم كرافتد فيزوال ضماناً محدوداً ضد عيوب التصنيع. لا يشمل الضمان التلف الناتج عن الاستخدام العادي أو سوء الاستخدام أو التنظيف غير الصحيح أو الاستخدام التجاري ما لم يتم الاتفاق عليه أو التعديلات غير المصرح بها.',
-      delivery_en: 'Delivery is available within Saudi Arabia. Made-to-order products typically require 15–20 working days, subject to material availability, production complexity, and delivery location.',
-      delivery_ar: 'التوصيل متاح داخل المملكة العربية السعودية. تستغرق المنتجات المصنعة حسب الطلب عادةً من 15 إلى 20 يوم عمل، وذلك حسب توفر المواد وتعقيد الإنتاج وموقع التسليم.'
-    }
-  };
-  const fieldMap = {
-    legalPrivacyTitleEn:['privacy','title_en'], legalPrivacyTitleAr:['privacy','title_ar'], legalPrivacyBodyEn:['privacy','body_en'], legalPrivacyBodyAr:['privacy','body_ar'],
-    legalTermsTitleEn:['terms','title_en'], legalTermsTitleAr:['terms','title_ar'], legalTermsBodyEn:['terms','body_en'], legalTermsBodyAr:['terms','body_ar'],
-    legalCookieTitleEn:['cookie','title_en'], legalCookieTitleAr:['cookie','title_ar'], legalCookieBodyEn:['cookie','body_en'], legalCookieBodyAr:['cookie','body_ar'],
-    legalHelpTitleEn:['help','title_en'], legalHelpTitleAr:['help','title_ar'], legalReturnsBodyEn:['help','returns_en'], legalReturnsBodyAr:['help','returns_ar'], legalWarrantyBodyEn:['help','warranty_en'], legalWarrantyBodyAr:['help','warranty_ar'], legalDeliveryBodyEn:['help','delivery_en'], legalDeliveryBodyAr:['help','delivery_ar']
-  };
-  function deepMerge(base, extra){
-    const out = JSON.parse(JSON.stringify(base || {}));
-    Object.keys(extra || {}).forEach(k=>{
-      if(extra[k] && typeof extra[k] === 'object' && !Array.isArray(extra[k])) out[k] = deepMerge(out[k] || {}, extra[k]);
-      else out[k] = extra[k];
-    });
-    return out;
-  }
-  function setStatus(message, isError){
-    const box = document.getElementById('policiesLegalStatus');
-    if(!box) return;
-    box.textContent = message || '';
-    box.style.color = isError ? '#b42318' : '#134e4a';
-  }
-  function getByPath(obj, path){ return path.reduce((acc,key)=>acc && acc[key], obj); }
-  function setByPath(obj, path, value){
-    let cur = obj;
-    path.slice(0,-1).forEach(k=>{ cur[k] = cur[k] || {}; cur = cur[k]; });
-    cur[path[path.length-1]] = value;
-  }
-  async function readSettings(){
-    const res = await fetch('/api/settings', {cache:'no-store', credentials:'same-origin'});
-    if(!res.ok) throw new Error('Could not load settings');
-    return await res.json();
-  }
-  async function writeSettings(next){
-    if(typeof cvPublishSettingsPatch === 'function'){
-      return await cvPublishSettingsPatch(next);
-    }
-    if(typeof cvAdminFetch === 'function'){
-      return await cvAdminFetch('/api/settings', {method:'PUT', body:next});
-    }
-    const token = (typeof cvAdminToken === 'function' ? cvAdminToken() : '') || localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
-    const headers = {'Content-Type':'application/json'};
-    if(token) headers.Authorization = 'Bearer ' + token;
-    const res = await fetch('/api/settings', {method:'PUT', credentials:'same-origin', headers, body:JSON.stringify(next)});
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(data.error || 'Could not save policies and legal content');
-    return data;
-  }
-  async function loadPoliciesLegal(){
-    const settingsObj = await readSettings().catch(()=>({}));
-    const content = deepMerge(DEFAULT_POLICIES_LEGAL, settingsObj.policies_legal || {});
-    Object.entries(fieldMap).forEach(([id,path])=>{
-      const el = document.getElementById(id);
-      if(el) el.value = getByPath(content, path) || '';
-    });
-    setStatus('Policies & Legal content loaded.');
-  }
-  async function savePoliciesLegal(){
-    try{
-      setStatus('Saving Policies & Legal content...');
-      const current = await readSettings().catch(()=>({}));
-      const content = deepMerge(DEFAULT_POLICIES_LEGAL, current.policies_legal || {});
-      Object.entries(fieldMap).forEach(([id,path])=>{
-        const el = document.getElementById(id);
-        if(el) setByPath(content, path, el.value || '');
-      });
-      await writeSettings(Object.assign({}, current, {policies_legal: content}));
-      setStatus('Policies & Legal content saved successfully.');
-    }catch(err){
-      setStatus('Could not save Policies & Legal content: ' + (err.message || err), true);
-    }
-  }
-  window.loadPoliciesLegal = loadPoliciesLegal;
-  window.savePoliciesLegal = savePoliciesLegal;
-  document.addEventListener('DOMContentLoaded', function(){
-    const saveBtn = document.getElementById('savePoliciesLegalBtn');
-    const reloadBtn = document.getElementById('reloadPoliciesLegalBtn');
-    if(saveBtn) saveBtn.addEventListener('click', savePoliciesLegal);
-    if(reloadBtn) reloadBtn.addEventListener('click', loadPoliciesLegal);
-    if(document.getElementById('policiesLegalControl')) loadPoliciesLegal().catch(()=>{});
   });
 })();
