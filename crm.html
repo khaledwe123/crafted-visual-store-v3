@@ -23,58 +23,102 @@
   <div class="crm-grid" id="crmGrid"></div>
 </main>
 <script>
-const users = JSON.parse(localStorage.getItem("users") || "[]");
-const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-const acts = JSON.parse(localStorage.getItem("crmActivities") || "[]").slice().reverse();
-const emailOutbox = JSON.parse(localStorage.getItem("crmEmailOutbox") || "[]").slice().reverse();
-const whatsappOutbox = JSON.parse(localStorage.getItem("crmWhatsAppOutbox") || "[]").slice().reverse();
-const inquiries = JSON.parse(localStorage.getItem("contactInquiries") || "[]").slice().reverse();
-const resets = JSON.parse(localStorage.getItem("passwordResetRequests") || "[]").slice().reverse();
-const state = {};
-function followTasks(){
-  return orders.filter(o=>!["Delivered","Cancelled"].includes(o.orderStatus || "New Order")).map(o=>({order:o.id, customer:o.customer?.name, mobile:o.customer?.mobile, status:o.orderStatus||"New Order"}));
+function crmToken(){
+  return (window.CV_API && CV_API.token && CV_API.token(true)) ||
+    localStorage.getItem('cvAdminApiToken') || sessionStorage.getItem('cvAdminApiToken') ||
+    localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
 }
-const sections = [
-  ["customers","Customers",users,u=>`<strong>${u.name||""}</strong><br>${u.email||""}<br>${u.mobile||""}`],
-  ["tasks","Follow-Up Tasks",followTasks(),t=>`<strong>${t.order}</strong><br>${t.customer||""} | ${t.mobile||""}<br>Status: ${t.status}`],
-  ["activities","CRM Activities",acts,a=>`<strong>${a.type}</strong><br>${new Date(a.date).toLocaleString()}<br><small>${JSON.stringify(a.payload)}</small>`],
-  ["email","Email Outbox",emailOutbox,e=>`<strong>${e.subject||e.id}</strong><br>To: ${e.to||""}<br>Status: ${e.status||""}<br><small>${new Date(e.date).toLocaleString()}</small>`],
-  ["whatsapp","WhatsApp Outbox",whatsappOutbox,w=>`<strong>${w.id}</strong><br>To: ${w.to||""}<br>Status: ${w.status||""}<br><small>${new Date(w.date).toLocaleString()}</small>`],
-  ["inquiries","Contact Inquiries",inquiries,i=>`<strong>${i.subject}</strong><br>${i.name} | ${i.mobile}<br>${i.message}`],
-  ["resets","Password Reset Requests",resets,r=>`<strong>${r.email}</strong><br>${r.status}<br><small>${new Date(r.date).toLocaleString()}</small>`]
-];
+function crmEscape(value){
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+async function crmApi(path){
+  const headers = { 'Content-Type':'application/json' };
+  const t = crmToken();
+  if(t) headers.Authorization = 'Bearer ' + t;
+  const res = await fetch(path, { headers, credentials:'same-origin' });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || data.message || 'CRM API failed');
+  return data;
+}
+const state = {};
+let sections = [];
+function normalizeActivity(a){
+  return {
+    ...a,
+    type: a.type || a.subject || 'Activity',
+    date: a.created_at || a.sent_at || a.date || '',
+    payload: a.metadata || a.metadata_json || a.body || ''
+  };
+}
+function followTasksFromOrders(orders){
+  return (orders || []).filter(o => !['Delivered','Cancelled'].includes(o.status || o.orderStatus || 'New Order')).map(o => ({
+    order: o.order_no || o.id,
+    customer: (o.customer && o.customer.name) || o.customer_name || '',
+    mobile: (o.customer && o.customer.mobile) || o.mobile || '',
+    status: o.status || o.orderStatus || 'New Order'
+  }));
+}
+function buildSections(data){
+  const customers = data.customers || [];
+  const activities = (data.activities || []).map(normalizeActivity);
+  const outbox = data.outbox || [];
+  const emailOutbox = outbox.filter(x => String(x.channel || '').toLowerCase() === 'email');
+  const whatsappOutbox = outbox.filter(x => String(x.channel || '').toLowerCase().includes('whatsapp'));
+  const tasks = data.tasks || followTasksFromOrders(data.orders || []);
+  sections = [
+    ['customers','Customers',customers,u=>`<strong>${crmEscape(u.name||'')}</strong><br>${crmEscape(u.email||'')}<br>${crmEscape(u.mobile||'')}<br>${crmEscape(u.city||'')}`],
+    ['tasks','Follow-Up Tasks',tasks,t=>`<strong>${crmEscape(t.order||'')}</strong><br>${crmEscape(t.customer||'')} | ${crmEscape(t.mobile||'')}<br>Status: ${crmEscape(t.status||'')}`],
+    ['activities','CRM Activities',activities,a=>`<strong>${crmEscape(a.type)}</strong><br>${crmEscape(a.date ? new Date(a.date).toLocaleString() : '')}<br><small>${crmEscape(typeof a.payload === 'string' ? a.payload : JSON.stringify(a.payload || {}))}</small>`],
+    ['email','Email Outbox',emailOutbox,e=>`<strong>${crmEscape(e.subject||e.id)}</strong><br>To: ${crmEscape(e.recipient||e.to||'')}<br>Status: ${crmEscape(e.provider_status||e.status||'')}<br><small>${crmEscape(e.created_at || e.sent_at || '')}</small>`],
+    ['whatsapp','WhatsApp Outbox',whatsappOutbox,w=>`<strong>${crmEscape(w.id)}</strong><br>To: ${crmEscape(w.recipient||w.to||'')}<br>Status: ${crmEscape(w.provider_status||w.status||'')}<br><small>${crmEscape(w.created_at || w.sent_at || '')}</small>`],
+    ['inquiries','Contact Inquiries',data.inquiries || [],i=>`<strong>${crmEscape(i.subject||'Inquiry')}</strong><br>${crmEscape(i.name||'')} | ${crmEscape(i.mobile||'')}<br>${crmEscape(i.message||'')}`],
+    ['resets','Password Reset Requests',activities.filter(a => /password reset/i.test(a.type || a.subject || '')),r=>`<strong>${crmEscape((r.metadata && r.metadata.email) || r.email || '')}</strong><br>${crmEscape(r.status||'open')}<br><small>${crmEscape(r.date||r.created_at||'')}</small>`]
+  ];
+}
 function renderShell(){
-  document.getElementById("crmGrid").innerHTML = sections.map(([id,title])=>`
+  document.getElementById('crmGrid').innerHTML = sections.map(([id,title])=>`
     <section class="admin-panel">
-      <h2>${title}</h2>
-      <input id="search-${id}" placeholder="Search ${title}" data-crm-search="${id}">
+      <h2>${crmEscape(title)}</h2>
+      <input id="search-${id}" placeholder="Search ${crmEscape(title)}" data-crm-search="${id}">
       <div id="list-${id}"></div>
       <div id="pager-${id}" class="crm-pager"></div>
     </section>
-  `).join("");
+  `).join('');
   sections.forEach(([id])=>{state[id]=1; renderSection(id);});
 }
 function renderSection(id,page=state[id]||1){
   state[id]=page;
   const sec = sections.find(s=>s[0]===id);
+  if(!sec) return;
   const [,title,data,template] = sec;
-  const q = (document.getElementById("search-"+id)?.value || "").toLowerCase();
-  const filtered = data.filter(x=>JSON.stringify(x).toLowerCase().includes(q));
+  const q = (document.getElementById('search-'+id)?.value || '').toLowerCase();
+  const filtered = (data || []).filter(x=>JSON.stringify(x).toLowerCase().includes(q));
   const per=10, pages=Math.max(1,Math.ceil(filtered.length/per));
   if(state[id]>pages) state[id]=pages;
   const list = filtered.slice((state[id]-1)*per,state[id]*per);
-  document.getElementById("list-"+id).innerHTML = list.length ? list.map(x=>`<div class="admin-item"><div>${template(x)}</div></div>`).join("") : `<p>No ${title.toLowerCase()} found.</p>`;
-  document.getElementById("pager-"+id).innerHTML = `<button data-crm-page="${id}" data-page="${Math.max(1,state[id]-1)}">Prev</button><span> Page ${state[id]} of ${pages} </span><button data-crm-page="${id}" data-page="${Math.min(pages,state[id]+1)}">Next</button>`;
+  document.getElementById('list-'+id).innerHTML = list.length ? list.map(x=>`<div class="admin-item"><div>${template(x)}</div></div>`).join('') : `<p>No ${crmEscape(title.toLowerCase())} found.</p>`;
+  document.getElementById('pager-'+id).innerHTML = `<button data-crm-page="${id}" data-page="${Math.max(1,state[id]-1)}">Prev</button><span> Page ${state[id]} of ${pages} </span><button data-crm-page="${id}" data-page="${Math.min(pages,state[id]+1)}">Next</button>`;
 }
-document.addEventListener("input", function(event){
-  const input = event.target.closest("[data-crm-search]");
+async function loadCrm(){
+  const grid = document.getElementById('crmGrid');
+  if(grid) grid.innerHTML = '<section class="admin-panel"><p>Loading CRM data...</p></section>';
+  try{
+    const data = await crmApi('/api/crm');
+    buildSections(data);
+    renderShell();
+  }catch(err){
+    if(grid) grid.innerHTML = '<section class="admin-panel"><h2>CRM could not load</h2><p>Login as an admin with CRM permission and refresh. '+crmEscape(err.message)+'</p></section>';
+  }
+}
+document.addEventListener('input', function(event){
+  const input = event.target.closest('[data-crm-search]');
   if(input) renderSection(input.dataset.crmSearch);
 });
-document.addEventListener("click", function(event){
-  const btn = event.target.closest("[data-crm-page]");
+document.addEventListener('click', function(event){
+  const btn = event.target.closest('[data-crm-page]');
   if(btn) renderSection(btn.dataset.crmPage, Number(btn.dataset.page || 1));
 });
-renderShell();
+document.addEventListener('DOMContentLoaded', loadCrm);
 </script>
 <script>
 function enforcePageWritePermission(section){

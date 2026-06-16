@@ -766,13 +766,16 @@ app.get('/api/journey/summary', adminAuth('analytics','read'), (req,res)=>{
   const days = Math.max(1, Math.min(365, Number(req.query.days || 30)));
   try{
     if(!ensureAnalyticsTablesSafe()) return res.status(200).json(analyticsEmptySummary(days, 'Analytics tables could not be verified'));
-    const since = `-${days} days`;
-    const totals = db.prepare(`SELECT COUNT(*) events, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE created_at >= datetime('now', ?)`).get(since) || {events:0, sessions:0};
-    const funnel = db.prepare(`SELECT event_type, COUNT(*) count, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE created_at >= datetime('now', ?) GROUP BY event_type ORDER BY count DESC`).all(since);
-    const sources = db.prepare(`SELECT COALESCE(NULLIF(source,''),'direct') source, COALESCE(NULLIF(medium,''),'none') medium, COUNT(DISTINCT session_id) sessions, COUNT(*) events FROM customer_journey_events WHERE created_at >= datetime('now', ?) GROUP BY source, medium ORDER BY sessions DESC LIMIT 20`).all(since);
-    const pages = db.prepare(`SELECT page_url, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type='page_view' AND created_at >= datetime('now', ?) GROUP BY page_url ORDER BY views DESC LIMIT 20`).all(since);
-    const products = db.prepare(`SELECT product_name, product_id, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type IN ('product_view','view_details') AND created_at >= datetime('now', ?) GROUP BY product_name, product_id ORDER BY views DESC LIMIT 20`).all(since);
-    const abandoned = db.prepare(`SELECT COUNT(*) open_carts FROM abandoned_carts WHERE status='open' AND updated_at >= datetime('now', ?)`).get(since) || {open_carts:0};
+    // Analytics timestamps are stored as TEXT for legacy SQLite/PostgreSQL compatibility.
+    // Use an ISO-like cutoff string instead of datetime('now', ?) so PostgreSQL does not
+    // compare TEXT columns to TIMESTAMP values, which previously made KPI cards return zeros.
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    const totals = db.prepare(`SELECT COUNT(*) events, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE COALESCE(created_at,'') >= ?`).get(cutoff) || {events:0, sessions:0};
+    const funnel = db.prepare(`SELECT event_type, COUNT(*) count, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE COALESCE(created_at,'') >= ? GROUP BY event_type ORDER BY count DESC`).all(cutoff);
+    const sources = db.prepare(`SELECT COALESCE(NULLIF(source,''),'direct') source, COALESCE(NULLIF(medium,''),'none') medium, COUNT(DISTINCT session_id) sessions, COUNT(*) events FROM customer_journey_events WHERE COALESCE(created_at,'') >= ? GROUP BY source, medium ORDER BY sessions DESC LIMIT 20`).all(cutoff);
+    const pages = db.prepare(`SELECT page_url, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type='page_view' AND COALESCE(created_at,'') >= ? GROUP BY page_url ORDER BY views DESC LIMIT 20`).all(cutoff);
+    const products = db.prepare(`SELECT product_name, product_id, COUNT(*) views, COUNT(DISTINCT session_id) sessions FROM customer_journey_events WHERE event_type IN ('product_view','view_details') AND COALESCE(created_at,'') >= ? GROUP BY product_name, product_id ORDER BY views DESC LIMIT 20`).all(cutoff);
+    const abandoned = db.prepare(`SELECT COUNT(*) open_carts FROM abandoned_carts WHERE status='open' AND COALESCE(updated_at,created_at,'') >= ?`).get(cutoff) || {open_carts:0};
     res.json({ok:true, empty:Number(totals.events||0)===0, days, totals, funnel, sources, pages, products, abandoned});
   }catch(err){
     console.error('Analytics summary failed:', err.message || err);

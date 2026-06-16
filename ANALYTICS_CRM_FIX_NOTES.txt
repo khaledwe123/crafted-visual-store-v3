@@ -1,0 +1,23 @@
+Analytics + CRM fix
+
+Changed files:
+- server.js
+- crm.html
+
+Fixes:
+1. Analytics KPI cards:
+   - /api/journey/summary no longer uses SQLite datetime('now', ?) against TEXT timestamp columns.
+   - Uses a safe cutoff string comparison compatible with PostgreSQL-backed deployment.
+   - Latest Customer Journey data remains unchanged.
+
+2. CRM customer visibility:
+   - crm.html now loads real backend CRM data from /api/crm instead of localStorage-only lists.
+   - Customers created through signup/order flow should appear in CRM after refresh.
+
+Preserved:
+- /api/admin/me route count remains unchanged from current source.
+- CSRF, SEO rendering, legal routes, payment, Arabic toggle, discounts and products are not intentionally changed.
+
+Validation:
+- node --check server.js passed.
+- extracted CRM page script syntax check passed.
