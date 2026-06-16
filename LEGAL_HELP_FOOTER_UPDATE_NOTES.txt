@@ -1,0 +1,21 @@
+LEGAL_HELP_FOOTER_UPDATE
+
+Added four new standalone pages:
+- privacy-policy.html
+- terms-and-conditions.html
+- cookie-policy.html
+- help.html
+
+Added footer links through legal-footer-links.js:
+- Privacy Policy / سياسة الخصوصية
+- Terms & Conditions / الشروط والأحكام
+- Cookie Policy / سياسة ملفات تعريف الارتباط
+- Help Center / مركز المساعدة
+
+Help Center contains:
+- Returns Process / Return Policy
+- Warranty Policy
+- Delivery Information
+
+Updated only public HTML pages to load legal-footer-links.js and added minimal legal page CSS to styles.css.
+No admin, discount, payment logic, product data, server routes, database, or authentication logic changed.

@@ -1196,3 +1196,11 @@ img, video, iframe { max-width: 100%; }
     max-width:240px;
   }
 }
+
+/* Legal and Help pages */
+.legal-page .page-hero{text-align:center;padding:70px 6% 35px;background:linear-gradient(135deg,rgba(24,61,50,.10),rgba(184,115,51,.10));}
+.legal-content{max-width:980px;margin:0 auto;line-height:1.8;}
+.legal-content h2{margin-top:28px;color:var(--green);}
+.legal-content p{margin:10px 0;}
+.legal-content a{color:var(--green);font-weight:700;}
+html[dir="rtl"] .legal-content{text-align:right;}
