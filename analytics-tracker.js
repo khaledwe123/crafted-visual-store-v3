@@ -37,15 +37,15 @@
       metadata:metadata||{}
     }, metadata&&metadata.product_id?{product_id:metadata.product_id, product_name:metadata.product_name||''}:{});
     try{
-      const csrf = (document.cookie.split('; ').find(function(v){ return v.indexOf('cv_csrf_token=') === 0; }) || '').split('=').slice(1).join('=');
-      fetch('/api/journey',{
-        method:'POST',
-        credentials:'same-origin',
-        headers:{'Content-Type':'application/json','X-CSRF-Token':decodeURIComponent(csrf || '')},
-        body:JSON.stringify(body),
-        keepalive:true
-      }).catch(()=>{});
-    }catch(e){}
+      var token = (document.cookie.split('; ').find(function(v){ return v.indexOf('cv_csrf_token=') === 0; }) || '').split('=').slice(1).join('=');
+      fetch('/api/journey', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type':'application/json', 'X-CSRF-Token': decodeURIComponent(token || '')},
+        body: JSON.stringify(body),
+        keepalive: true
+      }).catch(function(){});
+    } catch(e){}
   }
   window.CVTrack={event:send, sessionId:sid, attribution:attr};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
