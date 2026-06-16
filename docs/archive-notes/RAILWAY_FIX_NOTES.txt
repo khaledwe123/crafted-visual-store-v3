@@ -1,1 +1,0 @@
-Fixed Railway startup: backend/db.js now creates the database folder automatically. Root data/.gitkeep is included. Upload all files and folders to GitHub, then redeploy Railway.
