@@ -4,39 +4,76 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cookie Policy | Crafted Visual</title>
+  <meta name="description" content="Crafted Visual Cookie Policy explaining essential, preference, analytics, and marketing cookies.">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="responsive-all-devices.css">
   <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
   <header class="nav">
-    <div class="brand"><span id="brandText">Crafted Visual</span></div>
-    <nav id="mainMenu"></nav>
+    <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none;">Crafted Visual</a></div>
+    <nav id="mainMenu">
+      <a href="index.html" data-en="Home" data-ar="الرئيسية">Home</a>
+      <a href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
+      <a href="contact.html" data-en="Contact Us" data-ar="تواصل معنا">Contact Us</a>
+    </nav>
     <div class="nav-actions">
-      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="togglePageLang()">عربي</button>
-      <a class="outline" href="account.html">My Account</a>
-      <a class="cart-btn" href="shop.html">Shop</a>
+      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="toggleLang()">عربي</button>
+      <a class="cart-btn" href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
     </div>
   </header>
 
-  <main id="dynamicPageRoot">
+  <main class="legal-page">
     <section class="page-hero">
-      <h1 id="pageTitle">Page</h1>
-      <p id="pageSubtitle"></p>
+      <h1 data-lang-block="en">Cookie Policy</h1>
+      <h1 data-lang-block="ar" hidden>سياسة ملفات تعريف الارتباط</h1>
+      <p data-lang-block="en">Last updated: June 2026</p>
+      <p data-lang-block="ar" hidden>آخر تحديث: يونيو 2026</p>
     </section>
     <section class="section alt">
-      <div class="content-card" id="pageContent"></div>
+      <div class="content-card legal-content" data-lang-block="en">
+        <h2>1. What Are Cookies?</h2>
+        <p>Cookies are small files stored on your device when you visit a website. They help the website function, remember preferences, and improve the browsing experience.</p>
+        <h2>2. Types of Cookies We May Use</h2>
+        <p><strong>Essential cookies:</strong> Required for core website functions such as navigation, account access, cart behavior, security, and language preferences.</p>
+        <p><strong>Preference cookies:</strong> Help remember selected language, display preferences, and similar choices.</p>
+        <p><strong>Analytics cookies:</strong> Help us understand how visitors use the website so we can improve content, products, and performance.</p>
+        <p><strong>Marketing cookies:</strong> May be used in the future to measure campaigns or show relevant content, subject to applicable settings and laws.</p>
+        <h2>3. Third-Party Cookies</h2>
+        <p>Some cookies may be set by third-party services such as analytics providers, payment providers, embedded tools, or advertising platforms where enabled.</p>
+        <h2>4. Managing Cookies</h2>
+        <p>You can manage or block cookies through your browser settings. Blocking essential cookies may affect website functionality, account access, cart behavior, or checkout processes.</p>
+        <h2>5. Updates</h2>
+        <p>We may update this Cookie Policy when our website, services, or technology providers change.</p>
+        <h2>6. Contact</h2>
+        <p>For questions, contact <a href="mailto:support@craftedvisual.com">support@craftedvisual.com</a>.</p>
+      </div>
+      <div class="content-card legal-content" data-lang-block="ar" hidden dir="rtl">
+        <h2>١. ما هي ملفات تعريف الارتباط؟</h2>
+        <p>ملفات تعريف الارتباط هي ملفات صغيرة يتم حفظها على جهازك عند زيارة الموقع. تساعد هذه الملفات على تشغيل الموقع وتذكر التفضيلات وتحسين تجربة التصفح.</p>
+        <h2>٢. أنواع ملفات تعريف الارتباط التي قد نستخدمها</h2>
+        <p><strong>الملفات الأساسية:</strong> ضرورية لوظائف الموقع الأساسية مثل التصفح والدخول إلى الحساب وسلة التسوق والأمان وتفضيلات اللغة.</p>
+        <p><strong>ملفات التفضيلات:</strong> تساعد على تذكر اللغة المختارة وتفضيلات العرض والخيارات المشابهة.</p>
+        <p><strong>ملفات التحليلات:</strong> تساعدنا على فهم كيفية استخدام الزوار للموقع بهدف تحسين المحتوى والمنتجات والأداء.</p>
+        <p><strong>ملفات التسويق:</strong> قد تستخدم مستقبلاً لقياس الحملات أو عرض محتوى مناسب، وفقاً للإعدادات والأنظمة المعمول بها.</p>
+        <h2>٣. ملفات الأطراف الثالثة</h2>
+        <p>قد يتم وضع بعض الملفات من خلال خدمات أطراف ثالثة مثل مزودي التحليلات أو الدفع أو الأدوات المدمجة أو منصات الإعلانات عند تفعيلها.</p>
+        <h2>٤. إدارة ملفات تعريف الارتباط</h2>
+        <p>يمكنك إدارة أو حظر ملفات تعريف الارتباط من إعدادات المتصفح. قد يؤثر حظر الملفات الأساسية على وظائف الموقع أو الدخول للحساب أو سلة التسوق أو عملية الشراء.</p>
+        <h2>٥. التحديثات</h2>
+        <p>قد نقوم بتحديث هذه السياسة عند تغيير الموقع أو الخدمات أو مزودي التقنية.</p>
+        <h2>٦. التواصل</h2>
+        <p>للاستفسارات، تواصل معنا عبر <a href="mailto:support@craftedvisual.com">support@craftedvisual.com</a>.</p>
+      </div>
     </section>
   </main>
 
   <footer class="footer">
-    <strong id="footerBrand">Crafted Visual</strong>
-    <p id="footerText"></p>
-    <div id="footerDetails"></div>
+    <strong>Crafted Visual</strong>
+    <p data-en="Premium customizable furniture in Saudi Arabia." data-ar="أثاث فاخر قابل للتخصيص في المملكة العربية السعودية.">Premium customizable furniture in Saudi Arabia.</p>
   </footer>
-
-  <script src="page-builder.js"></script>
-  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+  <script src="legal-pages.js"></script>
+  <script src="legal-footer-links.js"></script>
   <script src="language-toggle-fix.js?v=20260611langstable"></script>
 </body>
 </html>

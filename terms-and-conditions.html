@@ -4,39 +4,90 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terms & Conditions | Crafted Visual</title>
+  <meta name="description" content="Crafted Visual Terms and Conditions for furniture orders, custom-made products, delivery, returns, and website use in Saudi Arabia.">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="responsive-all-devices.css">
   <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
   <header class="nav">
-    <div class="brand"><span id="brandText">Crafted Visual</span></div>
-    <nav id="mainMenu"></nav>
+    <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none;">Crafted Visual</a></div>
+    <nav id="mainMenu">
+      <a href="index.html" data-en="Home" data-ar="الرئيسية">Home</a>
+      <a href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
+      <a href="contact.html" data-en="Contact Us" data-ar="تواصل معنا">Contact Us</a>
+    </nav>
     <div class="nav-actions">
-      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="togglePageLang()">عربي</button>
-      <a class="outline" href="account.html">My Account</a>
-      <a class="cart-btn" href="shop.html">Shop</a>
+      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="toggleLang()">عربي</button>
+      <a class="cart-btn" href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
     </div>
   </header>
 
-  <main id="dynamicPageRoot">
+  <main class="legal-page">
     <section class="page-hero">
-      <h1 id="pageTitle">Page</h1>
-      <p id="pageSubtitle"></p>
+      <h1 data-lang-block="en">Terms & Conditions</h1>
+      <h1 data-lang-block="ar" hidden>الشروط والأحكام</h1>
+      <p data-lang-block="en">Last updated: June 2026</p>
+      <p data-lang-block="ar" hidden>آخر تحديث: يونيو 2026</p>
     </section>
     <section class="section alt">
-      <div class="content-card" id="pageContent"></div>
+      <div class="content-card legal-content" data-lang-block="en">
+        <h2>1. Acceptance of Terms</h2>
+        <p>By using the Crafted Visual website, placing an order, requesting a quotation, or communicating with us, you agree to these Terms & Conditions.</p>
+        <h2>2. Products and Customization</h2>
+        <p>Crafted Visual offers furniture products, custom furniture, and made-to-order items. Product images, colors, fabrics, textures, and dimensions are shown as accurately as possible, but may vary slightly due to screen settings, material batches, and handmade or customized production.</p>
+        <h2>3. Pricing and Availability</h2>
+        <p>Prices are shown in Saudi Riyals unless stated otherwise. Prices, availability, offers, and delivery charges may change without prior notice. A quotation or order is confirmed only when accepted by Crafted Visual.</p>
+        <h2>4. Orders and Payments</h2>
+        <p>Orders may be placed through the website, WhatsApp, email, or other approved channels. Until online payment is fully activated, orders may be treated as pending payment or awaiting verification. When a payment gateway is enabled, payment confirmation will depend on successful verification from the payment provider.</p>
+        <h2>5. Made-to-Order and Customized Products</h2>
+        <p>Customized, made-to-order, specially manufactured, or modified products cannot be cancelled, returned, exchanged, or refunded once production has commenced, except where there is a confirmed manufacturing defect or where required by applicable law.</p>
+        <h2>6. Delivery</h2>
+        <p>Delivery timelines are estimates and may vary depending on product availability, customization requirements, location, access conditions, and operational circumstances. Made-to-order products typically require 15–20 working days unless otherwise stated.</p>
+        <h2>7. Returns, Warranty, and Help</h2>
+        <p>Returns, refunds, warranty, delivery, and after-sales processes are explained in our Help Center. Customers should inspect products upon delivery and report visible damage or defects as soon as possible.</p>
+        <h2>8. Intellectual Property</h2>
+        <p>All website content, images, designs, branding, product names, text, and visual materials are owned by or licensed to Crafted Visual and may not be copied or used without permission.</p>
+        <h2>9. Limitation of Liability</h2>
+        <p>To the maximum extent permitted by law, Crafted Visual shall not be liable for indirect, incidental, or consequential losses arising from website use, product delays, third-party services, or customer misuse of products.</p>
+        <h2>10. Governing Law</h2>
+        <p>These Terms & Conditions are governed by the laws and regulations of the Kingdom of Saudi Arabia.</p>
+        <h2>11. Contact</h2>
+        <p>For support, contact <a href="mailto:support@craftedvisual.com">support@craftedvisual.com</a>.</p>
+      </div>
+      <div class="content-card legal-content" data-lang-block="ar" hidden dir="rtl">
+        <h2>١. قبول الشروط</h2>
+        <p>باستخدام موقع كرافتد فيزوال أو تقديم طلب أو طلب عرض سعر أو التواصل معنا، فإنك توافق على هذه الشروط والأحكام.</p>
+        <h2>٢. المنتجات والتخصيص</h2>
+        <p>تقدم كرافتد فيزوال منتجات أثاث وأثاثاً حسب الطلب ومنتجات مصنعة خصيصاً. يتم عرض الصور والألوان والأقمشة والخامات والمقاسات بأكبر قدر ممكن من الدقة، وقد تختلف قليلاً بسبب إعدادات الشاشة أو دفعات المواد أو طبيعة التصنيع اليدوي أو التخصيص.</p>
+        <h2>٣. الأسعار والتوفر</h2>
+        <p>تظهر الأسعار بالريال السعودي ما لم يذكر خلاف ذلك. قد تتغير الأسعار والتوفر والعروض ورسوم التوصيل دون إشعار مسبق. لا يعتبر عرض السعر أو الطلب مؤكداً إلا بعد قبوله من كرافتد فيزوال.</p>
+        <h2>٤. الطلبات والمدفوعات</h2>
+        <p>يمكن تقديم الطلبات عبر الموقع أو واتساب أو البريد الإلكتروني أو القنوات المعتمدة الأخرى. إلى حين تفعيل الدفع الإلكتروني بشكل كامل، قد تعتبر الطلبات قيد انتظار الدفع أو التحقق. عند تفعيل بوابة الدفع، يعتمد تأكيد الدفع على التحقق الناجح من مزود الدفع.</p>
+        <h2>٥. المنتجات حسب الطلب والمخصصة</h2>
+        <p>لا يمكن إلغاء أو إرجاع أو استبدال أو استرداد المنتجات المخصصة أو المصنعة حسب الطلب أو المعدلة بعد بدء الإنتاج، إلا في حال وجود عيب تصنيعي مؤكد أو إذا تطلب النظام المعمول به خلاف ذلك.</p>
+        <h2>٦. التوصيل</h2>
+        <p>مواعيد التوصيل تقديرية وقد تختلف حسب توفر المنتج ومتطلبات التخصيص والموقع وظروف الوصول والظروف التشغيلية. المنتجات حسب الطلب تتطلب عادةً من ١٥ إلى ٢٠ يوم عمل ما لم يذكر خلاف ذلك.</p>
+        <h2>٧. الإرجاع والضمان والمساعدة</h2>
+        <p>تم توضيح إجراءات الإرجاع والاسترداد والضمان والتوصيل وخدمة ما بعد البيع في مركز المساعدة. يجب على العملاء فحص المنتجات عند الاستلام والإبلاغ عن أي تلف أو عيب ظاهر في أسرع وقت ممكن.</p>
+        <h2>٨. الملكية الفكرية</h2>
+        <p>جميع محتويات الموقع والصور والتصاميم والعلامات التجارية وأسماء المنتجات والنصوص والمواد البصرية مملوكة أو مرخصة لكرافتد فيزوال ولا يجوز نسخها أو استخدامها دون إذن.</p>
+        <h2>٩. تحديد المسؤولية</h2>
+        <p>إلى أقصى حد يسمح به النظام، لا تتحمل كرافتد فيزوال مسؤولية الخسائر غير المباشرة أو العرضية أو التبعية الناتجة عن استخدام الموقع أو تأخر المنتجات أو خدمات الأطراف الثالثة أو سوء استخدام المنتجات من قبل العميل.</p>
+        <h2>١٠. القانون المعمول به</h2>
+        <p>تخضع هذه الشروط والأحكام للأنظمة واللوائح المعمول بها في المملكة العربية السعودية.</p>
+        <h2>١١. التواصل</h2>
+        <p>للدعم، تواصل معنا عبر <a href="mailto:support@craftedvisual.com">support@craftedvisual.com</a>.</p>
+      </div>
     </section>
   </main>
 
   <footer class="footer">
-    <strong id="footerBrand">Crafted Visual</strong>
-    <p id="footerText"></p>
-    <div id="footerDetails"></div>
+    <strong>Crafted Visual</strong>
+    <p data-en="Premium customizable furniture in Saudi Arabia." data-ar="أثاث فاخر قابل للتخصيص في المملكة العربية السعودية.">Premium customizable furniture in Saudi Arabia.</p>
   </footer>
-
-  <script src="page-builder.js"></script>
-  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+  <script src="legal-pages.js"></script>
+  <script src="legal-footer-links.js"></script>
   <script src="language-toggle-fix.js?v=20260611langstable"></script>
 </body>
 </html>

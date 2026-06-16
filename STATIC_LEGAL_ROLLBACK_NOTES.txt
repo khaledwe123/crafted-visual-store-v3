@@ -1,0 +1,22 @@
+STATIC LEGAL PAGES ROLLBACK NOTES
+
+Purpose:
+- Roll back backend-controlled legal/help pages that caused the homepage to become unresponsive.
+- Keep legal/help pages as simple static pages.
+
+Changed:
+- Removed cv-ui-dedupe-fix.js script loading from public HTML pages because it was the likely infinite-loop/freeze trigger.
+- Added legal-footer-links.js to public customer-facing HTML pages to show footer links.
+- Added static pages: privacy-policy.html, terms-and-conditions.html, cookie-policy.html, help.html.
+
+Not touched:
+- server.js
+- admin login/authentication
+- discounts
+- products
+- payment logic
+- SEO server rendering
+- database
+- CSS
+
+Replace only the files included in this ZIP.

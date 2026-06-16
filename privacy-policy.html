@@ -4,39 +4,82 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy | Crafted Visual</title>
+  <meta name="description" content="Crafted Visual Privacy Policy for customers using our furniture website and services in Saudi Arabia.">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="responsive-all-devices.css">
   <link rel="stylesheet" href="final-responsive-admin-mobile.css?v=20260611-final">
 </head>
 <body>
   <header class="nav">
-    <div class="brand"><span id="brandText">Crafted Visual</span></div>
-    <nav id="mainMenu"></nav>
+    <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none;">Crafted Visual</a></div>
+    <nav id="mainMenu">
+      <a href="index.html" data-en="Home" data-ar="الرئيسية">Home</a>
+      <a href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
+      <a href="contact.html" data-en="Contact Us" data-ar="تواصل معنا">Contact Us</a>
+    </nav>
     <div class="nav-actions">
-      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="togglePageLang()">عربي</button>
-      <a class="outline" href="account.html">My Account</a>
-      <a class="cart-btn" href="shop.html">Shop</a>
+      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="toggleLang()">عربي</button>
+      <a class="cart-btn" href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
     </div>
   </header>
 
-  <main id="dynamicPageRoot">
+  <main class="legal-page">
     <section class="page-hero">
-      <h1 id="pageTitle">Page</h1>
-      <p id="pageSubtitle"></p>
+      <h1 data-lang-block="en">Privacy Policy</h1>
+      <h1 data-lang-block="ar" hidden>سياسة الخصوصية</h1>
+      <p data-lang-block="en">Last updated: June 2026</p>
+      <p data-lang-block="ar" hidden>آخر تحديث: يونيو 2026</p>
     </section>
     <section class="section alt">
-      <div class="content-card" id="pageContent"></div>
+      <div class="content-card legal-content" data-lang-block="en">
+        <h2>1. Introduction</h2>
+        <p>This Privacy Policy explains how Crafted Visual collects, uses, stores, and protects personal information when customers use our website, contact our team, place orders, request quotations, or interact with our services in Saudi Arabia.</p>
+        <h2>2. Information We Collect</h2>
+        <p>We may collect your name, phone number, email address, delivery address, order details, product preferences, inquiry details, payment status information, and any information you choose to submit through forms, WhatsApp, email, or customer support channels.</p>
+        <h2>3. How We Use Information</h2>
+        <p>We use information to process inquiries and orders, prepare quotations, arrange delivery, provide after-sales support, improve our website, manage customer accounts, communicate order updates, and comply with applicable laws and business obligations.</p>
+        <h2>4. Payments and Third Parties</h2>
+        <p>When online payments are enabled, payment processing may be handled by approved third-party payment providers such as Geidea or similar providers. Crafted Visual does not intend to store full card details on its own servers.</p>
+        <h2>5. Delivery and Service Providers</h2>
+        <p>We may share limited information with delivery partners, installation teams, technology providers, payment processors, analytics providers, or customer support tools only where needed to deliver our services.</p>
+        <h2>6. Cookies and Analytics</h2>
+        <p>Our website may use cookies and similar technologies to support essential website functions, remember preferences, understand website performance, and improve customer experience. More information is available in our Cookie Policy.</p>
+        <h2>7. Data Protection</h2>
+        <p>We take reasonable technical and organizational measures to protect customer information from unauthorized access, loss, misuse, or disclosure. No online system is completely risk-free, but we work to keep your data secure.</p>
+        <h2>8. Your Rights</h2>
+        <p>Subject to applicable laws in the Kingdom of Saudi Arabia, you may request access, correction, or deletion of your personal information, or ask us to stop marketing communications.</p>
+        <h2>9. Contact</h2>
+        <p>For privacy requests, contact us at <a href="mailto:support@craftedvisual.com">support@craftedvisual.com</a>.</p>
+      </div>
+      <div class="content-card legal-content" data-lang-block="ar" hidden dir="rtl">
+        <h2>١. المقدمة</h2>
+        <p>توضح سياسة الخصوصية هذه كيفية قيام كرافتد فيزوال بجمع واستخدام وحفظ وحماية المعلومات الشخصية عند استخدام العملاء للموقع الإلكتروني أو التواصل معنا أو تقديم الطلبات أو طلب عروض الأسعار أو استخدام خدماتنا داخل المملكة العربية السعودية.</p>
+        <h2>٢. المعلومات التي نجمعها</h2>
+        <p>قد نجمع الاسم ورقم الجوال والبريد الإلكتروني وعنوان التوصيل وتفاصيل الطلب وتفضيلات المنتجات وتفاصيل الاستفسار وحالة الدفع وأي معلومات يقدمها العميل عبر النماذج أو واتساب أو البريد الإلكتروني أو قنوات خدمة العملاء.</p>
+        <h2>٣. كيفية استخدام المعلومات</h2>
+        <p>نستخدم المعلومات لمعالجة الاستفسارات والطلبات وإعداد عروض الأسعار وترتيب التوصيل وتقديم خدمة ما بعد البيع وتحسين الموقع وإدارة حسابات العملاء وإرسال تحديثات الطلب والامتثال للمتطلبات النظامية والتجارية.</p>
+        <h2>٤. المدفوعات والأطراف الثالثة</h2>
+        <p>عند تفعيل الدفع الإلكتروني، قد تتم معالجة المدفوعات من خلال مزودي دفع معتمدين مثل جيديا أو مزودين مشابهين. لا تهدف كرافتد فيزوال إلى تخزين بيانات البطاقات الكاملة على خوادمها.</p>
+        <h2>٥. مزودو التوصيل والخدمات</h2>
+        <p>قد نشارك معلومات محدودة مع شركاء التوصيل وفرق التركيب ومزودي التقنية ومعالجي الدفع ومزودي التحليلات أو أدوات خدمة العملاء عند الحاجة فقط لتقديم الخدمة.</p>
+        <h2>٦. ملفات تعريف الارتباط والتحليلات</h2>
+        <p>قد يستخدم الموقع ملفات تعريف الارتباط وتقنيات مشابهة لدعم وظائف الموقع الأساسية وتذكر التفضيلات وفهم أداء الموقع وتحسين تجربة العملاء. تتوفر تفاصيل إضافية في سياسة ملفات تعريف الارتباط.</p>
+        <h2>٧. حماية البيانات</h2>
+        <p>نتخذ إجراءات تقنية وتنظيمية معقولة لحماية معلومات العملاء من الوصول غير المصرح به أو الفقدان أو إساءة الاستخدام أو الإفصاح. لا يوجد نظام إلكتروني خالٍ تماماً من المخاطر، ولكننا نعمل على حماية بياناتك.</p>
+        <h2>٨. حقوقك</h2>
+        <p>وفقاً للأنظمة المعمول بها في المملكة العربية السعودية، يمكنك طلب الوصول إلى معلوماتك الشخصية أو تصحيحها أو حذفها أو طلب إيقاف الرسائل التسويقية.</p>
+        <h2>٩. التواصل</h2>
+        <p>لطلبات الخصوصية، يمكنك التواصل معنا عبر <a href="mailto:support@craftedvisual.com">support@craftedvisual.com</a>.</p>
+      </div>
     </section>
   </main>
 
   <footer class="footer">
-    <strong id="footerBrand">Crafted Visual</strong>
-    <p id="footerText"></p>
-    <div id="footerDetails"></div>
+    <strong>Crafted Visual</strong>
+    <p data-en="Premium customizable furniture in Saudi Arabia." data-ar="أثاث فاخر قابل للتخصيص في المملكة العربية السعودية.">Premium customizable furniture in Saudi Arabia.</p>
   </footer>
-
-  <script src="page-builder.js"></script>
-  <script src="cv-ui-dedupe-fix.js?v=20260611dedupe"></script>
+  <script src="legal-pages.js"></script>
+  <script src="legal-footer-links.js"></script>
   <script src="language-toggle-fix.js?v=20260611langstable"></script>
 </body>
 </html>
