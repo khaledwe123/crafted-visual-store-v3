@@ -2,6 +2,13 @@ let pageLang = localStorage.getItem('lang') || 'en';
 let pageSettings = {};
 
 function pageParam(name){ return new URLSearchParams(location.search).get(name) || ''; }
+function inferredPageSlug(){
+  const fromQuery = pageParam('slug');
+  if(fromQuery) return fromQuery;
+  const file = (location.pathname.split('/').pop() || '').replace(/\.html$/i,'');
+  const known = ['privacy-policy','terms-and-conditions','cookie-policy','help'];
+  return known.includes(file) ? file : '';
+}
 function pageEsc(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function pageNl2br(v){ return pageEsc(v).replace(/\n/g, '<br>'); }
 
@@ -41,8 +48,34 @@ function setPageMeta(page){
   meta.content = desc || '';
 }
 
+
+function renderPageFooterLegalLinks(){
+  const footer = document.querySelector('footer.footer') || document.querySelector('footer');
+  if(!footer) return;
+  let box = document.getElementById('footerLegalLinks');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'footerLegalLinks';
+    box.className = 'footer-legal-links';
+    box.style.marginTop = '14px';
+    box.style.display = 'flex';
+    box.style.gap = '14px';
+    box.style.flexWrap = 'wrap';
+    box.style.justifyContent = 'center';
+    footer.appendChild(box);
+  }
+  const fallback = [
+    {label_en:'Privacy Policy', label_ar:'سياسة الخصوصية', url:'privacy-policy.html', visible:true},
+    {label_en:'Terms & Conditions', label_ar:'الشروط والأحكام', url:'terms-and-conditions.html', visible:true},
+    {label_en:'Cookie Policy', label_ar:'سياسة ملفات تعريف الارتباط', url:'cookie-policy.html', visible:true},
+    {label_en:'Help Center', label_ar:'مركز المساعدة', url:'help.html', visible:true}
+  ];
+  const links = Array.isArray(pageSettings.footer_legal_links) && pageSettings.footer_legal_links.length ? pageSettings.footer_legal_links : fallback;
+  box.innerHTML = links.filter(l => l.visible !== false).map(l => `<a href="${pageEsc(l.url)}">${pageEsc(pageLang === 'ar' ? (l.label_ar || l.label_en) : (l.label_en || l.label_ar))}</a>`).join('');
+}
+
 function renderDynamicPage(){
-  const slug = pageParam('slug');
+  const slug = inferredPageSlug();
   const pages = Array.isArray(pageSettings.custom_pages) ? pageSettings.custom_pages : [];
   const page = pages.find(p => String(p.slug) === String(slug) || String(p.id) === String(slug));
   document.documentElement.lang = pageLang;
@@ -57,6 +90,7 @@ function renderDynamicPage(){
     document.getElementById('pageSubtitle').textContent = '';
     document.getElementById('pageContent').innerHTML = `<p>${pageLang === 'ar' ? 'هذه الصفحة غير منشورة حالياً.' : 'This page is not currently published.'}</p>`;
     renderPageMenu();
+    renderPageFooterLegalLinks();
     return;
   }
 
@@ -78,6 +112,7 @@ function renderDynamicPage(){
     ${btnLabel && page.button_url ? `<p style="margin-top:24px;"><a class="btn primary" href="${pageEsc(page.button_url)}">${pageEsc(btnLabel)}</a></p>` : ''}
   `;
   renderPageMenu();
+  renderPageFooterLegalLinks();
 }
 
 function togglePageLang(){

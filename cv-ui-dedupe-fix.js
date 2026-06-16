@@ -76,6 +76,46 @@
     }
   }
 
+
+  function cvLegalEsc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function cvCurrentLang(){ return (localStorage.getItem('lang') || document.documentElement.lang || 'en').toLowerCase().startsWith('ar') ? 'ar' : 'en'; }
+  function cvDefaultLegalLinks(){ return [
+    {label_en:'Privacy Policy', label_ar:'سياسة الخصوصية', url:'privacy-policy.html', visible:true},
+    {label_en:'Terms & Conditions', label_ar:'الشروط والأحكام', url:'terms-and-conditions.html', visible:true},
+    {label_en:'Cookie Policy', label_ar:'سياسة ملفات تعريف الارتباط', url:'cookie-policy.html', visible:true},
+    {label_en:'Help Center', label_ar:'مركز المساعدة', url:'help.html', visible:true}
+  ]; }
+  function renderFooterLegalLinks(settings){
+    var footer = document.querySelector('footer');
+    if(!footer) return;
+    var box = document.getElementById('footerLegalLinks');
+    if(!box){
+      box = document.createElement('div');
+      box.id = 'footerLegalLinks';
+      box.className = 'footer-legal-links';
+      box.style.marginTop = '14px';
+      box.style.display = 'flex';
+      box.style.gap = '14px';
+      box.style.flexWrap = 'wrap';
+      box.style.justifyContent = 'center';
+      footer.appendChild(box);
+    }
+    var links = settings && Array.isArray(settings.footer_legal_links) && settings.footer_legal_links.length ? settings.footer_legal_links : cvDefaultLegalLinks();
+    var lang = cvCurrentLang();
+    box.innerHTML = links.filter(function(l){ return l && l.visible !== false; }).map(function(l){
+      var label = lang === 'ar' ? (l.label_ar || l.label_en) : (l.label_en || l.label_ar);
+      return '<a href="' + cvLegalEsc(l.url || '#') + '">' + cvLegalEsc(label || '') + '</a>';
+    }).join('');
+  }
+  function initFooterLegalLinks(){
+    if(window.__CV_LEGAL_FOOTER_LOADING) return;
+    window.__CV_LEGAL_FOOTER_LOADING = true;
+    fetch('/api/settings', {cache:'no-store'}).then(function(r){ return r.ok ? r.json() : {}; }).then(function(st){
+      window.__CV_LEGAL_FOOTER_SETTINGS = st || {};
+      renderFooterLegalLinks(window.__CV_LEGAL_FOOTER_SETTINGS);
+    }).catch(function(){ renderFooterLegalLinks({}); }).finally(function(){ window.__CV_LEGAL_FOOTER_LOADING = false; });
+  }
+
   function clean(){
     if(running) return;
     running = true;
@@ -83,6 +123,7 @@
       normalizeMobileMenu();
       normalizeBottomNav();
       normalizeFloatingExpert();
+      renderFooterLegalLinks(window.__CV_LEGAL_FOOTER_SETTINGS || {});
     }finally{
       running = false;
     }
@@ -90,6 +131,7 @@
 
   ready(function(){
     clean();
+    initFooterLegalLinks();
     setTimeout(clean, 100);
     setTimeout(clean, 500);
     setTimeout(clean, 1200);

@@ -103,7 +103,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(helmet({
@@ -342,57 +342,15 @@ function parseCookies(req){
     return i === -1 ? [v, ''] : [decodeURIComponent(v.slice(0,i)), decodeURIComponent(v.slice(i+1))];
   }));
 }
-function appendCookie(res, cookieValue){
-  if (res.append) return res.append('Set-Cookie', cookieValue);
-  const existing = res.getHeader && res.getHeader('Set-Cookie');
-  if (!existing) return res.setHeader('Set-Cookie', cookieValue);
-  const next = Array.isArray(existing) ? existing.concat(cookieValue) : [existing, cookieValue];
-  return res.setHeader('Set-Cookie', next);
-}
 function setAuthCookie(res, name, value){
   const parts = [`${name}=${encodeURIComponent(value)}`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=43200'];
   if (IS_PROD) parts.push('Secure');
-  appendCookie(res, parts.join('; '));
+  res.setHeader('Set-Cookie', parts.join('; '));
 }
 function clearAuthCookie(res, name){
   const parts = [`${name}=`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0'];
   if (IS_PROD) parts.push('Secure');
-  appendCookie(res, parts.join('; '));
-}
-const CSRF_COOKIE_NAME = 'cv_csrf_token';
-const CSRF_HEADER_NAME = 'x-csrf-token';
-function isUnsafeHttpMethod(method=''){
-  return ['POST','PUT','PATCH','DELETE'].includes(String(method || '').toUpperCase());
-}
-function hasSessionCookie(req){
-  const cookies = parseCookies(req);
-  return !!(cookies.cv_admin_auth || cookies.cv_customer_auth);
-}
-function makeCsrfToken(){
-  return crypto.randomBytes(32).toString('hex');
-}
-function setCsrfCookie(res, tokenValue){
-  const parts = [`${CSRF_COOKIE_NAME}=${encodeURIComponent(tokenValue)}`, 'SameSite=Lax', 'Path=/', 'Max-Age=43200'];
-  if (IS_PROD) parts.push('Secure');
-  appendCookie(res, parts.join('; '));
-}
-function ensureCsrfCookie(req, res){
-  const cookies = parseCookies(req);
-  const existing = cookies[CSRF_COOKIE_NAME];
-  if(existing && /^[a-f0-9]{64}$/i.test(existing)) return existing;
-  const tokenValue = makeCsrfToken();
-  setCsrfCookie(res, tokenValue);
-  return tokenValue;
-}
-function csrfProtection(req, res, next){
-  ensureCsrfCookie(req, res);
-  if(!req.path.startsWith('/api/') || !isUnsafeHttpMethod(req.method)) return next();
-  if(!hasSessionCookie(req)) return next();
-  const cookies = parseCookies(req);
-  const cookieToken = cookies[CSRF_COOKIE_NAME] || '';
-  const submittedToken = String(req.headers[CSRF_HEADER_NAME] || req.body?._csrf || '');
-  if(cookieToken && submittedToken && cookieToken === submittedToken) return next();
-  return res.status(403).json({error:'Invalid or missing CSRF token'});
+  res.append ? res.append('Set-Cookie', parts.join('; ')) : res.setHeader('Set-Cookie', parts.join('; '));
 }
 function bearerOrCookieToken(req){
   const h = req.headers.authorization || '';
@@ -551,6 +509,87 @@ function auditLog(req, action, entityType='', entityId='', metadata={}){
       .run(req.user?.id || null, action, entityType, String(entityId || ''), hashValue(req.ip), JSON.stringify(metadata || {}));
   }catch(e){ console.warn('audit log skipped', e.message); }
 }
+
+const DEFAULT_LEGAL_HELP_PAGES = [
+  {
+    id:'privacy-policy', slug:'privacy-policy', url:'privacy-policy.html', active:true, show_in_menu:false,
+    title_en:'Privacy Policy', title_ar:'سياسة الخصوصية', menu_label_en:'Privacy Policy', menu_label_ar:'سياسة الخصوصية',
+    subtitle_en:'How Crafted Visual collects, uses, protects, and manages customer information.',
+    subtitle_ar:'كيفية جمع كرافتد فيجوال لمعلومات العملاء واستخدامها وحمايتها وإدارتها.',
+    body_en:`Effective date: 2026\n\nCrafted Visual respects your privacy and is committed to protecting the personal information you share with us through our website, customer service channels, order forms, and related services.\n\nInformation we collect\nWe may collect your name, mobile number, email address, delivery address, city, order details, product preferences, customization requests, inquiry messages, payment status, and website usage information.\n\nHow we use information\nWe use your information to process orders, respond to inquiries, arrange delivery, provide after-sales support, personalize your shopping experience, improve our website, prevent fraud, and communicate important service updates.\n\nPayments and third parties\nWhen online payment is enabled, payment processing may be handled by approved payment providers such as Geidea or other secure third-party providers. Crafted Visual does not store full card numbers on its servers.\n\nSharing information\nWe may share only the information necessary with delivery partners, payment processors, hosting providers, analytics providers, and service providers who help us operate the website and fulfill orders.\n\nMarketing communications\nWe may contact you with offers or updates only where permitted by applicable law or where you have provided consent. You may request to stop receiving marketing messages at any time.\n\nData protection\nWe apply reasonable technical and organizational measures to protect your information. However, no online system can be guaranteed to be completely secure.\n\nYour rights\nSubject to applicable laws in the Kingdom of Saudi Arabia, you may request access, correction, deletion, or restriction of your personal information by contacting us.\n\nContact\nFor privacy questions, contact us at support@craftedvisual.com.`,
+    body_ar:`تاريخ السريان: 2026\n\nتحترم كرافتد فيجوال خصوصيتك وتلتزم بحماية المعلومات الشخصية التي تشاركها معنا من خلال الموقع الإلكتروني وقنوات خدمة العملاء ونماذج الطلب والخدمات المرتبطة بها.\n\nالمعلومات التي نجمعها\nقد نجمع الاسم، رقم الجوال، البريد الإلكتروني، عنوان التوصيل، المدينة، تفاصيل الطلب، تفضيلات المنتج، طلبات التفصيل، رسائل الاستفسار، حالة الدفع، ومعلومات استخدام الموقع.\n\nكيفية استخدام المعلومات\nنستخدم معلوماتك لمعالجة الطلبات، الرد على الاستفسارات، ترتيب التوصيل، تقديم خدمة ما بعد البيع، تحسين تجربة التسوق، تطوير الموقع، منع الاحتيال، وإرسال تحديثات مهمة متعلقة بالخدمة.\n\nالمدفوعات والأطراف الثالثة\nعند تفعيل الدفع الإلكتروني، قد تتم معالجة المدفوعات من خلال مزودي دفع معتمدين مثل جيديا أو مزودي خدمات آمنين آخرين. لا تقوم كرافتد فيجوال بتخزين أرقام البطاقات الكاملة على خوادمها.\n\nمشاركة المعلومات\nقد نشارك فقط المعلومات الضرورية مع شركاء التوصيل، مزودي الدفع، مزودي الاستضافة، مزودي التحليلات، ومزودي الخدمات الذين يساعدوننا في تشغيل الموقع وتنفيذ الطلبات.\n\nالرسائل التسويقية\nقد نتواصل معك بالعروض أو التحديثات عندما يسمح النظام بذلك أو عند تقديم موافقتك. يمكنك طلب إيقاف الرسائل التسويقية في أي وقت.\n\nحماية البيانات\nنطبق إجراءات تقنية وتنظيمية معقولة لحماية معلوماتك، ومع ذلك لا يمكن ضمان أمان أي نظام إلكتروني بشكل كامل.\n\nحقوقك\nوفقاً للأنظمة المعمول بها في المملكة العربية السعودية، يمكنك طلب الوصول إلى معلوماتك الشخصية أو تصحيحها أو حذفها أو تقييد استخدامها من خلال التواصل معنا.\n\nالتواصل\nللاستفسارات المتعلقة بالخصوصية، يرجى التواصل عبر support@craftedvisual.com.`,
+    seo_title_en:'Privacy Policy | Crafted Visual', seo_title_ar:'سياسة الخصوصية | كرافتد فيجوال',
+    seo_description_en:'Read Crafted Visual privacy policy for customer data, orders, payments, cookies, and personal information protection in Saudi Arabia.',
+    seo_description_ar:'اقرأ سياسة الخصوصية الخاصة بكرافتد فيجوال والمتعلقة ببيانات العملاء والطلبات والمدفوعات وملفات تعريف الارتباط وحماية المعلومات الشخصية في السعودية.',
+    seo_keywords:'privacy policy, Crafted Visual privacy, furniture Saudi Arabia privacy'
+  },
+  {
+    id:'terms-and-conditions', slug:'terms-and-conditions', url:'terms-and-conditions.html', active:true, show_in_menu:false,
+    title_en:'Terms & Conditions', title_ar:'الشروط والأحكام', menu_label_en:'Terms & Conditions', menu_label_ar:'الشروط والأحكام',
+    subtitle_en:'The terms governing use of the Crafted Visual website, orders, products, and services.',
+    subtitle_ar:'الشروط التي تحكم استخدام موقع كرافتد فيجوال والطلبات والمنتجات والخدمات.',
+    body_en:`Effective date: 2026\n\nThese Terms & Conditions govern your use of the Crafted Visual website and your purchase of products from Crafted Visual in the Kingdom of Saudi Arabia.\n\nProducts and customization\nCrafted Visual offers furniture products, including made-to-order and customized items. Product images, colors, textures, fabrics, and dimensions are shown for guidance and may vary slightly due to screen settings, material batches, and handmade production processes.\n\nOrders\nSubmitting an order does not automatically mean the order has been accepted. Crafted Visual may contact you to confirm product details, customization requirements, delivery information, and payment status.\n\nPricing\nPrices are shown in Saudi Riyals unless stated otherwise. Delivery fees, taxes, and additional customization charges may apply and will be shown or confirmed during the order process.\n\nPayments\nUntil online payment is fully activated, orders may be treated as pending payment or awaiting payment verification. Once a payment gateway is enabled, payments may be processed through approved providers such as Geidea or other secure providers.\n\nMade-to-order products\nCustomized, made-to-order, or specially manufactured products cannot be cancelled, returned, exchanged, or refunded once production has commenced, except in cases of manufacturing defects or where required by applicable law.\n\nDelivery\nEstimated delivery timelines are provided for guidance and may vary depending on product availability, customization requirements, location, and logistics conditions.\n\nReturns and warranty\nReturns, refunds, and warranty claims are subject to the policies published on the Help Center page.\n\nIntellectual property\nAll website content, designs, images, text, branding, and product presentation are owned by Crafted Visual or licensed to it and may not be copied or used without permission.\n\nLimitation of liability\nTo the maximum extent permitted by law, Crafted Visual is not liable for indirect, incidental, or consequential losses arising from use of the website or products.\n\nGoverning law\nThese terms are governed by the laws and regulations of the Kingdom of Saudi Arabia.\n\nContact\nFor support, contact support@craftedvisual.com.`,
+    body_ar:`تاريخ السريان: 2026\n\nتحكم هذه الشروط والأحكام استخدامك لموقع كرافتد فيجوال وشراء المنتجات من كرافتد فيجوال داخل المملكة العربية السعودية.\n\nالمنتجات والتخصيص\nتقدم كرافتد فيجوال منتجات أثاث تشمل المنتجات الجاهزة والمنتجات المصممة أو المفصلة حسب الطلب. الصور والألوان والخامات والأقمشة والمقاسات المعروضة هي لأغراض توضيحية وقد تختلف بشكل بسيط بسبب إعدادات الشاشة أو دفعات المواد أو طبيعة التصنيع اليدوي.\n\nالطلبات\nإرسال الطلب لا يعني قبوله تلقائياً. قد تتواصل كرافتد فيجوال معك لتأكيد تفاصيل المنتج ومتطلبات التخصيص ومعلومات التوصيل وحالة الدفع.\n\nالأسعار\nتظهر الأسعار بالريال السعودي ما لم يذكر خلاف ذلك. قد تطبق رسوم توصيل أو ضرائب أو رسوم تخصيص إضافية ويتم توضيحها أو تأكيدها أثناء عملية الطلب.\n\nالمدفوعات\nإلى حين تفعيل الدفع الإلكتروني بالكامل، قد يتم اعتبار الطلبات قيد انتظار الدفع أو بانتظار التحقق من الدفع. عند تفعيل بوابة الدفع، قد تتم معالجة المدفوعات من خلال مزودي دفع معتمدين مثل جيديا أو مزودي خدمات آمنين آخرين.\n\nالمنتجات المصممة حسب الطلب\nلا يمكن إلغاء أو إرجاع أو استبدال أو استرداد قيمة المنتجات المخصصة أو المصممة حسب الطلب أو المصنعة خصيصاً بعد بدء الإنتاج، إلا في حالات العيوب التصنيعية أو إذا تطلب النظام خلاف ذلك.\n\nالتوصيل\nالمواعيد المتوقعة للتوصيل إرشادية وقد تختلف حسب توفر المنتج ومتطلبات التخصيص والموقع وظروف الخدمات اللوجستية.\n\nالإرجاع والضمان\nتخضع طلبات الإرجاع والاسترداد والضمان للسياسات المنشورة في صفحة مركز المساعدة.\n\nالملكية الفكرية\nجميع محتويات الموقع والتصاميم والصور والنصوص والعلامات التجارية وطريقة عرض المنتجات مملوكة لكرافتد فيجوال أو مرخصة لها ولا يجوز نسخها أو استخدامها دون إذن.\n\nتحديد المسؤولية\nإلى أقصى حد يسمح به النظام، لا تتحمل كرافتد فيجوال المسؤولية عن أي خسائر غير مباشرة أو عرضية أو تبعية ناتجة عن استخدام الموقع أو المنتجات.\n\nالقانون الحاكم\nتخضع هذه الشروط للأنظمة واللوائح المعمول بها في المملكة العربية السعودية.\n\nالتواصل\nللدعم، يرجى التواصل عبر support@craftedvisual.com.`,
+    seo_title_en:'Terms & Conditions | Crafted Visual', seo_title_ar:'الشروط والأحكام | كرافتد فيجوال',
+    seo_description_en:'Review Crafted Visual terms and conditions for furniture orders, customization, pricing, delivery, returns, and Saudi Arabia legal terms.',
+    seo_description_ar:'راجع الشروط والأحكام الخاصة بكرافتد فيجوال للطلبات والتفصيل والأسعار والتوصيل والإرجاع والأحكام النظامية في السعودية.',
+    seo_keywords:'terms and conditions, furniture terms Saudi Arabia, Crafted Visual terms'
+  },
+  {
+    id:'cookie-policy', slug:'cookie-policy', url:'cookie-policy.html', active:true, show_in_menu:false,
+    title_en:'Cookie Policy', title_ar:'سياسة ملفات تعريف الارتباط', menu_label_en:'Cookie Policy', menu_label_ar:'سياسة ملفات تعريف الارتباط',
+    subtitle_en:'How Crafted Visual uses cookies and similar technologies on the website.',
+    subtitle_ar:'كيفية استخدام كرافتد فيجوال لملفات تعريف الارتباط والتقنيات المشابهة على الموقع.',
+    body_en:`Effective date: 2026\n\nThis Cookie Policy explains how Crafted Visual uses cookies and similar technologies to operate and improve the website.\n\nWhat are cookies?\nCookies are small files stored on your device when you visit a website. They help the website remember information about your visit and improve your experience.\n\nEssential cookies\nThese cookies are required for core website functions such as navigation, account sessions, cart behavior, language preference, security, and checkout support.\n\nPreference cookies\nThese cookies help remember your selected language, city, saved preferences, and browsing choices.\n\nAnalytics cookies\nAnalytics tools may help us understand which pages customers visit, how customers interact with products, and how we can improve the website experience.\n\nMarketing cookies\nIn the future, we may use marketing or advertising cookies, including pixels or tags from approved platforms, to measure campaigns and improve advertising relevance.\n\nManaging cookies\nYou can manage or disable cookies through your browser settings. Some website features may not work correctly if essential cookies are disabled.\n\nContact\nFor questions about cookies, contact support@craftedvisual.com.`,
+    body_ar:`تاريخ السريان: 2026\n\nتوضح هذه السياسة كيفية استخدام كرافتد فيجوال لملفات تعريف الارتباط والتقنيات المشابهة لتشغيل الموقع وتحسينه.\n\nما هي ملفات تعريف الارتباط؟\nملفات تعريف الارتباط هي ملفات صغيرة يتم حفظها على جهازك عند زيارة الموقع، وتساعد الموقع على تذكر معلومات عن زيارتك وتحسين تجربتك.\n\nملفات تعريف الارتباط الأساسية\nهذه الملفات ضرورية لوظائف الموقع الأساسية مثل التصفح، جلسات الحساب، سلة التسوق، تفضيل اللغة، الأمان، ودعم عملية الطلب.\n\nملفات التفضيلات\nتساعد هذه الملفات في تذكر اللغة المختارة والمدينة والتفضيلات المحفوظة وخيارات التصفح.\n\nملفات التحليلات\nقد تساعدنا أدوات التحليلات في معرفة الصفحات التي يزورها العملاء وكيفية تفاعلهم مع المنتجات وكيفية تحسين تجربة الموقع.\n\nملفات التسويق\nفي المستقبل، قد نستخدم ملفات أو وسوم تسويقية وإعلانية من منصات معتمدة لقياس الحملات وتحسين ملاءمة الإعلانات.\n\nإدارة ملفات تعريف الارتباط\nيمكنك إدارة ملفات تعريف الارتباط أو تعطيلها من خلال إعدادات المتصفح. قد لا تعمل بعض ميزات الموقع بشكل صحيح عند تعطيل الملفات الأساسية.\n\nالتواصل\nللاستفسارات حول ملفات تعريف الارتباط، يرجى التواصل عبر support@craftedvisual.com.`,
+    seo_title_en:'Cookie Policy | Crafted Visual', seo_title_ar:'سياسة ملفات تعريف الارتباط | كرافتد فيجوال',
+    seo_description_en:'Learn how Crafted Visual uses essential, preference, analytics, and marketing cookies on its Saudi furniture website.',
+    seo_description_ar:'تعرف على كيفية استخدام كرافتد فيجوال لملفات تعريف الارتباط الأساسية وملفات التفضيلات والتحليلات والتسويق على موقع الأثاث في السعودية.',
+    seo_keywords:'cookie policy, cookies Saudi Arabia, Crafted Visual cookies'
+  },
+  {
+    id:'help', slug:'help', url:'help.html', active:true, show_in_menu:false,
+    title_en:'Help Center', title_ar:'مركز المساعدة', menu_label_en:'Help Center', menu_label_ar:'مركز المساعدة',
+    subtitle_en:'Returns process, return policy, warranty policy, and delivery information.',
+    subtitle_ar:'إجراءات الإرجاع وسياسة الإرجاع وسياسة الضمان ومعلومات التوصيل.',
+    body_en:`Returns Process / Return Policy\n\nStandard products\nReturn requests for standard, non-customized products may be submitted within 7 days of delivery. Products must be unused, undamaged, and in their original condition and packaging where applicable. Returned products are inspected before approval.\n\nCustom-made products\nCustomized, made-to-order, specially manufactured, or personalized products cannot be cancelled, returned, exchanged, or refunded once production has commenced, except in cases of manufacturing defects or where required by applicable law.\n\nDamaged or incorrect deliveries\nIf an item is delivered damaged or incorrect, please contact support@craftedvisual.com within 48 hours of delivery and provide the order number, photos, and a clear description of the issue.\n\nRefunds\nApproved refunds are processed after inspection and confirmation. Processing times may vary depending on the payment method and bank or payment provider.\n\nWarranty Policy\n\nCrafted Visual provides a limited warranty against manufacturing defects under normal residential use. Structural components may be covered for up to 5 years, while upholstery stitching, mechanisms, and workmanship defects may be covered for up to 1 year unless otherwise stated.\n\nWarranty exclusions\nThe warranty does not cover normal wear and tear, misuse, accidents, improper cleaning, exposure to heat or moisture, commercial use unless agreed in writing, unauthorized repair, modifications, or damage caused by customer handling or third-party delivery not arranged by Crafted Visual.\n\nWarranty claims\nTo submit a warranty claim, contact support@craftedvisual.com with your order number, photos, and details of the issue.\n\nDelivery Information\n\nDelivery area\nCrafted Visual delivers within Saudi Arabia, subject to service availability by city and order type.\n\nDelivery timelines\nReady products may have shorter timelines depending on availability. Made-to-order products typically require 15–20 working days, subject to material availability, production schedule, customization complexity, and delivery location.\n\nDelivery inspection\nCustomers should inspect products upon delivery and notify our team promptly of visible damage or incorrect items.\n\nRescheduling\nDelivery rescheduling may be possible subject to availability. Additional charges may apply for repeated failed delivery attempts or changes requested after dispatch.`,
+    body_ar:`إجراءات الإرجاع / سياسة الإرجاع\n\nالمنتجات القياسية\nيمكن تقديم طلبات إرجاع المنتجات القياسية غير المخصصة خلال 7 أيام من تاريخ التوصيل، بشرط أن يكون المنتج غير مستخدم وغير متضرر وبحالته الأصلية وتغليفه الأصلي متى كان ذلك مناسباً. يتم فحص المنتجات المرتجعة قبل الموافقة.\n\nالمنتجات المصممة حسب الطلب\nلا يمكن إلغاء أو إرجاع أو استبدال أو استرداد قيمة المنتجات المخصصة أو المصممة حسب الطلب أو المصنعة خصيصاً أو الشخصية بعد بدء الإنتاج، إلا في حالات العيوب التصنيعية أو إذا تطلب النظام خلاف ذلك.\n\nالمنتجات التالفة أو الخاطئة عند التوصيل\nإذا تم توصيل منتج تالف أو غير مطابق، يرجى التواصل عبر support@craftedvisual.com خلال 48 ساعة من التوصيل مع رقم الطلب والصور ووصف واضح للمشكلة.\n\nالاسترداد\nتتم معالجة المبالغ المستردة المعتمدة بعد الفحص والتأكيد، وقد تختلف مدة المعالجة حسب طريقة الدفع والبنك أو مزود الدفع.\n\nسياسة الضمان\n\nتوفر كرافتد فيجوال ضماناً محدوداً ضد العيوب التصنيعية في ظروف الاستخدام السكني الطبيعي. قد يغطي الضمان المكونات الهيكلية لمدة تصل إلى 5 سنوات، بينما قد يغطي عيوب الخياطة وآليات الحركة وجودة التصنيع لمدة تصل إلى سنة واحدة ما لم يذكر خلاف ذلك.\n\nاستثناءات الضمان\nلا يشمل الضمان التلف الناتج عن الاستخدام الطبيعي، سوء الاستخدام، الحوادث، التنظيف غير الصحيح، التعرض للحرارة أو الرطوبة، الاستخدام التجاري ما لم يتم الاتفاق خطياً، الإصلاح غير المصرح به، التعديلات، أو التلف الناتج عن تعامل العميل أو توصيل طرف ثالث غير مرتب من كرافتد فيجوال.\n\nمطالبات الضمان\nلتقديم مطالبة ضمان، يرجى التواصل عبر support@craftedvisual.com مع رقم الطلب والصور وتفاصيل المشكلة.\n\nمعلومات التوصيل\n\nنطاق التوصيل\nتوفر كرافتد فيجوال خدمة التوصيل داخل المملكة العربية السعودية وفقاً لتوفر الخدمة في المدينة ونوع الطلب.\n\nمدة التوصيل\nقد تكون مدة توصيل المنتجات الجاهزة أقصر حسب التوفر. عادةً ما تتطلب المنتجات المصممة حسب الطلب 15–20 يوم عمل، وذلك حسب توفر المواد وجدول الإنتاج وتعقيد التخصيص وموقع التوصيل.\n\nفحص المنتج عند التوصيل\nينبغي على العميل فحص المنتجات عند التوصيل وإبلاغ فريقنا فوراً عن أي تلف ظاهر أو منتج غير مطابق.\n\nإعادة جدولة التوصيل\nقد تكون إعادة جدولة التوصيل ممكنة حسب التوفر. قد تطبق رسوم إضافية في حال تكرار محاولات التوصيل غير الناجحة أو طلب تغييرات بعد خروج الطلب للتوصيل.`,
+    seo_title_en:'Help Center | Returns, Warranty & Delivery | Crafted Visual', seo_title_ar:'مركز المساعدة | الإرجاع والضمان والتوصيل | كرافتد فيجوال',
+    seo_description_en:'Find Crafted Visual returns process, return policy, warranty policy, and delivery information for furniture orders in Saudi Arabia.',
+    seo_description_ar:'اطلع على إجراءات الإرجاع وسياسة الإرجاع والضمان ومعلومات التوصيل لطلبات أثاث كرافتد فيجوال في السعودية.',
+    seo_keywords:'returns policy, warranty policy, delivery information, furniture Saudi Arabia'
+  }
+];
+
+const DEFAULT_FOOTER_LEGAL_LINKS = [
+  {label_en:'Privacy Policy', label_ar:'سياسة الخصوصية', url:'privacy-policy.html', visible:true},
+  {label_en:'Terms & Conditions', label_ar:'الشروط والأحكام', url:'terms-and-conditions.html', visible:true},
+  {label_en:'Cookie Policy', label_ar:'سياسة ملفات تعريف الارتباط', url:'cookie-policy.html', visible:true},
+  {label_en:'Help Center', label_ar:'مركز المساعدة', url:'help.html', visible:true}
+];
+
+function ensureDefaultLegalHelpPages(){
+  try{
+    const current = getSettingObject();
+    const pages = Array.isArray(current.custom_pages) ? current.custom_pages.slice() : [];
+    let changed = false;
+    DEFAULT_LEGAL_HELP_PAGES.forEach(def => {
+      const idx = pages.findIndex(p => String(p.slug) === def.slug || String(p.id) === def.id || String(p.url) === def.url);
+      if(idx === -1){ pages.push(def); changed = true; }
+      else {
+        const existing = pages[idx] || {};
+        const patched = Object.assign({}, def, existing, {id: existing.id || def.id, slug: existing.slug || def.slug, url: existing.url || def.url, show_in_menu: existing.show_in_menu === true ? true : false});
+        if(JSON.stringify(patched) !== JSON.stringify(existing)){ pages[idx] = patched; changed = true; }
+      }
+    });
+    const links = Array.isArray(current.footer_legal_links) ? current.footer_legal_links.slice() : [];
+    DEFAULT_FOOTER_LEGAL_LINKS.forEach(def => {
+      if(!links.some(l => String(l.url) === def.url)) { links.push(def); changed = true; }
+    });
+    if(changed) saveSettingObject({custom_pages: pages, footer_legal_links: links});
+  }catch(e){ console.warn('Legal/help page defaults skipped:', e.message || e); }
+}
+
 function seedDefaults(){
  const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@craftedvisual.com').trim().toLowerCase();
  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || (IS_PROD ? null : 'Admin@12345Secure');
@@ -591,10 +630,10 @@ function seedDefaults(){
  if(!catCount){ ['L Shape Sofas','Beds','Single Chairs'].forEach((c,i)=>db.prepare('INSERT INTO categories(name_en,active,sort_order) VALUES(?,?,?)').run(c,1,i)); }
  const seoCount=db.prepare('SELECT COUNT(*) c FROM settings WHERE key=?').get('seo_pages').c;
  if(!seoCount){ saveSettingObject({ seo_pages: DEFAULT_SEO_PAGES, site_url: process.env.PUBLIC_SITE_URL || '', seo_store_name_en: 'Crafted Visual', seo_store_name_ar: 'كرافتد فيجوال', seo_default_image: 'product_01.png' }); }
+ ensureDefaultLegalHelpPages();
 }
 
 seedDefaults();
-app.use(csrfProtection);
 app.get('/api/health',(req,res)=>res.json({ok:true, platform:'Crafted Visual DB Ecommerce', time:new Date().toISOString()}));
 
 
@@ -878,6 +917,13 @@ app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
   db.prepare('INSERT INTO crm_activities(customer_id,type,channel,subject,body,status,metadata_json) VALUES(?,?,?,?,?,?,?)')
     .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
   res.json({ok:true, message:'If this email exists, customer care will contact you.'});
+});
+app.get('/api/admin/me', auth, (req,res)=>{
+  if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
+  const u=db.prepare('SELECT id,name,email,role,permissions_json,active FROM admin_users WHERE id=? AND active=1').get(req.user.id);
+  if(!u) return res.status(404).json({error:'Admin not found'});
+  const role=String(u.role||'').toLowerCase();
+  res.json({user:{id:u.id,name:u.name,email:u.email,role:u.role,permissions:(role==='superadmin'||isDefaultSuperAdminEmail(u.email))?fullPermissions():json(u.permissions_json,{})}});
 });
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
@@ -1181,95 +1227,15 @@ function htmlFileForRequest(req){
   if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
-
-function escapeHtml(value=''){
-  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-function seoKeyForRequest(req){
-  const pathname = String((req && req.path) || '/').replace(/^\/+/, '') || 'index.html';
-  const file = pathname.toLowerCase();
-  if(file === 'index.html') return 'home';
-  if(file === 'shop.html' || file === 'discounted-items.html') return 'shop';
-  if(file === 'contact.html') return 'contact';
-  if(file === 'account.html' || file === 'auth.html') return 'account';
-  if(file === 'track-order.html') return 'track';
-  if(file === 'page.html' || file === 'review.html' || file === 'payment.html' || file === 'thankyou.html') return 'product';
-  return 'home';
-}
-function firstSetting(settings, keys, fallback=''){
-  for(const key of keys){
-    const value = settings && settings[key];
-    if(value !== undefined && value !== null && String(value).trim()) return String(value).trim();
-  }
-  return fallback;
-}
-function buildSeoTags(req, nonce){
-  let settings = {};
-  try{ settings = getSettingObject(); }catch(e){ settings = { seo_pages: DEFAULT_SEO_PAGES }; }
-  const pages = settings.seo_pages || DEFAULT_SEO_PAGES;
-  const page = pages[seoKeyForRequest(req)] || pages.home || DEFAULT_SEO_PAGES.home;
-  const title = page.title_en || page.title || DEFAULT_SEO_PAGES.home.title_en;
-  const description = page.description_en || page.description || DEFAULT_SEO_PAGES.home.description_en;
-  const keywords = Array.isArray(page.keywords) ? page.keywords.join(', ') : String(page.keywords || 'custom furniture Saudi Arabia, premium furniture Riyadh');
-  const canonical = absoluteUrl(req, req.path === '/' ? '' : req.path.replace(/^\//,''));
-  const storeName = firstSetting(settings, ['seo_store_name_en','store_name_en','brand_name_en'], 'Crafted Visual');
-  const imageValue = firstSetting(settings, ['seo_default_image','hero_image','logo_url'], 'assets/products/product_01.png');
-  const imageUrl = /^https?:\/\//i.test(imageValue) ? imageValue : absoluteUrl(req, imageValue);
-  const schema = {
-    '@context':'https://schema.org',
-    '@type':'FurnitureStore',
-    name: storeName,
-    url: absoluteUrl(req, ''),
-    image: imageUrl,
-    telephone: firstSetting(settings, ['phone','contact_phone','whatsapp'], '0565566699'),
-    email: firstSetting(settings, ['email','contact_email'], 'khaled.wehbi@gmail.com'),
-    address:{'@type':'PostalAddress', addressLocality:firstSetting(settings, ['city'], 'Riyadh'), addressCountry:'SA'},
-    sameAs: Array.isArray(settings.same_as) ? settings.same_as : []
-  };
-  return `
-  <title>${escapeHtml(title)}</title>
-  <meta name="description" content="${escapeHtml(description)}">
-  <meta name="keywords" content="${escapeHtml(keywords)}">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="author" content="${escapeHtml(storeName)}">
-  <link rel="canonical" href="${escapeHtml(canonical)}">
-  <meta property="og:title" content="${escapeHtml(title)}">
-  <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="${escapeHtml(canonical)}">
-  <meta property="og:image" content="${escapeHtml(imageUrl)}">
-  <meta property="og:locale" content="en_US">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${escapeHtml(title)}">
-  <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${escapeHtml(imageUrl)}">
-  <script nonce="${nonce}" type="application/ld+json" id="cv-store-schema">${JSON.stringify(schema).replace(/</g,'\\u003c')}</script>`;
-}
-function applyServerSeoTags(html, req, nonce){
-  let out = String(html || '');
-  out = out.replace(/<title[\s\S]*?<\/title>/gi, '');
-  out = out.replace(/<meta\s+name=["'](?:description|keywords|robots|author|twitter:card|twitter:title|twitter:description|twitter:image)["'][^>]*>/gi, '');
-  out = out.replace(/<meta\s+property=["']og:(?:title|description|type|url|image|locale)["'][^>]*>/gi, '');
-  out = out.replace(/<link\s+rel=["']canonical["'][^>]*>/gi, '');
-  out = out.replace(/<script[^>]*id=["']cv-store-schema["'][\s\S]*?<\/script>/gi, '');
-  const tags = buildSeoTags(req, nonce);
-  if(/<head[^>]*>/i.test(out)) return out.replace(/<head([^>]*)>/i, `<head$1>${tags}`);
-  return tags + out;
-}
-
-function applyHtmlSecurityTransforms(html, nonce, req){
-  let out = applyServerSeoTags(html, req, nonce);
-  if(!out.includes('cv-csrf-fetch-bridge')){
-    out = out.replace(/<head([^>]*)>/i, `<head$1>
-  <script nonce="${nonce}" id="cv-csrf-fetch-bridge">(function(){if(window.__cvCsrfFetchPatched)return;window.__cvCsrfFetchPatched=true;function token(){return(document.cookie.split('; ').find(function(v){return v.indexOf('cv_csrf_token=')===0;})||'').split('=').slice(1).join('=');}var originalFetch=window.fetch;window.fetch=function(input,init){init=init||{};var method=String(init.method||(input&&input.method)||'GET').toUpperCase();var url=String((input&&input.url)||input||'');var sameOrigin=!/^https?:\/\//i.test(url)||url.indexOf(location.origin)===0;if(sameOrigin&&['POST','PUT','PATCH','DELETE'].indexOf(method)!==-1){var headers=new Headers(init.headers||(input&&input.headers)||{});if(!headers.has('X-CSRF-Token'))headers.set('X-CSRF-Token',decodeURIComponent(token()||''));init.headers=headers;}return originalFetch.call(this,input,init);};})();</script>`);
-  }
+function applyHtmlSecurityTransforms(html, nonce){
+  let out = html;
   if(!out.includes('cv-csp-action-bridge.js')){
-    out = out.replace(/<head([^>]*)>/i, `<head$1>
-  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
+    out = out.replace(/<head([^>]*)>/i, `<head$1>\n  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
   }
   out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
   return out;
 }
+
 // Safe frontend asset resolver: serve whitelisted CSS/JS/JSON/image assets from /public first,
 // then from project root as a Railway fallback. This prevents unstyled pages when a deploy
 // contains root-level frontend files but no populated /public folder.
@@ -1302,7 +1268,7 @@ app.get(['/', '/*.html'], (req,res,next)=>{
   if(!file) return next();
   try{
     const html = fs.readFileSync(file, 'utf8');
-    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce, req));
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
   }catch(e){ next(e); }
 });
 
