@@ -26,14 +26,113 @@
       .replace(/'/g, '&#39;');
   }
 
-  function paragraphs(text){
-    const safe = escapeHtml(text);
-    return safe
-      .split(/\n\s*\n/g)
-      .map(part => part.trim())
-      .filter(Boolean)
-      .map(part => '<p>' + part.replace(/\n/g, '<br>') + '</p>')
-      .join('\n');
+  // Allow simple, safe formatting for legal content entered from Admin.
+  // Supports: <strong>, <b>, <em>, <i>, <p>, <br>, <ul>, <ol>, <li>, <h1>-<h4>, and safe links.
+  function sanitizeHtml(html){
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const allowedTags = new Set(['STRONG','B','EM','I','P','BR','UL','OL','LI','H1','H2','H3','H4','A','DIV','SPAN']);
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    nodes.forEach(node => {
+      if (!allowedTags.has(node.tagName)) {
+        const text = document.createTextNode(node.textContent || '');
+        node.parentNode && node.parentNode.replaceChild(text, node);
+        return;
+      }
+
+      Array.from(node.attributes).forEach(attr => {
+        const name = attr.name.toLowerCase();
+        const value = attr.value || '';
+        if (node.tagName === 'A' && name === 'href') {
+          if (/^(https?:\/\/|mailto:|\/|#)/i.test(value)) return;
+        }
+        if (node.tagName === 'A' && ['target','rel'].includes(name)) return;
+        node.removeAttribute(attr.name);
+      });
+
+      if (node.tagName === 'A') {
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+    return template.innerHTML;
+  }
+
+  function markdownToHtml(text){
+    const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+    const out = [];
+    let inUl = false;
+    let inOl = false;
+    let para = [];
+
+    function inlineFormat(value){
+      return escapeHtml(value)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/__(.+?)__/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/_(.+?)_/g, '<em>$1</em>');
+    }
+
+    function closeLists(){
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (inOl) { out.push('</ol>'); inOl = false; }
+    }
+    function flushPara(){
+      if (para.length) {
+        out.push('<p>' + para.map(inlineFormat).join('<br>') + '</p>');
+        para = [];
+      }
+    }
+
+    lines.forEach(raw => {
+      const line = raw.trim();
+      if (!line) { flushPara(); closeLists(); return; }
+
+      const h = line.match(/^(#{1,4})\s+(.+)$/);
+      if (h) {
+        flushPara(); closeLists();
+        const level = Math.min(h[1].length, 4);
+        out.push('<h' + level + '>' + inlineFormat(h[2]) + '</h' + level + '>');
+        return;
+      }
+
+      const bullet = line.match(/^[-*•]\s+(.+)$/);
+      if (bullet) {
+        flushPara();
+        if (inOl) { out.push('</ol>'); inOl = false; }
+        if (!inUl) { out.push('<ul>'); inUl = true; }
+        out.push('<li>' + inlineFormat(bullet[1]) + '</li>');
+        return;
+      }
+
+      const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+      if (numbered) {
+        flushPara();
+        if (inUl) { out.push('</ul>'); inUl = false; }
+        if (!inOl) { out.push('<ol>'); inOl = true; }
+        out.push('<li>' + inlineFormat(numbered[1]) + '</li>');
+        return;
+      }
+
+      para.push(line);
+    });
+
+    flushPara();
+    closeLists();
+    return out.join('\n');
+  }
+
+  function formattedContent(text){
+    const value = cleanText(text);
+    if (!value) return '';
+    // If user entered HTML tags in Admin, preserve only safe formatting tags.
+    if (/<\/?(strong|b|em|i|p|br|ul|ol|li|h1|h2|h3|h4|a|div|span)\b/i.test(value)) {
+      return sanitizeHtml(value);
+    }
+    // Otherwise support Markdown-like formatting such as **bold** and # headings.
+    return sanitizeHtml(markdownToHtml(value));
   }
 
   function updateHero(titleEn, titleAr){
@@ -57,8 +156,8 @@
 
     const en = document.querySelector('.legal-content[data-lang-block="en"]');
     const ar = document.querySelector('.legal-content[data-lang-block="ar"]');
-    if (en && bodyEn) en.innerHTML = paragraphs(bodyEn);
-    if (ar && bodyAr) ar.innerHTML = paragraphs(bodyAr);
+    if (en && bodyEn) en.innerHTML = formattedContent(bodyEn);
+    if (ar && bodyAr) ar.innerHTML = formattedContent(bodyAr);
     if (ar) ar.setAttribute('dir', 'rtl');
   }
 
@@ -77,15 +176,15 @@
 
     if (en && (returnsEn || warrantyEn || deliveryEn)) {
       en.innerHTML = ''
-        + (returnsEn ? '<h2>1. Returns Process / Return Policy</h2>' + paragraphs(returnsEn) : '')
-        + (warrantyEn ? '<h2>2. Warranty Policy</h2>' + paragraphs(warrantyEn) : '')
-        + (deliveryEn ? '<h2>3. Delivery Information</h2>' + paragraphs(deliveryEn) : '');
+        + (returnsEn ? '<h2>1. Returns Process / Return Policy</h2>' + formattedContent(returnsEn) : '')
+        + (warrantyEn ? '<h2>2. Warranty Policy</h2>' + formattedContent(warrantyEn) : '')
+        + (deliveryEn ? '<h2>3. Delivery Information</h2>' + formattedContent(deliveryEn) : '');
     }
     if (ar && (returnsAr || warrantyAr || deliveryAr)) {
       ar.innerHTML = ''
-        + (returnsAr ? '<h2>١. إجراءات الإرجاع / سياسة الإرجاع</h2>' + paragraphs(returnsAr) : '')
-        + (warrantyAr ? '<h2>٢. سياسة الضمان</h2>' + paragraphs(warrantyAr) : '')
-        + (deliveryAr ? '<h2>٣. معلومات التوصيل</h2>' + paragraphs(deliveryAr) : '');
+        + (returnsAr ? '<h2>١. إجراءات الإرجاع / سياسة الإرجاع</h2>' + formattedContent(returnsAr) : '')
+        + (warrantyAr ? '<h2>٢. سياسة الضمان</h2>' + formattedContent(warrantyAr) : '')
+        + (deliveryAr ? '<h2>٣. معلومات التوصيل</h2>' + formattedContent(deliveryAr) : '');
       ar.setAttribute('dir', 'rtl');
     }
   }
