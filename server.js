@@ -836,6 +836,13 @@ app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
     .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
   res.json({ok:true, message:'If this email exists, customer care will contact you.'});
 });
+app.get('/api/admin/me', auth, (req,res)=>{
+  if(req.user.type !== 'admin') return res.status(403).json({error:'Admin only'});
+  const u=db.prepare('SELECT id,name,email,role,permissions_json,active FROM admin_users WHERE id=? AND active=1').get(req.user.id);
+  if(!u) return res.status(404).json({error:'Admin not found'});
+  const role=String(u.role||'').toLowerCase();
+  res.json({user:{id:u.id,name:u.name,email:u.email,role:u.role,permissions:(role==='superadmin'||isDefaultSuperAdminEmail(u.email))?fullPermissions():json(u.permissions_json,{})}});
+});
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });
 
@@ -1138,127 +1145,15 @@ function htmlFileForRequest(req){
   if(fs.existsSync(rootCandidate) && fs.statSync(rootCandidate).isFile()) return rootCandidate;
   return null;
 }
-function htmlEscape(value=''){
-  return String(value || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-}
-function jsonLdEscape(value=''){
-  return String(value || '').replace(/<\/script/gi, '<\\/script');
-}
-function requestLanguage(req){
-  const q = String(req.query?.lang || '').toLowerCase();
-  if(q === 'ar') return 'ar';
-  const accept = String(req.get('accept-language') || '').toLowerCase();
-  return accept.startsWith('ar') ? 'ar' : 'en';
-}
-function seoValueServer(pageSeo, base, lang='en'){
-  return pageSeo?.[base + '_' + lang] || pageSeo?.[base] || pageSeo?.[base + '_en'] || '';
-}
-function seoPageKeyForRequest(req, file){
-  const fileName = path.basename(file || '').toLowerCase();
-  if(fileName === 'index.html') return 'home';
-  if(fileName === 'shop.html') return req.query?.product || req.query?.id ? 'product' : 'shop';
-  if(fileName === 'discounted-items.html') return 'shop';
-  if(fileName === 'contact.html') return 'contact';
-  if(fileName === 'track-order.html') return 'track';
-  if(fileName === 'account.html' || fileName === 'auth.html') return 'account';
-  return 'home';
-}
-function productForSeoRequest(req){
-  const wanted = cleanStr(req.query?.product || req.query?.id || '', 120);
-  if(!wanted) return null;
-  try{
-    return db.prepare('SELECT * FROM products WHERE active=1 AND (sku=? OR id=?) LIMIT 1').get(wanted, Number(wanted) || -1) || null;
-  }catch(_e){ return null; }
-}
-function normalizeSeoImage(settings, image, req){
-  const fallback = image || settings.seo_default_image || settings.hero_image || (Array.isArray(settings.hero_banners) && settings.hero_banners[0]) || 'assets/products/product_01.png';
-  if(!fallback) return '';
-  if(/^https?:\/\//i.test(fallback)) return fallback;
-  return absoluteUrl(req, String(fallback).replace(/^\/+/, ''));
-}
-function buildServerSeoTags(req, file, nonce){
-  let settings = {};
-  try{ settings = getSettingObject(); }catch(_e){ settings = {}; }
-  const seoPages = Object.assign({}, DEFAULT_SEO_PAGES, settings.seo_pages || {});
-  const lang = requestLanguage(req);
-  const key = seoPageKeyForRequest(req, file);
-  const pageSeo = seoPages[key] || seoPages.home || {};
-  const adminPages = new Set(['admin.html','admin-login.html','orders.html','financial-dashboard.html','customer-journey-dashboard.html','crm.html','audit-logs.html']);
-  const fileName = path.basename(file || '').toLowerCase();
-  const noindex = adminPages.has(fileName);
-  let title = seoValueServer(pageSeo, 'title', lang) || 'Crafted Visual';
-  let description = seoValueServer(pageSeo, 'description', lang) || '';
-  let keywords = Array.isArray(pageSeo.keywords) ? pageSeo.keywords.join(', ') : (pageSeo.keywords || '');
-  let image = normalizeSeoImage(settings, '', req);
-  let type = 'website';
-  const product = key === 'product' ? productForSeoRequest(req) : null;
-  if(product){
-    const data = json(product.data_json, {});
-    const pname = lang === 'ar' ? (product.name_ar || product.name_en) : (product.name_en || product.name_ar);
-    const pdesc = lang === 'ar' ? (product.description_ar || product.description_en) : (product.description_en || product.description_ar);
-    title = `${pname || title} | ${lang === 'ar' ? 'كرافتد فيزوال' : 'Crafted Visual'}`;
-    description = pdesc || description;
-    const gallery = Array.isArray(data.gallery) ? data.gallery : [];
-    image = normalizeSeoImage(settings, gallery[0] || data.image || data.main_image || '', req);
-    type = 'product';
-  }
-  const canonicalPath = (req.path === '/' ? '' : req.path.replace(/^\/+/, '')) + (req.query?.product ? `?product=${encodeURIComponent(req.query.product)}` : '');
-  const canonicalUrl = absoluteUrl(req, canonicalPath);
-  const brandName = lang === 'ar' ? (settings.brand_ar || settings.seo_store_name_ar || 'كرافتد فيزوال') : (settings.brand_en || settings.seo_store_name_en || 'Crafted Visual');
-  const storeSchema = {
-    '@context':'https://schema.org', '@type':'FurnitureStore', name:brandName, url:absoluteUrl(req,''), image:image || undefined,
-    telephone:settings.footer_phone || settings.whatsapp_number || '', email:settings.footer_email || settings.customer_care_email || '',
-    address:{'@type':'PostalAddress', addressLocality:'Riyadh', addressCountry:'SA'},
-    sameAs:[settings.instagram_url,settings.tiktok_url,settings.facebook_url,settings.linkedin_url].filter(Boolean)
-  };
-  const schemaTags = [`<script nonce="${htmlEscape(nonce)}" type="application/ld+json" id="cv-store-schema">${jsonLdEscape(JSON.stringify(storeSchema))}</script>`];
-  if(product){
-    const data = json(product.data_json, {});
-    schemaTags.push(`<script nonce="${htmlEscape(nonce)}" type="application/ld+json" id="cv-product-schema">${jsonLdEscape(JSON.stringify({
-      '@context':'https://schema.org','@type':'Product', name: lang==='ar' ? (product.name_ar||product.name_en) : (product.name_en||product.name_ar),
-      description, image:image ? [image] : [], brand:{'@type':'Brand', name:brandName}, category:data.category || '',
-      offers:{'@type':'Offer', priceCurrency:'SAR', price:String(Math.round(Number(product.base_price||0))), availability:'https://schema.org/InStock', url:canonicalUrl}
-    }))}</script>`);
-  }
-  return `
-  <!-- Server-rendered SEO from backend settings -->
-  <title>${htmlEscape(title)}</title>
-  <meta name="description" content="${htmlEscape(description)}">
-  ${keywords ? `<meta name="keywords" content="${htmlEscape(keywords)}">` : ''}
-  <meta name="robots" content="${noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large'}">
-  <meta name="author" content="${htmlEscape(brandName)}">
-  <meta name="language" content="${lang === 'ar' ? 'Arabic' : 'English'}">
-  <link rel="canonical" href="${htmlEscape(canonicalUrl)}">
-  <meta property="og:title" content="${htmlEscape(title)}">
-  <meta property="og:description" content="${htmlEscape(description)}">
-  <meta property="og:type" content="${type}">
-  <meta property="og:url" content="${htmlEscape(canonicalUrl)}">
-  ${image ? `<meta property="og:image" content="${htmlEscape(image)}">` : ''}
-  <meta property="og:locale" content="${lang === 'ar' ? 'ar_SA' : 'en_US'}">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${htmlEscape(title)}">
-  <meta name="twitter:description" content="${htmlEscape(description)}">
-  ${image ? `<meta name="twitter:image" content="${htmlEscape(image)}">` : ''}
-  ${schemaTags.join('\n  ')}
-  <!-- End server-rendered SEO -->`;
-}
-function stripExistingSeoTags(html){
-  return html
-    .replace(/<title>[\s\S]*?<\/title>/gi, '')
-    .replace(/<meta\s+(?:name|property)=["'](?:description|keywords|robots|author|language|twitter:card|twitter:title|twitter:description|twitter:image|og:title|og:description|og:type|og:url|og:image|og:locale)["'][^>]*>\s*/gi, '')
-    .replace(/<link\s+rel=["']canonical["'][^>]*>\s*/gi, '')
-    .replace(/<script[^>]+type=["']application\/ld\+json["'][^>]*id=["']cv-(?:store|product)-schema["'][\s\S]*?<\/script>\s*/gi, '');
-}
-function applyHtmlSecurityTransforms(html, nonce, req, file){
-  let out = stripExistingSeoTags(html);
+function applyHtmlSecurityTransforms(html, nonce){
+  let out = html;
   if(!out.includes('cv-csp-action-bridge.js')){
-    out = out.replace(/<head([^>]*)>/i, `<head$1>\n  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>\n  ${buildServerSeoTags(req, file, nonce)}`);
-  } else {
-    out = out.replace(/<head([^>]*)>/i, `<head$1>\n  ${buildServerSeoTags(req, file, nonce)}`);
+    out = out.replace(/<head([^>]*)>/i, `<head$1>\n  <script nonce="${nonce}" src="/cv-csp-action-bridge.js" defer></script>`);
   }
   out = out.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
   return out;
 }
+
 // Safe frontend asset resolver: serve whitelisted CSS/JS/JSON/image assets from /public first,
 // then from project root as a Railway fallback. This prevents unstyled pages when a deploy
 // contains root-level frontend files but no populated /public folder.
@@ -1291,7 +1186,7 @@ app.get(['/', '/*.html'], (req,res,next)=>{
   if(!file) return next();
   try{
     const html = fs.readFileSync(file, 'utf8');
-    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce, req, file));
+    res.type('html').send(applyHtmlSecurityTransforms(html, res.locals.cspNonce));
   }catch(e){ next(e); }
 });
 

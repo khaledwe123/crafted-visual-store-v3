@@ -21,7 +21,7 @@
 
 <main class="review-page">
   <h1>Payment</h1>
-  <p>Select your preferred payment method. Your order will be recorded as pending payment until payment is verified.</p>
+  <p>Select your payment method to complete the order.</p>
 
   <section class="review-box" id="paymentSummary"></section>
 
@@ -44,10 +44,10 @@
       <input id="expiry" placeholder="MM/YY">
       <input id="cvv" placeholder="CVV">
     </div>
-    <p class="small-note">Payment gateway is not active yet. This page records the selected method only; payment remains pending until verified manually or through a live gateway.</p>
+    <p class="small-note">Demo payment page. Connect a real Saudi payment gateway such as Moyasar, HyperPay, Tap, or PayTabs for live payments.</p>
   </section>
 
-  <button class="btn primary" onclick="payNow()">Submit Order</button>
+  <button class="btn primary" onclick="payNow()">Pay Now</button>
 </main>
 
 <script>
@@ -75,13 +75,13 @@ function selectPayment(method, el){
 
 async function payNow(){
   if(!document.getElementById("cardName").value || !document.getElementById("cardNumber").value){
-    alert("Please add payment details or selected payment reference.");
+    alert("Please add payment details.");
     return;
   }
   order.paymentMethod = selectedPayment;
-  order.paymentStatus = "Pending Payment";
-  order.orderStatus = "Awaiting Payment Verification";
-  order.paymentSubmittedAt = new Date().toISOString();
+  order.paymentStatus = "Paid";
+  order.orderStatus = "Paid";
+  order.paidAt = new Date().toISOString();
 
   const orders = JSON.parse(localStorage.getItem("orders") || "[]");
   orders.push(order);
@@ -94,7 +94,7 @@ async function payNow(){
     to: order.customer?.email,
     from: "do-not-reply@craftedvisual.com",
     fromName: "Crafted Visual Customer Care",
-    subject: "Crafted Visual Order Received - Payment Pending - " + order.id,
+    subject: "Crafted Visual Payment Confirmation - " + order.id,
     body: paymentMessage(order),
     customer: order.customer
   });
@@ -115,11 +115,11 @@ function paymentMessage(order){
 Thank you for your order with Crafted Visual.
 
 Order Number: ${order.id}
-Payment Status: ${order.paymentStatus || "Pending Payment"}
-Order Status: ${order.orderStatus || "Awaiting Payment Verification"}
-Total Amount: SAR ${Number(order.total).toLocaleString()}
+Payment Status: Paid
+Order Status: ${order.orderStatus || "Paid"}
+Total Paid: SAR ${Number(order.total).toLocaleString()}
 
-Your order has been received. Payment is not confirmed yet and will remain pending until verified manually or through the live payment gateway.
+We will now start processing your order and keep you updated at every stage.
 
 Best regards,
 Crafted Visual Customer Care`;
