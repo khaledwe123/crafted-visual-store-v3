@@ -47,7 +47,7 @@ function renderShell(){
   document.getElementById("crmGrid").innerHTML = sections.map(([id,title])=>`
     <section class="admin-panel">
       <h2>${title}</h2>
-      <input id="search-${id}" placeholder="Search ${title}" oninput="renderSection('${id}')">
+      <input id="search-${id}" placeholder="Search ${title}" data-crm-search="${id}">
       <div id="list-${id}"></div>
       <div id="pager-${id}" class="crm-pager"></div>
     </section>
@@ -64,8 +64,16 @@ function renderSection(id,page=state[id]||1){
   if(state[id]>pages) state[id]=pages;
   const list = filtered.slice((state[id]-1)*per,state[id]*per);
   document.getElementById("list-"+id).innerHTML = list.length ? list.map(x=>`<div class="admin-item"><div>${template(x)}</div></div>`).join("") : `<p>No ${title.toLowerCase()} found.</p>`;
-  document.getElementById("pager-"+id).innerHTML = `<button onclick="renderSection('${id}',${Math.max(1,state[id]-1)})">Prev</button><span> Page ${state[id]} of ${pages} </span><button onclick="renderSection('${id}',${Math.min(pages,state[id]+1)})">Next</button>`;
+  document.getElementById("pager-"+id).innerHTML = `<button data-crm-page="${id}" data-page="${Math.max(1,state[id]-1)}">Prev</button><span> Page ${state[id]} of ${pages} </span><button data-crm-page="${id}" data-page="${Math.min(pages,state[id]+1)}">Next</button>`;
 }
+document.addEventListener("input", function(event){
+  const input = event.target.closest("[data-crm-search]");
+  if(input) renderSection(input.dataset.crmSearch);
+});
+document.addEventListener("click", function(event){
+  const btn = event.target.closest("[data-crm-page]");
+  if(btn) renderSection(btn.dataset.crmPage, Number(btn.dataset.page || 1));
+});
 renderShell();
 </script>
 <script>

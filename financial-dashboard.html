@@ -30,7 +30,7 @@
   <section class="admin-panel">
     <h2>Filters</h2>
     <div class="admin-grid-3">
-      <select id="filterType" onchange="renderFilterInputs()">
+      <select id="filterType" data-action="render-filter-inputs">
         <option value="all">All Time</option>
         <option value="range">Date Range</option>
         <option value="month">Month Range</option>
@@ -62,8 +62,8 @@
       </select></label>
       <label id="yearWrap" style="display:none">Year <input id="yearInput" type="number" placeholder="Year" value="2026"></label>
     </div>
-    <button class="btn primary" onclick="render()">Apply Filter</button>
-    <button class="btn secondary" onclick="resetFilters()">All Time</button>
+    <button class="btn primary" data-action="render-financial">Apply Filter</button>
+    <button class="btn secondary" data-action="reset-filters">All Time</button>
   </section>
 
   <section class="finance-cards">
@@ -91,7 +91,7 @@
       </select>
       <input id="expenseDate" type="date">
       <textarea id="expenseNotes" placeholder="Notes"></textarea>
-      <button class="btn primary" onclick="addExpense()">Add Expense</button>
+      <button class="btn primary" data-action="add-expense">Add Expense</button>
     </div>
 
     <div class="admin-panel">
@@ -100,7 +100,7 @@
       <input id="manualSaleAmount" type="number" placeholder="Selling price before VAT SAR">
       <input id="manualSaleCogs" type="number" placeholder="COGS SAR">
       <input id="manualSaleDate" type="date">
-      <button class="btn primary" onclick="addManualSale()">Add Manual Sale</button>
+      <button class="btn primary" data-action="add-manual-sale">Add Manual Sale</button>
     </div>
   </section>
 
@@ -247,7 +247,7 @@ function render(){
   `).join("");
 
   document.getElementById("expensesTable").innerHTML = expenses.map((e,i)=>`
-    <tr><td>${e.date || ""}</td><td>${e.name}</td><td>${e.type}</td><td>${money(e.amount)}</td><td><button onclick="deleteExpense(${i})">Delete</button></td></tr>
+    <tr><td>${e.date || ""}</td><td>${e.name}</td><td>${e.type}</td><td>${money(e.amount)}</td><td><button data-action="delete-expense" data-expense-index="${i}">Delete</button></td></tr>
   `).join("");
 
   drawChart({salesBeforeVat,cogs,gross,generalExpenses,opex,net});
@@ -293,5 +293,23 @@ document.addEventListener("DOMContentLoaded", ()=>enforcePageWritePermission('fi
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.addEventListener('change', function(event){
+    if(event.target.closest('[data-action="render-filter-inputs"]') && typeof renderFilterInputs === 'function') renderFilterInputs();
+  });
+  document.addEventListener('click', function(event){
+    const el = event.target.closest('[data-action]');
+    if(!el) return;
+    const action = el.dataset.action;
+    if(action === 'render-financial' && typeof render === 'function') render();
+    if(action === 'reset-filters' && typeof resetFilters === 'function') resetFilters();
+    if(action === 'add-expense' && typeof addExpense === 'function') addExpense();
+    if(action === 'add-manual-sale' && typeof addManualSale === 'function') addManualSale();
+    if(action === 'delete-expense' && typeof deleteExpense === 'function') deleteExpense(Number(el.dataset.expenseIndex));
+  });
+});
+</script>
 </body>
 </html>

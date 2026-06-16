@@ -13,7 +13,7 @@
     <div class="brand"><span id="brandText">Crafted Visual</span></div>
     <nav id="mainMenu"></nav>
     <div class="nav-actions">
-      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="togglePageLang()">عربي</button>
+      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" data-action="toggle-page-lang">عربي</button>
       <a class="outline" href="account.html">My Account</a>
       <a class="cart-btn" href="shop.html">Shop</a>
     </div>
@@ -38,5 +38,13 @@
   <script src="page-builder.js"></script>  <script src="legal-footer-links.js"></script>
 
 <script src="language-toggle-fix.js?v=20260611langstable"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-action="toggle-page-lang"]').forEach(function(btn){
+    btn.addEventListener('click', function(){ if (typeof togglePageLang === 'function') togglePageLang(); });
+  });
+});
+</script>
 </body>
 </html>

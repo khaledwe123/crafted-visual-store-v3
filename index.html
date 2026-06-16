@@ -60,9 +60,9 @@
     <div class="brand" id="brandText">Crafted Visual</div>
     <nav id="mainMenu"></nav>
     <div class="nav-actions">
-      <button class="lang-btn" data-cv-lang-toggle="true" onclick="toggleLang()">عربي</button>
+      <button class="lang-btn" data-cv-lang-toggle="true" data-action="toggle-lang">عربي</button>
       <button class="lang-btn" id="authBtn" type="button">Sign In</button>
-      <button class="cart-btn" onclick="openCart()"><span data-i18n="cart">Cart</span> <span id="cartCount">0</span></button>
+      <button class="cart-btn" data-action="open-cart"><span data-i18n="cart">Cart</span> <span id="cartCount">0</span></button>
     </div>
   </header>
 
@@ -124,11 +124,11 @@
   </footer>
 
   <aside id="cartPanel" class="cart hidden">
-    <button type="button" class="close" onclick="closeCart()">×</button>
+    <button type="button" class="close" data-action="close-cart">×</button>
     <h2 data-i18n="yourCart">Your Cart</h2>
     <div id="cartItems"></div>
     <h3 id="cartTotal"></h3>
-    <button type="button" class="btn primary" onclick="checkout()" data-i18n="checkout">Checkout</button>
+    <button type="button" class="btn primary" data-action="checkout" data-i18n="checkout">Checkout</button>
   </aside>
 
   <script src="script.js?v=20260607premium"></script>  <script src="legal-footer-links.js"></script>
@@ -141,5 +141,20 @@
   <script src="ux95-final-visible.js?v=20260607final2"></script>
   <script src="room-tools-working.js?v=20260607tools2"></script>
   <script src="public-cleanup.js?v=20260607clean4"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const actionMap = {
+    'toggle-lang': function(){ if (typeof toggleLang === 'function') toggleLang(); },
+    'open-cart': function(){ if (typeof openCart === 'function') openCart(); },
+    'close-cart': function(){ if (typeof closeCart === 'function') closeCart(); },
+    'checkout': function(){ if (typeof checkout === 'function') checkout(); }
+  };
+  document.querySelectorAll('[data-action]').forEach(function(el){
+    const handler = actionMap[el.dataset.action];
+    if (handler) el.addEventListener('click', handler);
+  });
+});
+</script>
 </body>
 </html>

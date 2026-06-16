@@ -16,7 +16,7 @@
 <div class="ux95-release-ribbon"><span>UX95 Journey Dashboard</span> <small>Tracking events, sources, funnel and wishlist</small></div>
   <div class="nav-small"><a href="admin.html">Admin</a><a href="financial-dashboard.html">Financials</a><a href="crm.html">CRM</a><a href="shop.html">Shop</a></div>
   <main class="dashboard-wrap">
-    <div class="toolbar"><div><h1>Customer Journey Dashboard</h1><p class="muted">Tracks UTMs, customer source, pages, funnel events, product interest and abandoned carts.</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="journeyDays" onchange="loadJourney()"><option value="1">Today</option><option value="7">Last 7 Days</option><option value="30">Last 30 Days</option><option value="60">Last 60 Days</option><option value="90">Last 90 Days</option></select><button class="btn" onclick="loadJourney()">Refresh</button></div></div>
+    <div class="toolbar"><div><h1>Customer Journey Dashboard</h1><p class="muted">Tracks UTMs, customer source, pages, funnel events, product interest and abandoned carts.</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="journeyDays" data-action="load-journey-change"><option value="1">Today</option><option value="7">Last 7 Days</option><option value="30">Last 30 Days</option><option value="60">Last 60 Days</option><option value="90">Last 90 Days</option></select><button class="btn" data-action="load-journey">Refresh</button></div></div>
     <div class="cards" id="metrics"></div>
     <div class="panel"><h2>Funnel Events</h2><table><thead><tr><th>Event</th><th>Events</th><th>Sessions</th></tr></thead><tbody id="funnel"></tbody></table></div>
     <div class="panel"><h2>Traffic Sources</h2><table><thead><tr><th>Source</th><th>Medium</th><th>Sessions</th><th>Events</th></tr></thead><tbody id="sources"></tbody></table></div>
@@ -45,5 +45,12 @@ loadJourney();
 </script>
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-action="load-journey-change"]').forEach(function(el){ el.addEventListener('change', function(){ if (typeof loadJourney === 'function') loadJourney(); }); });
+  document.querySelectorAll('[data-action="load-journey"]').forEach(function(el){ el.addEventListener('click', function(){ if (typeof loadJourney === 'function') loadJourney(); }); });
+});
+</script>
 </body>
 </html>

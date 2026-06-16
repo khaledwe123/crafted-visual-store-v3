@@ -206,7 +206,7 @@
                         <span id="summary-grand-total">SAR 0.00</span>
                     </div>
                  </div>
-                 <button onclick="window.print()" class="w-full mt-6 bg-gray-800 text-white font-bold py-4 rounded-lg hover:bg-gray-700 transition-all">
+                 <button data-action="print-page" class="w-full mt-6 bg-gray-800 text-white font-bold py-4 rounded-lg hover:bg-gray-700 transition-all">
                     Print / Save as PDF
                 </button>
             </div>
@@ -794,5 +794,13 @@
         });
     </script>
   <script src="legal-footer-links.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-action="print-page"]').forEach(function(btn){
+    btn.addEventListener('click', function(){ window.print(); });
+  });
+});
+</script>
 </body>
 </html>

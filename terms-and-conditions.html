@@ -18,7 +18,7 @@
       <a href="contact.html" data-en="Contact Us" data-ar="تواصل معنا">Contact Us</a>
     </nav>
     <div class="nav-actions">
-      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" onclick="toggleLang()">عربي</button>
+      <button class="outline lang-btn" data-cv-lang-toggle="true" type="button" data-action="toggle-lang">عربي</button>
       <a class="cart-btn" href="shop.html" data-en="Shop" data-ar="المتجر">Shop</a>
     </div>
   </header>
@@ -90,5 +90,13 @@
   <script src="legal-footer-links.js"></script>
   <script src="legal-dynamic-content.js?v=20260616phase2"></script>
   <script src="language-toggle-fix.js?v=20260611langstable"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-action="toggle-lang"]').forEach(function(btn){
+    btn.addEventListener('click', function(){ if (typeof toggleLang === 'function') toggleLang(); });
+  });
+});
+</script>
 </body>
 </html>

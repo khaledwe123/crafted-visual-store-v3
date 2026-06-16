@@ -43,11 +43,11 @@ function renderOrders(){
       <strong>Total: SAR ${Number(o.total || 0).toLocaleString()}</strong>
       <p>Payment: ${o.paymentStatus || "Pending"} ${o.paymentMethod ? "| " + o.paymentMethod : ""}</p>
       <div class="order-status-icons">
-        ${statuses.map(([s,icon])=>`<button type="button" class="${s===(o.orderStatus||"New Order") ? "active" : ""}" onclick="setOrderStatus(${idx}, '${s}')"><span>${icon}</span><small>${s}</small></button>`).join("")}
+        ${statuses.map(([s,icon])=>`<button type="button" class="${s===(o.orderStatus||"New Order") ? "active" : ""}" data-action="set-order-status" data-order-index="${idx}" data-status="${s}"><span>${icon}</span><small>${s}</small></button>`).join("")}
       </div>
       <label>Follow-Up Note</label>
       <textarea id="note-${idx}" placeholder="Internal note or customer message note"></textarea>
-      <button class="btn primary" onclick="saveStatusAndSendCRM(${idx})">Save + Send CRM Update</button>
+      <button class="btn primary" data-action="save-status-crm" data-order-index="${idx}">Save + Send CRM Update</button>
       <p><strong>Current Status:</strong> ${o.orderStatus || "New Order"}</p>
       <div><h4>Status History</h4>${(o.statusHistory || []).map(h=>`<p><small>${new Date(h.date).toLocaleString()} - ${h.status}${h.note ? " - " + h.note : ""}</small></p>`).join("") || "<p><small>No history yet.</small></p>"}</div>
     </div>
@@ -105,5 +105,17 @@ document.addEventListener("DOMContentLoaded", ()=>enforcePageWritePermission('or
   <script src="responsive-all-devices.js?v=20260607v2"></script>
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.addEventListener('click', function(event){
+    const el = event.target.closest('[data-action]');
+    if(!el) return;
+    const idx = Number(el.dataset.orderIndex);
+    if(el.dataset.action === 'set-order-status' && typeof setOrderStatus === 'function') setOrderStatus(idx, el.dataset.status);
+    if(el.dataset.action === 'save-status-crm' && typeof saveStatusAndSendCRM === 'function') saveStatusAndSendCRM(idx);
+  });
+});
+</script>
 </body>
 </html>

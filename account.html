@@ -49,8 +49,8 @@
     <textarea id="notes" placeholder="Preferred delivery notes"></textarea>
 
     <div class="account-actions">
-      <button class="btn primary" type="button" onclick="saveAccount()">Save Account</button>
-      <button class="btn secondary" type="button" onclick="logout()">Logout</button>
+      <button class="btn primary" type="button" data-action="save-account">Save Account</button>
+      <button class="btn secondary" type="button" data-action="logout">Logout</button>
     </div>
     <div id="accountStatus" class="admin-save-status"></div>
   </section>
@@ -169,5 +169,12 @@ function logout(){
   <script src="cv-premium-journey.js?v=20260607premium"></script>
   <script src="ux95-final-visible.js?v=20260607final2"></script>
   <script src="legal-footer-links.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-action="save-account"]').forEach(function(btn){ btn.addEventListener('click', function(){ if (typeof saveAccount === 'function') saveAccount(); }); });
+  document.querySelectorAll('[data-action="logout"]').forEach(function(btn){ btn.addEventListener('click', function(){ if (typeof logout === 'function') logout(); }); });
+});
+</script>
 </body>
 </html>
