@@ -874,14 +874,41 @@ app.get('/api/customer/me', auth, (req,res)=>{
   res.json({user:u});
 });
 app.post('/api/auth/logout',(req,res)=>{ clearAuthCookie(res,'cv_customer_auth'); clearAuthCookie(res,'cv_admin_auth'); res.json({ok:true}); });
-app.post('/api/customers/forgot-password', authLimiter, (req,res)=>{
+app.post('/api/customers/forgot-password', authLimiter, async (req,res)=>{
   const {email}=req.body||{};
   if(!isEmail(email)) return res.status(400).json({error:'Enter a valid email.'});
-  const u=db.prepare('SELECT id,email FROM customers WHERE lower(email)=lower(?)').get(String(email).trim().toLowerCase());
-  const tokenValue=crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO crm_activities(customer_id,type,channel,subject,body,status,metadata_json) VALUES(?,?,?,?,?,?,?)')
-    .run(u?.id||null,'Password Reset Request','email','Password reset requested','Customer requested a password reset. Verify identity before manually resetting.', 'open', JSON.stringify({email:String(email).trim().toLowerCase(), reset_token_hash:crypto.createHash('sha256').update(tokenValue).digest('hex')}));
-  res.json({ok:true, message:'If this email exists, customer care will contact you.'});
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const u=db.prepare('SELECT id,email,name FROM customers WHERE lower(email)=lower(?)').get(normalizedEmail);
+  if(u){
+    const tokenValue=crypto.randomBytes(24).toString('hex');
+    const tokenHash=crypto.createHash('sha256').update(tokenValue).digest('hex');
+    const expires=new Date(Date.now() + 60*60*1000).toISOString();
+    db.prepare('UPDATE customers SET reset_token_hash=?, reset_token_expires=? WHERE id=?').run(tokenHash, expires, u.id);
+    db.prepare('INSERT INTO crm_activities(customer_id,type,channel,subject,body,status,metadata_json) VALUES(?,?,?,?,?,?,?)')
+      .run(u.id,'Password Reset Request','email','Password reset requested','Customer requested a password reset; reset link emailed.', 'open', JSON.stringify({email:normalizedEmail}));
+    const base=(process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/,'');
+    const resetLink=`${base}/account.html?reset_token=${tokenValue}&email=${encodeURIComponent(normalizedEmail)}`;
+    try{
+      await sendEmailNow(normalizedEmail, 'Reset your Crafted Visual password',
+        `Hi ${u.name || 'there'},\n\nWe received a request to reset your password. Click the link below to choose a new password (valid for 1 hour):\n${resetLink}\n\nIf you did not request this, you can ignore this email.`);
+    }catch(err){
+      console.error('Password reset email failed:', err.message);
+    }
+  }
+  res.json({ok:true, message:'If this email exists, a reset link has been sent.'});
+});
+app.post('/api/customers/reset-password', authLimiter, (req,res)=>{
+  const {email, token, password}=req.body||{};
+  if(!isEmail(email) || !token || !password || String(password).length < 8) return res.status(400).json({error:'Enter a valid email, token, and a password of at least 8 characters.'});
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const u=db.prepare('SELECT id,reset_token_hash,reset_token_expires FROM customers WHERE lower(email)=lower(?)').get(normalizedEmail);
+  if(!u || !u.reset_token_hash || !u.reset_token_expires) return res.status(400).json({error:'Invalid or expired reset link.'});
+  if(new Date(u.reset_token_expires).getTime() < Date.now()) return res.status(400).json({error:'Invalid or expired reset link.'});
+  const tokenHash=crypto.createHash('sha256').update(String(token)).digest('hex');
+  if(tokenHash !== u.reset_token_hash) return res.status(400).json({error:'Invalid or expired reset link.'});
+  db.prepare('UPDATE customers SET password_hash=?, reset_token_hash=NULL, reset_token_expires=NULL WHERE id=?')
+    .run(bcrypt.hashSync(String(password),12), u.id);
+  res.json({ok:true, message:'Password updated. You can now log in.'});
 });
 app.get('/api/categories',(req,res)=>res.json(db.prepare('SELECT * FROM categories WHERE active=1 ORDER BY sort_order,name_en').all()));
 app.post('/api/categories',adminAuth('categories','write'),(req,res)=>{ const r=db.prepare('INSERT INTO categories(name_en,name_ar,active,sort_order) VALUES(?,?,?,?)').run(req.body.name_en,req.body.name_ar||'',req.body.active!==false?1:0,req.body.sort_order||0); res.json(db.prepare('SELECT * FROM categories WHERE id=?').get(r.lastInsertRowid)); });

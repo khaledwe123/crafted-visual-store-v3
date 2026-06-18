@@ -1,6 +1,12 @@
 (function(){
   window.CV_ANALYTICS_READY = false;
+
+  function hasAnalyticsConsent(){
+    try{ return localStorage.getItem('cv_consent_analytics') === 'granted'; }catch(e){ return false; }
+  }
+
   async function loadCVAnalytics(){
+    if(!hasAnalyticsConsent()) return;
     try{
       var local = localStorage.getItem('cms_settings');
       var settings = local ? JSON.parse(local) : await fetch('settings.json').then(function(r){ return r.json(); });
@@ -39,4 +45,6 @@
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCVAnalytics);
   else loadCVAnalytics();
+
+  window.addEventListener('cv-consent-updated', loadCVAnalytics);
 })();

@@ -8,8 +8,10 @@ CREATE TABLE IF NOT EXISTS admin_users(
 );
 CREATE TABLE IF NOT EXISTS customers(
  id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE, mobile TEXT, password_hash TEXT,
- city TEXT, address TEXT, notes TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+ city TEXT, address TEXT, notes TEXT, reset_token_hash TEXT, reset_token_expires TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS reset_token_hash TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS reset_token_expires TEXT;
 CREATE TABLE IF NOT EXISTS categories(
  id SERIAL PRIMARY KEY, name_en TEXT NOT NULL UNIQUE, name_ar TEXT, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER DEFAULT 0
 );
